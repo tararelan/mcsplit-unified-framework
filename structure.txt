@@ -1,0 +1,6 @@
+The key design principle is that graph.h, common.h, and main.cpp are shared by everything. Each algorithm file implements a single solve() function with the same signature. main.cpp reads the graphs, parses arguments, and dispatches to whichever algorithm was selected via a command line flag like --algorithm mcsplit.
+
+
+Running and compiling requires
+wsl
+g++ -std=c++17 -c [filename].cpp -o [filename].o
