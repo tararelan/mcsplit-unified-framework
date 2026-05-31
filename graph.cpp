@@ -2,6 +2,7 @@
 
 #include "graph.h"
 #include <stdexcept>
+#include <climits>
 
 // Constructor
 Graph::Graph(unsigned int n): n(n), adjmat(n, std::vector<unsigned int>(n, 0)), label(n, 0), degree(nullptr), adjlist(nullptr) {}
@@ -20,19 +21,29 @@ Graph::~Graph() {
 	}
 }
 
-static void add_edge(Graph& g, int v, int w, unsigned int edge_val, bool directed) {
-	if (v != w) {
-		if (directed) {
-			g.adjmat[v][w] |= edge_val;
-			g.adjmat[w][v] |= (edge_val << 16);
-		} else {
-			g.adjmat[v][w] |= edge_val;
-			g.adjmat[w][v] |= edge_val;
-		}
-	} else {
-		// loop: set most significant bit of vertex label
-		g.label[v] |= (1u << 31);
-	}
+static void add_edge(Graph& g, int v, int w, unsigned int edge_val, bool directed, bool edge_labelled) {
+    if (v != w) {
+        if (edge_labelled) {
+            if (directed) {
+                g.adjmat[v][w] |= edge_val;
+                g.adjmat[w][v] |= (edge_val << 16);
+            } else {
+                g.adjmat[v][w] = edge_val;
+                g.adjmat[w][v] = edge_val;
+            }
+        } else {
+            if (directed) {
+                g.adjmat[v][w] |= 1;
+                g.adjmat[w][v] |= 2;
+            } else {
+                g.adjmat[v][w] = 1;
+                g.adjmat[w][v] = 1;
+            }
+        }
+    } else {
+        // loop: set most significant bit of vertex label
+        g.label[v] |= (1u << (sizeof(unsigned int) * CHAR_BIT - 1));
+    }
 }
 
 Graph induced_subgraph(Graph& g, std::vector<int> vv) {
@@ -89,7 +100,7 @@ static Graph readBinaryGraph(char* filename, bool directed, bool labelled) {
 		for (int j = 0; j < len; j++) {
 			int target = read_word(f);
 			int label = (read_word(f) >> (16 - k1)) + 1;
-			add_edge(g, i, target, labelled ? label : 1, directed);
+			add_edge(g, i, target, labelled ? label : 1, directed, labelled);
 		}
 	}
 
@@ -121,7 +132,7 @@ static Graph readLadGraph(char* filename, bool directed) {
 			if (fscanf(f, "%d", &w) != 1) {
 				throw std::runtime_error("an edge was not read correctly.");
 			}
-			add_edge(g, i, w, 1, directed);
+			add_edge(g, i, w, 1, directed, false);
 		}
 	}
 	fclose(f);
@@ -158,7 +169,7 @@ static Graph readDimacsGraph(char* filename, bool directed, bool labelled) {
 					if (sscanf(line, "e %d %d", &v, &w) != 2) {
 						throw std::runtime_error("Error reading e line.");
 					}
-					add_edge(*g, v-1, w-1, 1, directed);
+					add_edge(*g, v-1, w-1, 1, directed, labelled);
 					edges_read++;
 					break;
 				}
