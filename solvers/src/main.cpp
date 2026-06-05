@@ -1,4 +1,4 @@
-#define _GNU_SOURCE
+// #define _GNU_SOURCE
 
 #include "graph.h"
 #include "common.h"
@@ -11,8 +11,10 @@
 #include <atomic>
 #include <argp.h>
 
-// Forward declaration
+// Forward declarations
 std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway,
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout);
+std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout);
 
 /*******************************************************************************
@@ -29,6 +31,7 @@ static struct argp_option options[] = {
     {"labelled",        'a', 0,         0, "Use edge and vertex labels"},
     {"vertex-labelled", 'x', 0,         0, "Use vertex labels only"},
     {"timeout",         't', "timeout", 0, "Timeout in seconds"},
+    {"algorithm",       'A', "algo",    0, "Algorithm: mcsplit (default), dal"},
     { 0 }
 };
 
@@ -40,6 +43,7 @@ static struct {
     bool edge_labelled = false;
     bool vertex_labelled = false;
     int timeout = 0;
+    std::string algorithm = "mcsplit";
     char* filename1 = nullptr;
     char* filename2 = nullptr;
     int arg_num = 0;
@@ -54,6 +58,7 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
         case 'a': arguments.edge_labelled = true; arguments.vertex_labelled = true; break;
         case 'x': arguments.vertex_labelled = true; break;
         case 't': arguments.timeout = std::stoi(arg); break;
+        case 'A': arguments.algorithm = arg; break;
         case ARGP_KEY_ARG:
             if (arguments.arg_num == 0) arguments.filename1 = arg;
             else if (arguments.arg_num == 1) arguments.filename2 = arg;
@@ -77,13 +82,15 @@ static struct argp argp = { options, parse_opt, args_doc, doc };
 int main(int argc, char** argv) {
     argp_parse(&argp, argc, argv, 0, 0, 0);
 
+    if (!arguments.quiet)
+        std::cerr << "# solution_size solution_edges nodes time_elapsed aborted root_ub nodes_to_best time_to_best cut_branches bound_pruned sym_pruned conflicts" << std::endl;
+
     char format = arguments.dimacs ? 'D' : arguments.lad ? 'L' : 'B';
     Graph g = readGraph(arguments.filename1, format, arguments.directed,
             arguments.edge_labelled, arguments.vertex_labelled);
     Graph h = readGraph(arguments.filename2, format, arguments.directed,
             arguments.edge_labelled, arguments.vertex_labelled);
 
-    // Always put smaller graph on left
     if (g.n > h.n) std::swap(g, h);
 
     if (!arguments.quiet) {
@@ -91,7 +98,6 @@ int main(int argc, char** argv) {
         std::cout << h.n << " vertices" << std::endl;
     }
 
-    // Timeout setup
     std::atomic<bool> abort_due_to_timeout(false);
     std::thread timeout_thread;
     std::mutex timeout_mutex;
@@ -115,13 +121,25 @@ int main(int argc, char** argv) {
 
     bool multiway = arguments.directed || arguments.edge_labelled;
 
-    // Run search
     auto start = std::chrono::steady_clock::now();
     Stats stats;
-    std::vector<VtxPair> solution = mcs(g, h, multiway, stats, abort_due_to_timeout);
+    std::vector<VtxPair> solution;
+
+    if (arguments.algorithm == "dal")
+        solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout);
+    else
+        solution = mcs(g, h, multiway, stats, abort_due_to_timeout);
+
     auto stop = std::chrono::steady_clock::now();
     stats.time_elapsed = std::chrono::duration<double>(stop - start).count();
     stats.aborted = aborted;
+
+    // Count edges in solution
+    int solution_edges = 0;
+    for (int i = 0; i < (int)solution.size(); i++)
+        for (int j = i + 1; j < (int)solution.size(); j++)
+            if (g.adjmat[solution[i].v][solution[j].v])
+                solution_edges++;
 
     // Clean up timeout thread
     if (timeout_thread.joinable()) {
@@ -133,11 +151,18 @@ int main(int argc, char** argv) {
         timeout_thread.join();
     }
 
-    // Output: solution_size nodes time_elapsed aborted
     std::cout << solution.size() << " "
+              << solution_edges << " "
               << stats.nodes << " "
               << stats.time_elapsed << " "
-              << stats.aborted << std::endl;
+              << stats.aborted << " "
+              << stats.root_upper_bound << " "
+              << stats.nodes_to_best << " "
+              << stats.time_to_best << " "
+              << stats.cut_branches << " "
+              << stats.bound_pruned << " "
+              << stats.sym_pruned << " "
+              << stats.conflicts << std::endl;
 
     return 0;
 }

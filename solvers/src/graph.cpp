@@ -1,8 +1,9 @@
-#define _GNU_SOURCE
+// #define _GNU_SOURCE
 
 #include "graph.h"
 #include <stdexcept>
 #include <climits>
+#include <algorithm>
 
 // Constructor
 Graph::Graph(unsigned int n): n(n), adjmat(n, std::vector<unsigned int>(n, 0)), label(n, 0), degree(nullptr), adjlist(nullptr) {}
@@ -255,4 +256,31 @@ void GetEqClass(Graph& g, ui*& EqClass) {
 			}
 		}
 	}
+}
+
+void pack_leaves(Graph& g) {
+    std::vector<int> deg(g.n, 0);
+    for (int i = 0; i < g.n; i++)
+        for (int j = 0; j < g.n; j++)
+            if (i != j && g.adjmat[i][j])
+                deg[i]++;
+
+    for (int u = 0; u < g.n; u++) {
+        for (int v = 0; v < g.n; v++) {
+            if (g.adjmat[u][v] && u != v && deg[v] == 1) {
+                std::pair<unsigned int, unsigned int> labels(g.adjmat[u][v], g.label[v]);
+                int pos = -1;
+                for (int k = 0; ; k++) {
+                    if (k == (int)g.leaves[u].size())
+                        g.leaves[u].push_back(std::make_pair(labels, std::vector<int>()));
+                    if (g.leaves[u][k].first == labels) {
+                        pos = k;
+                        break;
+                    }
+                }
+                g.leaves[u][pos].second.push_back(v);
+            }
+        }
+        std::sort(g.leaves[u].begin(), g.leaves[u].end());
+    }
 }

@@ -25,3 +25,6 @@ Graph induced_subgraph(Graph& g, std::vector<int> vv);
 Graph readGraph(char* filename, char format, bool directed, bool edge_labelled, bool vertex_labelled);
 void set_adjlist(Graph& g);
 void GetEqClass(Graph& g, ui*& EqClass);
+
+// Needed for DAL & and LL for LUM
+void pack_leaves(Graph& g);

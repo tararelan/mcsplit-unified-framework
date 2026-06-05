@@ -32,6 +32,7 @@ struct Stats {
     double time_to_best = 0.0;             // time to find incumbent solution
     unsigned long long nodes_to_best = 0;  // nodes when incumbent was found
     int incumbent_size = 0;                // size of best solution found
+	int solution_edges = 0;  // number of edges in the common subgraph
     double root_upper_bound = 0.0;         // upper bound at root node
     bool aborted = false;                  // true if timeout was reached
 };
