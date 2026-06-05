@@ -10,9 +10,6 @@ REF_SYMSPLIT="./reference/symsplit/bin/run.o"
 # Unified binary
 UNIFIED="./solvers/bin/mcsp"
 
-# Output goes to results/
-OUTPUT="results/validation_results_${ALGO}.csv"
-
 # Parse -f flag
 SINGLE_FILE=""
 if [ "$1" == "-f" ]; then
@@ -24,6 +21,9 @@ else
     NUM="${3:-1}"
     PATTERN="${4:-*.A00}"
 fi
+
+# Output goes to results/
+OUTPUT="results/validation_results_${ALGO}.csv"
 
 # Select reference binary and command based on algorithm
 case "$ALGO" in

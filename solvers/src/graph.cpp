@@ -231,31 +231,57 @@ void set_adjlist(Graph &g) {
 	}
 }
 
+// void GetEqClass(Graph& g, ui*& EqClass) {
+// 	EqClass = new ui[g.n];
+// 	for (int i = 0; i < g.n; i++) {
+// 		EqClass[i] = i;
+// 	}
+// 	for (int i = 0; i < g.n; i++) {
+// 		for (int j = i + 1; j < g.n; j++) {
+// 			if (EqClass[j] != (ui)j) {
+// 				continue;
+// 			}
+// 			bool equiv = true;
+// 			for (int k = 0; k < g.n; k++) {
+// 				if (k == i || k == j) {
+// 					continue;
+// 				}
+// 				if (g.adjmat[i][k] != g.adjmat[j][k]) {
+// 					equiv = false;
+// 					break;
+// 				}
+// 			}
+// 			if (equiv) {
+// 				EqClass[j] = i;
+// 			}
+// 		}
+// 	}
+// }
+
 void GetEqClass(Graph& g, ui*& EqClass) {
-	EqClass = new ui[g.n];
-	for (int i = 0; i < g.n; i++) {
-		EqClass[i] = i;
-	}
-	for (int i = 0; i < g.n; i++) {
-		for (int j = i + 1; j < g.n; j++) {
-			if (EqClass[j] != (ui)j) {
-				continue;
-			}
-			bool equiv = true;
-			for (int k = 0; k < g.n; k++) {
-				if (k == i || k == j) {
-					continue;
-				}
-				if (g.adjmat[i][k] != g.adjmat[j][k]) {
-					equiv = false;
-					break;
-				}
-			}
-			if (equiv) {
-				EqClass[j] = i;
-			}
-		}
-	}
+    ui graph_size = g.n, label = 1, node = 0, node_neg = 0, node_nneg;
+    EqClass = new ui[graph_size];
+    bool equiv = true;
+    for (ui i = 0; i < graph_size; i++) { EqClass[i] = 0; }
+    for (ui i = 0; i < graph_size; i++) {
+        if (EqClass[i] != 0 || g.degree[i] == 0) { continue; }
+        node = g.adjlist[i][0];
+        for (ui j = 0; j < g.degree[node]; j++) {
+            node_neg = g.adjlist[node][j];
+            if (g.degree[i] == g.degree[node_neg] && node_neg > i) {
+                equiv = true;
+                for (ui k = 0; k < g.degree[node_neg]; k++) {
+                    node_nneg = g.adjlist[node_neg][k];
+                    if (node_nneg != i && g.adjmat[i][node_nneg] == 0) {
+                        equiv = false; break;
+                    }
+                }
+                if (equiv) { EqClass[node_neg] = label; }
+            }
+        }
+        EqClass[i] = label;
+        ++label;
+    }
 }
 
 void pack_leaves(Graph& g) {

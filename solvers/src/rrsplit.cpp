@@ -1,0 +1,374 @@
+// #define _GNU_SOURCE
+
+#include "graph.h"
+#include "common.h"
+#include <algorithm>
+#include <numeric>
+#include <vector>
+#include <chrono>
+#include <atomic>
+#include <limits.h>
+#include <iostream>
+
+// Forward declarations
+static int calc_bound(const std::vector<Bidomain>& domains);
+static void remove_bidomain(std::vector<Bidomain>& domains, int idx);
+static int select_bidomain(const std::vector<Bidomain>& domains, const std::vector<int>& left, int current_matching_size);
+static int find_min_value(const std::vector<int>& arr, int start_idx, int len);
+static int index_of_next_smallest(const std::vector<int>& arr, int start_idx, int len, int w);
+int partition_rr(std::vector<int>& all_vv, int start, int len, const std::vector<unsigned int>& adjrow);
+int partition_right_rr(std::vector<int>& all_vv, int start, int len, const std::vector<unsigned int>& adjrow, std::vector<int>& index_right);
+int partition_sparse_rr(std::vector<int>& all_vv, int start, int len, int degree, const unsigned int* adjlist, std::vector<int>& index_right);
+std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vector<int>& left, std::vector<int>& right, const Graph& g, const Graph& h, int v, int w, bool& best_match, std::vector<int>& index_right);
+void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, const ui* EqClass, std::vector<int>& index_right);
+std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h, Stats& stats, std::atomic<bool>& abort_due_to_timeout);
+
+static int calc_bound(const std::vector<Bidomain>& domains) {
+    int bound = 0;
+    for (const Bidomain& bd : domains) {
+        bound += std::min(bd.left_len, bd.right_len);
+    }
+    return bound;
+}
+
+static void remove_bidomain(std::vector<Bidomain>& domains, int idx) {
+    domains[idx] = domains[domains.size() - 1];
+    domains.pop_back();
+}
+
+static int find_min_value(const std::vector<int>& arr, int start_idx, int len) {
+    int min_v = INT_MAX;
+    for (int i = 0; i < len; i++) {
+        if (arr[start_idx + i] < min_v) {
+            min_v = arr[start_idx + i];
+        }
+    }
+    return min_v;
+}
+
+static int select_bidomain(const std::vector<Bidomain>& domains, const std::vector<int>& left, int current_matching_size) {
+    int min_size = INT_MAX;
+    int min_tie_breaker = INT_MAX;
+    int best = -1;
+    for (unsigned int i = 0; i < domains.size(); i++) {
+        const Bidomain& bd = domains[i];
+        int len = std::max(bd.left_len, bd.right_len);
+        if (len < min_size) {
+            min_size = len;
+            min_tie_breaker = find_min_value(left, bd.l, bd.left_len);
+            best = i;
+        } else if (len == min_size) {
+            int tie_breaker = find_min_value(left, bd.l, bd.left_len);
+            if (tie_breaker < min_tie_breaker) {
+                min_tie_breaker = tie_breaker;
+                best = i;
+            }
+        }
+    }
+    return best;
+}
+
+// Returns index of smallest value in arr[start_idx..start_idx+len-1] that is > w.
+static int index_of_next_smallest(const std::vector<int>& arr, int start_idx, int len, int w) {
+    int idx = -1;
+    int smallest = INT_MAX;
+    for (int i = 0; i < len; i++) {
+        if (arr[start_idx + i] > w && arr[start_idx + i] < smallest) {
+            smallest = arr[start_idx + i];
+            idx = i;
+        }
+    }
+    return idx;
+}
+
+int partition_rr(std::vector<int>& all_vv, int start, int len, const std::vector<unsigned int>& adjrow) {
+    int i = 0;
+    for (int j = 0; j < len; j++) {
+        if (adjrow[all_vv[start + j]]) {
+            std::swap(all_vv[start + i], all_vv[start + j]);
+            i++;
+        }
+    }
+    return i;
+}
+
+int partition_right_rr(std::vector<int>& all_vv, int start, int len,
+        const std::vector<unsigned int>& adjrow, std::vector<int>& index_right) {
+    int i = 0;
+    for (int j = 0; j < len; j++) {
+        if (adjrow[all_vv[start + j]]) {
+            std::swap(index_right[all_vv[start + i]], index_right[all_vv[start + j]]);
+            std::swap(all_vv[start + i], all_vv[start + j]);
+            i++;
+        }
+    }
+    return i;
+}
+
+int partition_sparse_rr(std::vector<int>& all_vv, int start, int len,
+        int degree, const unsigned int* adjlist, std::vector<int>& index_right) {
+    int j = 0;
+    for (int i = 0; i < degree; i++) {
+        int pos = index_right[adjlist[i]];
+        if (pos >= start && pos < start + len) {
+            std::swap(index_right[all_vv[start + j]], index_right[all_vv[pos]]);
+            std::swap(all_vv[start + j], all_vv[pos]);
+            j++;
+        }
+    }
+    return j;
+}
+
+std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vector<int>& left,
+        std::vector<int>& right, const Graph& g, const Graph& h, int v, int w,
+        bool& best_match, std::vector<int>& index_right) {
+    std::vector<Bidomain> new_d;
+    new_d.reserve(d.size());
+    unsigned int ccount = 0;
+
+    for (const Bidomain& old_bd : d) {
+        int l = old_bd.l;
+        int r = old_bd.r;
+
+        int left_len = partition_rr(left, l, old_bd.left_len, g.adjmat[v]);
+
+        int right_len;
+        if (old_bd.right_len > (int)h.degree[w]) {
+            right_len = partition_sparse_rr(right, r, old_bd.right_len, h.degree[w], h.adjlist[w], index_right);
+        } else {
+            right_len = partition_right_rr(right, r, old_bd.right_len, h.adjmat[w], index_right);
+        }
+
+        int left_len_noedge = old_bd.left_len - left_len;
+        int right_len_noedge = old_bd.right_len - right_len;
+
+        if ((left_len == 0 && right_len == 0) ||
+            (left_len_noedge == 0 && right_len_noedge == 0) ||
+            old_bd.left_len == 0) {
+            ccount++;
+        }
+
+        if (left_len_noedge && right_len_noedge) {
+            new_d.push_back({l + left_len, r + right_len, left_len_noedge, right_len_noedge, old_bd.is_adjacent});
+        }
+        if (left_len && right_len) {
+            new_d.push_back({l, r, left_len, right_len, true});
+        }
+    }
+
+    best_match = (ccount == d.size());
+    return new_d;
+}
+
+void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
+        std::vector<VtxPair>& current, std::vector<Bidomain>& domains,
+        std::vector<int>& left, std::vector<int>& right, unsigned int goal,
+        Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time,
+        std::atomic<bool>& abort_due_to_timeout, const ui* EqClass,
+        std::vector<int>& index_right) {
+
+    if (abort_due_to_timeout) { return; }
+
+    if (current.size() > incumbent.size()) {
+        incumbent = current;
+        stats.incumbent_size = incumbent.size();
+        stats.nodes_to_best = stats.nodes;
+        stats.time_to_best = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - start_time).count();
+    }
+
+    int bound = current.size() + calc_bound(domains);
+    if (bound <= (int)incumbent.size() || bound < (int)goal) {
+        stats.cut_branches++;
+        stats.bound_pruned++;
+        return;
+    }
+
+    int bd_idx = select_bidomain(domains, left, current.size());
+    if (bd_idx == -1) { return; }
+
+    Bidomain& bd = domains[bd_idx];
+
+    int v = find_min_value(left, bd.l, bd.left_len);
+
+    {
+        int i = 0;
+        while (left[bd.l + i] != v) { i++; }
+        std::swap(left[bd.l + i], left[bd.l + bd.left_len - 1]);
+        bd.left_len--;
+    }
+
+    // Vertex-equivalence reduction: find largest w already matched to
+    // an equivalent vertex, skip all w <= that value
+    int w_lower = -1;
+    for (const VtxPair& a : current) {
+        if (EqClass[a.v] == EqClass[v] && w_lower < a.w) {
+            w_lower = a.w;
+        }
+    }
+
+    bd.right_len--;
+
+    // Tighter equivalence-class bound check (from reference):
+    // If w_lower > 0, an equivalent vertex was already matched.
+    // Count equivalent left vertices and right vertices > w_lower.
+    // If the bound adjusted for the equivalence class imbalance cannot
+    // beat the incumbent, prune before counting this as a node.
+    if (w_lower > 0) {
+        int count_left = 0, count_right = 0;
+        for (int i = bd.left_len; i >= 0; --i) {
+            if (EqClass[left[bd.l + i]] == EqClass[v]) { count_left++; }
+        }
+        for (int i = bd.right_len; i >= 0; --i) {
+            if (right[bd.r + i] > w_lower) { count_right++; }
+        }
+        if (bd.left_len <= bd.right_len && count_left > count_right) {
+            if (bound + count_right - count_left <= (int)incumbent.size()) {
+                bd.right_len++;
+                left[bd.l + bd.left_len] = v;
+                bd.left_len++;
+                stats.sym_pruned++;
+                return;
+            }
+        }
+        if (bd.left_len > bd.right_len && (bd.right_len - count_right) > (bd.left_len - count_left)) {
+            if (bound + (bd.left_len - count_left) - (bd.right_len - count_right) <= (int)incumbent.size()) {
+                bd.right_len++;
+                left[bd.l + bd.left_len] = v;
+                bd.left_len++;
+                stats.sym_pruned++;
+                return;
+            }
+        }
+    }
+
+    int w = w_lower;
+
+    stats.nodes++;
+
+#ifdef DEBUG_RR
+    if (stats.nodes <= 5) {
+        std::cerr << "NODE " << stats.nodes
+                  << " current=" << current.size()
+                  << " bound=" << bound
+                  << " v=" << v
+                  << " EqClass[v]=" << EqClass[v]
+                  << " w_lower=" << w_lower
+                  << " bd.left_len=" << bd.left_len
+                  << " bd.right_len=" << (bd.right_len + 1)
+                  << std::endl;
+    }
+#endif
+
+    bool best_match = false;
+    for (int i = bd.right_len; i >= 0; --i) {
+        int idx = index_of_next_smallest(right, bd.r, bd.right_len + 1, w);
+        if (idx == -1) { break; }
+        w = right[bd.r + idx];
+
+        std::swap(index_right[w], index_right[right[bd.r + bd.right_len]]);
+        right[bd.r + idx] = right[bd.r + bd.right_len];
+        right[bd.r + bd.right_len] = w;
+
+        auto new_domains = filter_domains_rr(domains, left, right, g, h, v, w,
+                best_match, index_right);
+        current.push_back(VtxPair(v, w));
+        solve_rr(g, h, incumbent, current, new_domains, left, right, goal,
+                stats, start_time, abort_due_to_timeout, EqClass, index_right);
+        current.pop_back();
+
+        // Maximality reduction: if best_match, current solution is optimal here
+        if (best_match || bound <= (int)incumbent.size()) {
+            stats.sym_pruned++;
+            break;
+        }
+    }
+
+    bd.right_len++;
+
+    // Vertex-equivalence reduction (exclude branch):
+    // Remove all G-vertices equivalent to v — their branches are isomorphic
+    for (int i = 0; i < bd.left_len; i++) {
+        if (EqClass[left[bd.l + i]] == EqClass[v]) {
+            std::swap(left[bd.l + i], left[bd.l + bd.left_len - 1]);
+            bd.left_len--;
+            i--;
+            stats.sym_pruned++;
+        }
+    }
+
+    if (bd.left_len == 0) { remove_bidomain(domains, bd_idx); }
+
+    solve_rr(g, h, incumbent, current, domains, left, right, goal,
+            stats, start_time, abort_due_to_timeout, EqClass, index_right);
+}
+
+std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout) {
+
+    auto calc_degrees = [](const Graph& g) {
+        std::vector<int> degree(g.n, 0);
+        for (int v = 0; v < g.n; v++) {
+            for (int w = 0; w < g.n; w++) {
+                if (g.adjmat[v][w] & 1) { degree[v]++; }
+            }
+        }
+        return degree;
+    };
+
+    std::vector<int> g_deg = calc_degrees(g);
+    std::vector<int> h_deg = calc_degrees(h);
+
+    // Reference uses sum < n*(n-1) for density (not /2)
+    auto sum_vec = [](const std::vector<int>& v) {
+        int s = 0; for (int x : v) { s += x; } return s;
+    };
+
+    bool g1_dense = sum_vec(h_deg) < h.n * (h.n - 1);
+    bool g0_dense = sum_vec(g_deg) < g.n * (g.n - 1);
+
+    std::vector<int> vv0(g.n), vv1(h.n);
+    std::iota(vv0.begin(), vv0.end(), 0);
+    std::iota(vv1.begin(), vv1.end(), 0);
+    std::stable_sort(vv0.begin(), vv0.end(), [&](int a, int b) {
+        return !g1_dense ? (g_deg[a] < g_deg[b]) : (g_deg[a] > g_deg[b]);
+    });
+    std::stable_sort(vv1.begin(), vv1.end(), [&](int a, int b) {
+        return !g0_dense ? (h_deg[a] < h_deg[b]) : (h_deg[a] > h_deg[b]);
+    });
+
+    Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
+    Graph h_sorted = induced_subgraph(const_cast<Graph&>(h), vv1);
+
+    set_adjlist(g_sorted);
+    set_adjlist(h_sorted);
+
+    ui* EqClass = nullptr;
+    GetEqClass(g_sorted, EqClass);
+
+    std::vector<int> index_right(h_sorted.n);
+    for (int i = 0; i < h_sorted.n; i++) { index_right[i] = i; }
+
+    // Single bidomain — reference does not split by label
+    std::vector<int> left, right;
+    for (int i = 0; i < g_sorted.n; i++) { left.push_back(i); }
+    for (int i = 0; i < h_sorted.n; i++) { right.push_back(i); }
+    std::vector<Bidomain> domains;
+    domains.push_back({0, 0, g_sorted.n, h_sorted.n, false});
+
+    stats.root_upper_bound = calc_bound(domains);
+
+    std::vector<VtxPair> incumbent, current;
+    auto start_time = std::chrono::steady_clock::now();
+    solve_rr(g_sorted, h_sorted, incumbent, current, domains, left, right, 1,
+            stats, start_time, abort_due_to_timeout, EqClass, index_right);
+
+    delete[] EqClass;
+
+    for (auto& p : incumbent) {
+        p.v = vv0[p.v];
+        p.w = vv1[p.w];
+    }
+
+    return incumbent;
+}
