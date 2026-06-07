@@ -20,6 +20,8 @@ std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout);
 std::vector<VtxPair> mcs_sym(const Graph& g, const Graph& h,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout);
+std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout);
 
 /*******************************************************************************
                              Command-line arguments
@@ -135,6 +137,8 @@ int main(int argc, char** argv) {
 		solution = mcs_rr(g, h, stats, abort_due_to_timeout);
 	else if (arguments.algorithm == "symsplit")
 		solution = mcs_sym(g, h, stats, abort_due_to_timeout);
+	else if (arguments.algorithm == "ll")
+		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout);
     else
         solution = mcs(g, h, multiway, stats, abort_due_to_timeout);
 
