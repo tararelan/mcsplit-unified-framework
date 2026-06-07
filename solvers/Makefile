@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -O3 -march=native -Wall -std=c++17 -pthread -DDEBUG_RR
 
-SRC = src/main.cpp src/mcsplit.cpp src/mcsplit-dal.cpp src/rrsplit.cpp src/symsplit.cpp src/mcsplit-ll.cpp src/graph.cpp
+SRC = src/main.cpp src/mcsplit.cpp src/mcsplit-dal.cpp src/rrsplit.cpp src/symsplit.cpp src/mcsplit-ll.cpp src/mcsplit-dsb.cpp src/graph.cpp
 
 all: bin/mcsp
 

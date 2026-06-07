@@ -12,13 +12,17 @@ struct VtxPair {
 
 // A label class: paired sets of vertices from G and H sharing the same label
 struct Bidomain {
-	int l;	// start index of left set in left buffer
-	int r;	// start index of right set in right buffer
-	int left_len;
-	int right_len;
-	bool is_adjacent;
-	Bidomain(int l, int r, int left_len, int right_len, bool is_adjacent):
-		l(l), r(r), left_len(left_len), right_len(right_len), is_adjacent(is_adjacent) {}
+    int l;
+    int r;
+    int left_len;
+    int right_len;
+    bool is_adjacent;
+    int size = -1;
+    bool is_valid = false;
+    Bidomain(int l, int r, int left_len, int right_len, bool is_adjacent):
+        l(l), r(r), left_len(left_len), right_len(right_len), is_adjacent(is_adjacent) {}
+    Bidomain(int l, int r, int left_len, int right_len, bool is_adjacent, int size, bool is_valid):
+        l(l), r(r), left_len(left_len), right_len(right_len), is_adjacent(is_adjacent), size(size), is_valid(is_valid) {}
 };
 
 // Statistics collected during search

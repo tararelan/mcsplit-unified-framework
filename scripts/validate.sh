@@ -46,14 +46,14 @@ case "$ALGO" in
         }
         ;;
     dsb)
-        REF_BIN="$REF_DSB"
-        REF_CMD() { $REF_BIN min_max -q "$1" "$2" 2>/dev/null; }
-        parse_ref() {
-            ref_size=$(echo "$1" | awk -F',' '{print $1}')
-            ref_edges="N/A"
-            ref_nodes=$(echo "$1" | awk -F',' '{print $5}')
-        }
-        ;;
+		REF_BIN="$REF_DSB"
+		REF_CMD() { $REF_BIN min_max -q "$1" "$2" 2>/dev/null; }
+		parse_ref() {
+			ref_size=$(echo "$1" | awk -F',' '{print $1}' | tr -d ' ')
+			ref_edges="N/A"
+			ref_nodes=$(echo "$1" | awk -F',' '{print $5}' | tr -d ' ')
+		}
+		;;
     ll)
         REF_BIN="$REF_LL"
         REF_CMD() { $REF_BIN min_max -q "$1" "$2" 2>/dev/null; }
