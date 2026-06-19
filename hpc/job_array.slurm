@@ -1,8 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=mcs_{ALGO}
-#SBATCH --array=0-{NJOBS}%500
-#SBATCH --time=00:12:00
-#SBATCH --mem=64G
+#SBATCH --partition=large-short
+#SBATCH --array=0-{NJOBS}%200
+#SBATCH --time=00:18:00
+#SBATCH --mem=36G
 #SBATCH --cpus-per-task=1
 #SBATCH --output=hpc/logs/{ALGO}_%A_%a.out
 #SBATCH --error=hpc/logs/{ALGO}_%A_%a.err

@@ -113,16 +113,18 @@ INSTANCE_DIRS=(
     "instances/MIVIA/mcs90/rand/r005"
     "instances/MIVIA/mcs90/rand/r01"
     "instances/MIVIA/mcs90/rand/r02"
+    # TODO: paste SIP directories here once you run:
+    # find instances/SIP -name "*.A*" | sed 's|/[^/]*$||' | sort -u
 )
 
 mkdir -p hpc/logs
 
 for ALGO in $ALGOS; do
-    # Build instance list
     LIST="hpc/instances_${ALGO}.txt"
     rm -f $LIST
     for DIR in "${INSTANCE_DIRS[@]}"; do
         for A in $DIR/*.A*; do
+            [ -f "$A" ] || continue
             B="${A/.A/.B}"
             if [ -f "$B" ]; then
                 echo "$A $B" >> $LIST
@@ -131,9 +133,8 @@ for ALGO in $ALGOS; do
     done
 
     NJOBS=$(wc -l < $LIST)
-    NJOBS=$((NJOBS - 1))  # 0-indexed
+    NJOBS=$((NJOBS - 1))
 
-    # Generate job script from template
     SCRIPT="hpc/job_${ALGO}.slurm"
     sed "s/{ALGO}/$ALGO/g; s/{NJOBS}/$NJOBS/g" hpc/job_array.slurm > $SCRIPT
 
