@@ -6,7 +6,7 @@
 #include <algorithm>
 
 // Constructor
-Graph::Graph(unsigned int n): n(n), adjmat(n, std::vector<unsigned int>(n, 0)), label(n, 0), degree(nullptr), adjlist(nullptr) {}
+Graph::Graph(unsigned int n): n(n), adjmat(n, std::vector<unsigned int>(n, 0)), label(n, 0), degree(nullptr), adjlist(nullptr), leaves(n) {}
 
 // Destructor
 // Needs to free degree and adjlist if they were allocated

@@ -113,8 +113,6 @@ INSTANCE_DIRS=(
     "instances/MIVIA/mcs90/rand/r005"
     "instances/MIVIA/mcs90/rand/r01"
     "instances/MIVIA/mcs90/rand/r02"
-    # TODO: paste SIP directories here once you run:
-    # find instances/SIP -name "*.A*" | sed 's|/[^/]*$||' | sort -u
 )
 
 mkdir -p hpc/logs
@@ -123,7 +121,7 @@ for ALGO in $ALGOS; do
     LIST="hpc/instances_${ALGO}.txt"
     rm -f $LIST
     for DIR in "${INSTANCE_DIRS[@]}"; do
-        for A in $DIR/*.A*; do
+        for A in $DIR/*.A0[0-9]; do
             [ -f "$A" ] || continue
             B="${A/.A/.B}"
             if [ -f "$B" ]; then
