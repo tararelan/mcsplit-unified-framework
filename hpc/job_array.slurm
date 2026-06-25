@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=mcs_{ALGO}
 #SBATCH --partition=large-short
-#SBATCH --array=0-{NJOBS}%200
+#SBATCH --array=0-{NJOBS}%168
 #SBATCH --time=00:40:00
 #SBATCH --mem=36G
 #SBATCH --cpus-per-task=1

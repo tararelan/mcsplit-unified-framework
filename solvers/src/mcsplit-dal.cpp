@@ -12,6 +12,7 @@
 #include <condition_variable>
 #include <atomic>
 #include <limits.h>
+#include <iterator>
 
 using gtype = double;
 const int short_memory_threshold = 1e5;       // decay threshold for short-term RL scores
@@ -26,7 +27,7 @@ int partition_dal(std::vector<int>& all_vv, int start, int len, const std::vecto
 int remove_matched_vertex(std::vector<int>& arr, int start, int len, const std::vector<int>& matched);
 void remove_vtx_from_array(std::vector<int>& arr, int start_idx, int& len, int remove_idx);
 static void remove_bidomain(std::vector<Bidomain>& domains, int idx);
-std::vector<Bidomain> rewardfeed_RL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
+std::vector<Bidomain> rewardfeed_RL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, std::vector<int>& g_matched, std::vector<int>& h_matched, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
 std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& V, std::vector<gtype>& Qv, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
 void solve_dal(const Graph& g, const Graph& h, std::vector<gtype>& V, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, std::vector<std::vector<gtype>>& Q, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, int& M, int& num, int Maxnum, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout);
 std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout);
@@ -149,10 +150,13 @@ int select_bidomain_dal(const std::vector<Bidomain>& domains, const std::vector<
 std::vector<Bidomain> rewardfeed_RL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current,
         std::vector<int>& left, std::vector<int>& right,
         std::vector<gtype>& lgrade, std::vector<gtype>& rgrade,
+        std::vector<int>& g_matched, std::vector<int>& h_matched,
         const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats) {
     std::vector<Bidomain> new_d;
     new_d.reserve(d.size());
     current.push_back(VtxPair(v, w));
+    g_matched[v] = 1;
+    h_matched[w] = 1;
 
     int temp = 0, total = 0;
     for (const Bidomain& old_bd : d) {
@@ -426,7 +430,7 @@ void solve_dal(const Graph& g, const Graph& h,
         // rewardfeed_RL: adds (v,w) to current, splits domains, updates RL scores
         // rewardfeed_DAL: adds (v,w) + leaf matches to current, splits domains, updates DAL scores
         if (M == 1) {
-            new_domains = rewardfeed_RL(domains, current, left, right, lgrade, rgrade, g, h, v, w, multiway, stats);
+            new_domains = rewardfeed_RL(domains, current, left, right, lgrade, rgrade, g_matched, h_matched, g, h, v, w, multiway, stats);
         } else {
             new_domains = rewardfeed_DAL(domains, current, g_matched, h_matched, left, right, V, Q[v], g, h, v, w, multiway, stats);
         }
@@ -478,8 +482,8 @@ std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway,
     int g_edges = 0, h_edges = 0;
     for (int d : g_deg) { g_edges += d; }
     for (int d : h_deg) { h_edges += d; }
-    bool h_dense = h_edges > h.n * (h.n - 1) / 2;
-    bool g_dense = g_edges > g.n * (g.n - 1) / 2;
+    bool h_dense = h_edges > h.n * (h.n - 1);
+    bool g_dense = g_edges > g.n * (g.n - 1);
 
     // Sort vertices: ascending if sparse, descending if dense
     std::vector<int> vv0(g.n), vv1(h.n);

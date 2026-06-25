@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <climits>
 #include <algorithm>
+#include <string>
 
 // Constructor
 Graph::Graph(unsigned int n): n(n), adjmat(n, std::vector<unsigned int>(n, 0)), label(n, 0), degree(nullptr), adjlist(nullptr), leaves(n) {}
@@ -230,33 +231,6 @@ void set_adjlist(Graph &g) {
 		}
 	}
 }
-
-// void GetEqClass(Graph& g, ui*& EqClass) {
-// 	EqClass = new ui[g.n];
-// 	for (int i = 0; i < g.n; i++) {
-// 		EqClass[i] = i;
-// 	}
-// 	for (int i = 0; i < g.n; i++) {
-// 		for (int j = i + 1; j < g.n; j++) {
-// 			if (EqClass[j] != (ui)j) {
-// 				continue;
-// 			}
-// 			bool equiv = true;
-// 			for (int k = 0; k < g.n; k++) {
-// 				if (k == i || k == j) {
-// 					continue;
-// 				}
-// 				if (g.adjmat[i][k] != g.adjmat[j][k]) {
-// 					equiv = false;
-// 					break;
-// 				}
-// 			}
-// 			if (equiv) {
-// 				EqClass[j] = i;
-// 			}
-// 		}
-// 	}
-// }
 
 void GetEqClass(Graph& g, ui*& EqClass) {
     ui graph_size = g.n, label = 1, node = 0, node_neg = 0, node_nneg;

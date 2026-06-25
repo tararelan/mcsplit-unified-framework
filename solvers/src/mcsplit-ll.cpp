@@ -354,8 +354,8 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
     int g_edges = 0, h_edges = 0;
     for (int d : g_deg) { g_edges += d; }
     for (int d : h_deg) { h_edges += d; }
-    bool h_dense = h_edges > h.n * (h.n - 1) / 2;
-    bool g_dense = g_edges > g.n * (g.n - 1) / 2;
+    bool h_dense = h_edges > h.n * (h.n - 1);
+    bool g_dense = g_edges > g.n * (g.n - 1);
 
     // Sort vertices: ascending degree if sparse, descending if dense.
     // Note: LL reference uses > n*(n-1) threshold (same as RRSplit/SymSplit)
