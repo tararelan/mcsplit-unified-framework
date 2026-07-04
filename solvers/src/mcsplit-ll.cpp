@@ -23,8 +23,8 @@ int select_bidomain_ll(const std::vector<Bidomain>& domains, const std::vector<i
 int partition_ll(std::vector<int>& all_vv, int start, int len, const std::vector<unsigned int>& adjrow);
 int remove_matched_vertex_ll(std::vector<int>& arr, int start, int len, const std::vector<int>& matched);
 void remove_vtx_from_array_ll(std::vector<int>& arr, int start_idx, int& len, int remove_idx);
-std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
-void solve_ll(const Graph& g, const Graph& h, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout);
+std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& lgrade, std::vector<gtype>& Qv, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
+void solve_ll(const Graph& g, const Graph& h, std::vector<gtype>& lgrade, std::vector<std::vector<gtype>>& Q, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout);
 std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout);
 
 static int calc_bound_ll(const std::vector<Bidomain>& domains) {
@@ -57,7 +57,8 @@ int selectV_index_ll(const std::vector<int>& arr, const std::vector<gtype>& grad
     return idx;
 }
 
-// Selects w with highest score, skipping already-tried vertices.
+// Selects w with highest per-pair score St(v,w), skipping already-tried vertices.
+// Uses Qv = Q[v] (the row of the per-pair score table for the current v).
 int selectW_index_ll(const std::vector<int>& arr, const std::vector<gtype>& grade,
         int start_idx, int len, const std::vector<int>& wselected) {
     int idx = -1;
@@ -110,7 +111,6 @@ int partition_ll(std::vector<int>& all_vv, int start, int len,
 }
 
 // Removes already-matched vertices from a domain side in-place.
-// Used by LUM to clean up non-adjacent bidomains after leaf matching.
 int remove_matched_vertex_ll(std::vector<int>& arr, int start, int len,
         const std::vector<int>& matched) {
     int p = 0;
@@ -129,29 +129,26 @@ void remove_vtx_from_array_ll(std::vector<int>& arr, int start_idx, int& len, in
     std::swap(arr[start_idx + remove_idx], arr[start_idx + len]);
 }
 
-// Combined LUM + RL reward function.
+// Combined LUM + LSM reward function.
 // After matching (v, w):
-//   1. Immediately match all compatible leaf pairs (LUM) — leaf vertices have
-//      degree 1 so they always end up in the same bidomain; matching them in
-//      bulk avoids branching on trivial choices.
+//   1. Immediately match all compatible leaf pairs (LUM).
 //   2. Compute the RL reward = reduction in the upper bound caused by the split.
-//   3. Update lgrade[v] and rgrade[w] by the reward. Decay all scores by half
-//      if either score exceeds short_memory_threshold.
-// This is the key difference from DAL: LL uses only the RL reward (no V/Q
-// scores, no domain count term, no policy alternation).
+//   3. Update lgrade[v] (short-term, per-vertex S0) and Qv[w] (long-term,
+//      per-pair St(v,w)) by the reward, with independent decay thresholds.
+//      This implements LSM: S0 focuses on short-term reward (threshold Ts=1e5),
+//      St focuses on long-term reward (threshold Tl=1e9), decayed independently
+//      per row of the score table.
 std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d,
         std::vector<VtxPair>& current,
         std::vector<int>& g_matched, std::vector<int>& h_matched,
         std::vector<int>& left, std::vector<int>& right,
-        std::vector<gtype>& lgrade, std::vector<gtype>& rgrade,
+        std::vector<gtype>& lgrade, std::vector<gtype>& Qv,
         const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats) {
     current.push_back(VtxPair(v, w));
     g_matched[v] = 1;
     h_matched[w] = 1;
 
     // LUM: match leaf vertices of v and w in bulk.
-    // g.leaves[v] is a sorted list of (edge_label, vertex_label) → [leaf vertices].
-    // Merge-scan to find matching label groups and greedily match unmatched pairs.
     int leaves_match_size = 0;
     for (unsigned int i = 0, j = 0; i < g.leaves[v].size() && j < h.leaves[w].size(); ) {
         if (g.leaves[v][i].first < h.leaves[w][j].first) { i++; }
@@ -176,7 +173,7 @@ std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d,
     }
 
     std::vector<Bidomain> new_d;
-    new_d.reserve(d.size());
+    new_d.reserve(d.size() * 2);
     int temp = 0, total = 0;
     int unmatched_left_len, unmatched_right_len;
 
@@ -184,7 +181,6 @@ std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d,
         int l = old_bd.l;
         int r = old_bd.r;
 
-        // If LUM matched leaves, remove them from non-adjacent bidomains
         if (leaves_match_size > 0 && !old_bd.is_adjacent) {
             unmatched_left_len = remove_matched_vertex_ll(left, l, old_bd.left_len, g_matched);
             unmatched_right_len = remove_matched_vertex_ll(right, r, old_bd.right_len, h_matched);
@@ -198,7 +194,6 @@ std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d,
         int left_len_noedge = unmatched_left_len - left_len;
         int right_len_noedge = unmatched_right_len - right_len;
 
-        // RL reward: how much the bound dropped due to this split
         temp = std::min(old_bd.left_len, old_bd.right_len)
              - std::min(left_len, right_len)
              - std::min(left_len_noedge, right_len_noedge);
@@ -233,27 +228,29 @@ std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d,
         }
     }
 
-    // Update RL scores and decay if threshold exceeded
+    // LSM update:
+    // lgrade[v] = S0(v): short-term per-vertex score, decay threshold Ts=1e5
+    // Qv[w] = St(v,w): long-term per-pair score, decay threshold Tl=1e9
+    // Decay of St is per-row (all St(v,*) halved when St(v,w) exceeds Tl)
     if (total > 0) {
         stats.conflicts++;
         lgrade[v] += total;
-        rgrade[w] += total;
+        Qv[w] += total;
         if (lgrade[v] > short_memory_threshold_ll) {
             for (int i = 0; i < g.n; i++) { lgrade[i] /= 2; }
         }
-        if (rgrade[w] > long_memory_threshold_ll) {
-            for (int i = 0; i < h.n; i++) { rgrade[i] /= 2; }
+        if (Qv[w] > long_memory_threshold_ll) {
+            for (int i = 0; i < h.n; i++) { Qv[i] /= 2; }
         }
     }
     return new_d;
 }
 
 // Core BnB recursive search for McSplit+LL.
-// Identical structure to McSplit+DAL with M=1 (RL-only mode), but without
-// policy alternation. Uses lgrade/rgrade for both bidomain selection and
-// v/w selection throughout the entire search.
+// v selection uses lgrade (short-term S0 score).
+// w selection uses Q[v] (long-term per-pair St(v,*) score).
 void solve_ll(const Graph& g, const Graph& h,
-        std::vector<gtype>& lgrade, std::vector<gtype>& rgrade,
+        std::vector<gtype>& lgrade, std::vector<std::vector<gtype>>& Q,
         std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current,
         std::vector<int>& g_matched, std::vector<int>& h_matched,
         std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right,
@@ -265,7 +262,6 @@ void solve_ll(const Graph& g, const Graph& h,
 
     stats.nodes++;
 
-    // Update incumbent if current solution is the best seen so far
     if (current.size() > incumbent.size()) {
         incumbent = current;
         stats.incumbent_size = incumbent.size();
@@ -274,7 +270,6 @@ void solve_ll(const Graph& g, const Graph& h,
             std::chrono::steady_clock::now() - start_time).count();
     }
 
-    // Prune if upper bound cannot beat incumbent
     int bound = current.size() + calc_bound_ll(domains);
     if (bound <= (int)incumbent.size() || bound < (int)goal) {
         stats.cut_branches++;
@@ -282,13 +277,13 @@ void solve_ll(const Graph& g, const Graph& h,
         return;
     }
 
-    // Select bidomain using lgrade scores
+    // Select bidomain using lgrade (S0) scores
     int bd_idx = select_bidomain_ll(domains, left, lgrade, current.size());
     if (bd_idx == -1) { return; }
 
     Bidomain& bd = domains[bd_idx];
 
-    // Select v using lgrade scores
+    // Select v using lgrade (S0) scores
     int tmp_idx = selectV_index_ll(left, lgrade, bd.l, bd.left_len);
     int v = left[bd.l + tmp_idx];
     remove_vtx_from_array_ll(left, bd.l, bd.left_len, tmp_idx);
@@ -296,25 +291,23 @@ void solve_ll(const Graph& g, const Graph& h,
     std::vector<int> wselected(h.n, 0);
     bd.right_len--;
 
-    // Try matching v with each w, selected by rgrade score
+    // Try matching v with each w, selected by Q[v] (per-pair St score)
     for (int i = 0; i <= bd.right_len; i++) {
-        int w_idx = selectW_index_ll(right, rgrade, bd.r, bd.right_len + 1, wselected);
+        int w_idx = selectW_index_ll(right, Q[v], bd.r, bd.right_len + 1, wselected);
         if (w_idx == -1) { break; }
         int w = right[bd.r + w_idx];
         wselected[w] = 1;
         std::swap(right[bd.r + w_idx], right[bd.r + bd.right_len]);
 
-        // Record current size before rewardfeed adds LUM matches
         unsigned int cur_len = current.size();
 
         auto new_domains = rewardfeed_ll(domains, current, g_matched, h_matched,
-                left, right, lgrade, rgrade, g, h, v, w, multiway, stats);
+                left, right, lgrade, Q[v], g, h, v, w, multiway, stats);
 
-        solve_ll(g, h, lgrade, rgrade, incumbent, current,
+        solve_ll(g, h, lgrade, Q, incumbent, current,
                 g_matched, h_matched, new_domains, left, right,
                 goal, multiway, stats, start_time, abort_due_to_timeout);
 
-        // Undo all matches added by rewardfeed (v,w and any LUM leaves)
         while (current.size() > cur_len) {
             VtxPair pr = current.back();
             current.pop_back();
@@ -326,15 +319,11 @@ void solve_ll(const Graph& g, const Graph& h,
     bd.right_len++;
     if (bd.left_len == 0) { remove_bidomain_ll(domains, bd_idx); }
 
-    // Branch where v is not matched
-    solve_ll(g, h, lgrade, rgrade, incumbent, current,
+    solve_ll(g, h, lgrade, Q, incumbent, current,
             g_matched, h_matched, domains, left, right,
             goal, multiway, stats, start_time, abort_due_to_timeout);
 }
 
-// Entry point for McSplit+LL search.
-// Sorts vertices by degree, packs leaf lists for LUM, builds per-label
-// initial bidomains, initialises RL score vectors, runs solve_ll().
 std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout) {
 
@@ -357,9 +346,6 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
     bool h_dense = h_edges > h.n * (h.n - 1);
     bool g_dense = g_edges > g.n * (g.n - 1);
 
-    // Sort vertices: ascending degree if sparse, descending if dense.
-    // Note: LL reference uses > n*(n-1) threshold (same as RRSplit/SymSplit)
-    // not the McSplit /2 formulation.
     std::vector<int> vv0(g.n), vv1(h.n);
     std::iota(vv0.begin(), vv0.end(), 0);
     std::iota(vv1.begin(), vv1.end(), 0);
@@ -373,11 +359,9 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
     Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
     Graph h_sorted = induced_subgraph(const_cast<Graph&>(h), vv1);
 
-    // Precompute leaf lists for LUM
     pack_leaves(g_sorted);
     pack_leaves(h_sorted);
 
-    // Build per-label bidomains — LL uses label splitting unlike RRSplit/SymSplit
     std::vector<int> left, right;
     std::vector<Bidomain> domains;
 
@@ -407,19 +391,19 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
 
     stats.root_upper_bound = calc_bound_ll(domains);
 
-    // Initialise RL score vectors — all zero at start of search
+    // S0: short-term per-vertex score for v selection
+    // Q:  long-term per-pair score table St(v,w) for w selection
     std::vector<gtype> lgrade(g_sorted.n, 0);
-    std::vector<gtype> rgrade(h_sorted.n, 0);
+    std::vector<std::vector<gtype>> Q(g_sorted.n, std::vector<gtype>(h_sorted.n, 0));
     std::vector<int> g_matched(g_sorted.n, 0);
     std::vector<int> h_matched(h_sorted.n, 0);
 
     std::vector<VtxPair> incumbent, current;
     auto start_time = std::chrono::steady_clock::now();
-    solve_ll(g_sorted, h_sorted, lgrade, rgrade, incumbent, current,
+    solve_ll(g_sorted, h_sorted, lgrade, Q, incumbent, current,
             g_matched, h_matched, domains, left, right, 1,
             multiway, stats, start_time, abort_due_to_timeout);
 
-    // Convert solution indices back to original vertex indices
     for (auto& p : incumbent) {
         p.v = vv0[p.v];
         p.w = vv1[p.w];

@@ -123,7 +123,7 @@ std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vec
         std::vector<int>& right, const Graph& g, const Graph& h, int v, int w,
         bool& best_match, std::vector<int>& index_right) {
     std::vector<Bidomain> new_d;
-    new_d.reserve(d.size());
+    new_d.reserve(d.size() * 2);
     unsigned int ccount = 0;
 
     for (const Bidomain& old_bd : d) {

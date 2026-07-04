@@ -20,7 +20,13 @@ static const int DSB_BOXES = 2;
 
 // Forward declarations
 static void dsb_init_array(long double* arr, int size);
-static unsigned int calc_bound_dsb(const Graph& g, const Graph& h, std::vector<Bidomain>& domains, const std::vector<int>& left, const std::vector<int>& right, const std::vector<VtxPair>& incumbent, const std::vector<VtxPair>& current, long double* array, bool& bound_enabled, bool& count_enabled, int& called_count, int& success_count, int max_count, int max_success, int* s_degrees);
+static unsigned int calc_bound_dsb(const Graph& g, const Graph& h,
+        std::vector<Bidomain>& domains,    // ← remove const
+        const std::vector<int>& left, const std::vector<int>& right,
+        const std::vector<VtxPair>& incumbent, const std::vector<VtxPair>& current,
+        long double* array, bool& bound_enabled, bool& count_enabled,
+        int& called_count, int& success_count, int max_count, int max_success,
+        int* s_degrees);
 static int find_min_value_dsb(const std::vector<int>& arr, int start_idx, int len);
 static int select_bidomain_dsb(const std::vector<Bidomain>& domains, const std::vector<int>& left, int current_matching_size);
 static int partition_dsb(std::vector<int>& all_vv, int start, int len, const std::vector<unsigned int>& adjrow);
@@ -41,7 +47,7 @@ static void dsb_init_array(long double* arr, int size) {
 // Uses a learned probability table to decide when to spend time on the tighter computation.
 // For large or unbalanced bidomains, falls back to McSplit's min(left, right) bound.
 static unsigned int calc_bound_dsb(const Graph& g, const Graph& h,
-        std::vector<Bidomain>& domains,
+        std::vector<Bidomain>& domains,    // ← remove const
         const std::vector<int>& left, const std::vector<int>& right,
         const std::vector<VtxPair>& incumbent, const std::vector<VtxPair>& current,
         long double* array, bool& bound_enabled, bool& count_enabled,
@@ -254,15 +260,16 @@ static int partition_dsb(std::vector<int>& all_vv, int start, int len,
 // go to one side), the cached bound (size, is_valid) can be carried over to
 // the child bidomain since the internal structure is unchanged.
 // When the split mixes vertices, the cache is invalidated.
-static std::vector<Bidomain> filter_domains_dsb(const std::vector<Bidomain>& d,
+std::vector<Bidomain> filter_domains_dsb(const std::vector<Bidomain>& d,
         std::vector<int>& left, std::vector<int>& right,
         const Graph& g, const Graph& h, int v, int w, bool multiway) {
     std::vector<Bidomain> new_d;
-    new_d.reserve(d.size());
+    new_d.reserve(d.size() * 2);
 
     for (const Bidomain& old_bd : d) {
         int l = old_bd.l;
         int r = old_bd.r;
+
         int left_len = partition_dsb(left, l, old_bd.left_len, g.adjmat[v]);
         int right_len = partition_dsb(right, r, old_bd.right_len, h.adjmat[w]);
         int left_len_noedge = old_bd.left_len - left_len;
@@ -270,11 +277,15 @@ static std::vector<Bidomain> filter_domains_dsb(const std::vector<Bidomain>& d,
 
         if (left_len_noedge && right_len_noedge) {
             if (left_len != 0 || right_len != 0) {
-                // Split mixed — cache invalid
-                new_d.push_back({l + left_len, r + right_len, left_len_noedge, right_len_noedge, old_bd.is_adjacent, -1, false});
+                // Bidomain split — cache invalidated
+                new_d.push_back({l + left_len, r + right_len,
+                                 left_len_noedge, right_len_noedge,
+                                 old_bd.is_adjacent, -1, false});
             } else {
-                // All vertices went to non-adjacent side — carry cache over
-                new_d.push_back({l + left_len, r + right_len, left_len_noedge, right_len_noedge, old_bd.is_adjacent, old_bd.size, old_bd.is_valid});
+                // Bidomain unchanged — inherit cached bound
+                new_d.push_back({l + left_len, r + right_len,
+                                 left_len_noedge, right_len_noedge,
+                                 old_bd.is_adjacent, old_bd.size, old_bd.is_valid});
             }
         }
 
@@ -288,24 +299,25 @@ static std::vector<Bidomain> filter_domains_dsb(const std::vector<Bidomain>& d,
             int l_top = l + left_len, r_top = r + right_len;
             int li = l, ri = r;
             while (li < l_top && ri < r_top) {
-                unsigned int left_label = adjrow_v[left[li]];
-                unsigned int right_label = adjrow_w[right[ri]];
-                if (left_label < right_label) { li++; }
-                else if (left_label > right_label) { ri++; }
+                unsigned int ll = adjrow_v[left[li]];
+                unsigned int rl = adjrow_w[right[ri]];
+                if (ll < rl) { li++; }
+                else if (ll > rl) { ri++; }
                 else {
                     int lmin = li, rmin = ri;
-                    do { li++; } while (li < l_top && adjrow_v[left[li]] == left_label);
-                    do { ri++; } while (ri < r_top && adjrow_w[right[ri]] == left_label);
+                    do { li++; } while (li < l_top && adjrow_v[left[li]] == ll);
+                    do { ri++; } while (ri < r_top && adjrow_w[right[ri]] == ll);
                     new_d.push_back({lmin, rmin, li - lmin, ri - rmin, true, -1, false});
                 }
             }
         } else if (left_len && right_len) {
             if (left_len_noedge != 0 || right_len_noedge != 0) {
-                // Split mixed — cache invalid
+                // Bidomain split — cache invalidated
                 new_d.push_back({l, r, left_len, right_len, true, -1, false});
             } else {
-                // All vertices went to adjacent side — carry cache over
-                new_d.push_back({l, r, left_len, right_len, true, old_bd.size, old_bd.is_valid});
+                // Bidomain unchanged — inherit cached bound
+                new_d.push_back({l, r, left_len, right_len,
+                                 true, old_bd.size, old_bd.is_valid});
             }
         }
     }

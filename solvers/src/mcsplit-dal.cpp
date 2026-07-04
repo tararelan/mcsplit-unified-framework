@@ -153,7 +153,7 @@ std::vector<Bidomain> rewardfeed_RL(const std::vector<Bidomain>& d, std::vector<
         std::vector<int>& g_matched, std::vector<int>& h_matched,
         const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats) {
     std::vector<Bidomain> new_d;
-    new_d.reserve(d.size());
+    new_d.reserve(d.size() * 2);
     current.push_back(VtxPair(v, w));
     g_matched[v] = 1;
     h_matched[w] = 1;
@@ -265,7 +265,7 @@ std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector
     }
 
     std::vector<Bidomain> new_d;
-    new_d.reserve(d.size());
+    new_d.reserve(d.size() * 2);
     int temp = 0, total = 0;
 
     for (const Bidomain& old_bd : d) {
@@ -371,6 +371,7 @@ void solve_dal(const Graph& g, const Graph& h,
         stats.nodes_to_best = stats.nodes;
         stats.time_to_best = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - start_time).count();
+		num = 0;
     }
 
     // Prune if upper bound cannot beat incumbent

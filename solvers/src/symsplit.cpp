@@ -125,7 +125,7 @@ std::vector<Bidomain> filter_domains_sym(const std::vector<Bidomain>& d, std::ve
         std::vector<int>& right, const Graph& g, const Graph& h, int v, int w,
         bool& best_match, std::vector<int>& index_right) {
     std::vector<Bidomain> new_d;
-    new_d.reserve(d.size());
+    new_d.reserve(d.size() * 2);
     unsigned int ccount = 0;
 
     for (const Bidomain& old_bd : d) {
@@ -248,7 +248,6 @@ void solve_sym(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
             std::chrono::steady_clock::now() - start_time).count();
     }
 
-    // nodes++ before bound check — matches SymSplit reference
     stats.nodes++;
 
     int bound = current.size() + calc_bound_sym(domains);
@@ -271,9 +270,6 @@ void solve_sym(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         bd.left_len--;
     }
 
-    // Variable symmetry (G-side):
-    // Find largest w already matched to an equivalent G-vertex.
-    // Only applies when v has a detected symmetry class.
     int w_lower = -1;
     if (g_eqn_classes[v] != -1) {
         for (const VtxPair& a : current) {
@@ -287,14 +283,13 @@ void solve_sym(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
     int w = w_lower;
 
     bool best_match = false;
+    bool skip_exclude = false;  // ← NEW
+
     for (int i = bd.right_len; i >= 0; --i) {
         int idx = index_of_next_smallest_sym(right, bd.r, bd.right_len + 1, w);
         if (idx == -1) { break; }
         w = right[bd.r + idx];
 
-        // Value symmetry (H-side):
-        // Skip w if a smaller equivalent H-vertex exists in the domain.
-        // Only applies when w has a detected symmetry class.
         if (h_eqn_classes[w] != -1 && break_h_sym(right, bd.r, bd.right_len + 1, w, h_eqn_classes)) {
             stats.sym_pruned++;
             continue;
@@ -312,17 +307,15 @@ void solve_sym(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
                 g_eqn_classes, h_eqn_classes, index_right);
         current.pop_back();
 
-        // Maximality reduction
         if (best_match || bound <= (int)incumbent.size()) {
             stats.sym_pruned++;
+            skip_exclude = true;  // ← NEW: skip exclude branch, matching reference
             break;
         }
     }
 
     bd.right_len++;
 
-    // Variable symmetry (G-side, exclude branch):
-    // Remove all G-vertices equivalent to v — their branches are isomorphic.
     if (g_eqn_classes[v] != -1) {
         for (int i = 0; i < bd.left_len; i++) {
             if (g_eqn_classes[left[bd.l + i]] == g_eqn_classes[v]) {
@@ -336,9 +329,11 @@ void solve_sym(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
 
     if (bd.left_len == 0) { remove_bidomain_sym(domains, bd_idx); }
 
-    solve_sym(g, h, incumbent, current, domains, left, right, goal,
-            stats, start_time, abort_due_to_timeout,
-            g_eqn_classes, h_eqn_classes, index_right);
+    if (!skip_exclude) {  // ← NEW: only explore exclude branch if not pruned
+        solve_sym(g, h, incumbent, current, domains, left, right, goal,
+                stats, start_time, abort_due_to_timeout,
+                g_eqn_classes, h_eqn_classes, index_right);
+    }
 }
 
 // Entry point for SymSplit search.

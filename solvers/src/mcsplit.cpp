@@ -125,7 +125,7 @@ static void remove_bidomain(std::vector<Bidomain>& domains, int idx) {
 std::vector<Bidomain> filter_domains(const std::vector<Bidomain>& d, std::vector<int>& left,
         std::vector<int>& right, const Graph& g, const Graph& h, int v, int w, bool multiway) {
     std::vector<Bidomain> new_d;
-    new_d.reserve(d.size());
+    new_d.reserve(d.size() * 2);
     for (const Bidomain& old_bd : d) {
         int l = old_bd.l;
         int r = old_bd.r;

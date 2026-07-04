@@ -145,7 +145,7 @@ static std::vector<Bidomain> rewardfeed_rl(const std::vector<Bidomain>& d,
     h_matched[w] = 1;
 
     std::vector<Bidomain> new_d;
-    new_d.reserve(d.size());
+    new_d.reserve(d.size() * 2);
     int temp = 0, total = 0;
 
     for (const Bidomain& old_bd : d) {
@@ -249,7 +249,7 @@ static std::vector<Bidomain> rewardfeed_rllum(const std::vector<Bidomain>& d,
     }
 
     std::vector<Bidomain> new_d;
-    new_d.reserve(d.size());
+    new_d.reserve(d.size() * 2);
     int temp = 0, total = 0;
     int unmatched_left_len, unmatched_right_len;
 
