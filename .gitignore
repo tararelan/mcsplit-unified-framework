@@ -1,7 +1,6 @@
-instances/
-reference/
-misc/
-results/
-hpc/
-finish/
 .vscode/
+instances/
+misc/
+reference/
+.gitattributes
+.gitignore
