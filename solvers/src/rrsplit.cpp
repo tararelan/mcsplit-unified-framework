@@ -20,8 +20,8 @@ int partition_rr(std::vector<int>& all_vv, int start, int len, const std::vector
 int partition_right_rr(std::vector<int>& all_vv, int start, int len, const std::vector<unsigned int>& adjrow, std::vector<int>& index_right);
 int partition_sparse_rr(std::vector<int>& all_vv, int start, int len, int degree, const unsigned int* adjlist, std::vector<int>& index_right);
 std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vector<int>& left, std::vector<int>& right, const Graph& g, const Graph& h, int v, int w, bool& best_match, std::vector<int>& index_right);
-void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, const ui* EqClass, std::vector<int>& index_right);
-std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h, Stats& stats, std::atomic<bool>& abort_due_to_timeout);
+void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, const ui* EqClass, std::vector<int>& index_right, int red_mode);
+std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h, Stats& stats, std::atomic<bool>& abort_due_to_timeout, int red_mode = 7);
 
 static int calc_bound(const std::vector<Bidomain>& domains) {
     int bound = 0;
@@ -160,12 +160,21 @@ std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vec
     return new_d;
 }
 
+// red_mode: bitmask controlling which RRSplit reductions are enabled
+//   bit 0 (value 1) = vertex-equivalence reduction (w_lower skip + exclude-branch removal)
+//   bit 1 (value 2) = maximality reduction (best_match commit/prune)
+//   bit 2 (value 4) = tighter equivalence-class bound
+// Presets:
+//   7 (111) = full RRSplit — all reductions on
+//   6 (110) = no vertex-equivalence (max + bound only)
+//   5 (101) = no maximality (veq + bound only)
+//   3 (011) = no tighter bound (veq + max only)
 void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         std::vector<VtxPair>& current, std::vector<Bidomain>& domains,
         std::vector<int>& left, std::vector<int>& right, unsigned int goal,
         Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time,
         std::atomic<bool>& abort_due_to_timeout, const ui* EqClass,
-        std::vector<int>& index_right) {
+        std::vector<int>& index_right, int red_mode) {
 
     if (abort_due_to_timeout) { return; }
 
@@ -201,20 +210,18 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
     // Vertex-equivalence reduction: find largest w already matched to
     // an equivalent vertex, skip all w <= that value
     int w_lower = -1;
-    for (const VtxPair& a : current) {
-        if (EqClass[a.v] == EqClass[v] && w_lower < a.w) {
-            w_lower = a.w;
+    if (red_mode & 1) {   // VEQ enabled
+        for (const VtxPair& a : current) {
+            if (EqClass[a.v] == EqClass[v] && w_lower < a.w) {
+                w_lower = a.w;
+            }
         }
     }
 
     bd.right_len--;
 
     // Tighter equivalence-class bound check (from reference):
-    // If w_lower > 0, an equivalent vertex was already matched.
-    // Count equivalent left vertices and right vertices > w_lower.
-    // If the bound adjusted for the equivalence class imbalance cannot
-    // beat the incumbent, prune before counting this as a node.
-    if (w_lower > 0) {
+    if ((red_mode & 4) && w_lower > 0) {   // tighter BOUND enabled
         int count_left = 0, count_right = 0;
         for (int i = bd.left_len; i >= 0; --i) {
             if (EqClass[left[bd.l + i]] == EqClass[v]) { count_left++; }
@@ -274,11 +281,12 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
                 best_match, index_right);
         current.push_back(VtxPair(v, w));
         solve_rr(g, h, incumbent, current, new_domains, left, right, goal,
-                stats, start_time, abort_due_to_timeout, EqClass, index_right);
+                stats, start_time, abort_due_to_timeout, EqClass, index_right, red_mode);
         current.pop_back();
 
         // Maximality reduction: if best_match, current solution is optimal here
-        if (best_match || bound <= (int)incumbent.size()) {
+        bool maximality_prune = (red_mode & 2) && best_match;   // MAX enabled
+        if (maximality_prune || bound <= (int)incumbent.size()) {
             stats.sym_pruned++;
             break;
         }
@@ -288,23 +296,26 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
 
     // Vertex-equivalence reduction (exclude branch):
     // Remove all G-vertices equivalent to v — their branches are isomorphic
-    for (int i = 0; i < bd.left_len; i++) {
-        if (EqClass[left[bd.l + i]] == EqClass[v]) {
-            std::swap(left[bd.l + i], left[bd.l + bd.left_len - 1]);
-            bd.left_len--;
-            i--;
-            stats.sym_pruned++;
+    if (red_mode & 1) {   // VEQ enabled
+        for (int i = 0; i < bd.left_len; i++) {
+            if (EqClass[left[bd.l + i]] == EqClass[v]) {
+                std::swap(left[bd.l + i], left[bd.l + bd.left_len - 1]);
+                bd.left_len--;
+                i--;
+                stats.sym_pruned++;
+            }
         }
     }
 
     if (bd.left_len == 0) { remove_bidomain(domains, bd_idx); }
 
     solve_rr(g, h, incumbent, current, domains, left, right, goal,
-            stats, start_time, abort_due_to_timeout, EqClass, index_right);
+            stats, start_time, abort_due_to_timeout, EqClass, index_right, red_mode);
 }
 
 std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
-        Stats& stats, std::atomic<bool>& abort_due_to_timeout) {
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout,
+        int red_mode) {
 
     auto calc_degrees = [](const Graph& g) {
         std::vector<int> degree(g.n, 0);
@@ -324,17 +335,17 @@ std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
         int s = 0; for (int x : v) { s += x; } return s;
     };
 
-    bool g1_dense = sum_vec(h_deg) < h.n * (h.n - 1);
-    bool g0_dense = sum_vec(g_deg) < g.n * (g.n - 1);
+    bool h_dense = sum_vec(h_deg) < h.n * (h.n - 1);
+    bool g_dense = sum_vec(g_deg) < g.n * (g.n - 1);
 
     std::vector<int> vv0(g.n), vv1(h.n);
     std::iota(vv0.begin(), vv0.end(), 0);
     std::iota(vv1.begin(), vv1.end(), 0);
     std::stable_sort(vv0.begin(), vv0.end(), [&](int a, int b) {
-        return !g1_dense ? (g_deg[a] < g_deg[b]) : (g_deg[a] > g_deg[b]);
+        return !h_dense ? (g_deg[a] < g_deg[b]) : (g_deg[a] > g_deg[b]);
     });
     std::stable_sort(vv1.begin(), vv1.end(), [&](int a, int b) {
-        return !g0_dense ? (h_deg[a] < h_deg[b]) : (h_deg[a] > h_deg[b]);
+        return !g_dense ? (h_deg[a] < h_deg[b]) : (h_deg[a] > h_deg[b]);
     });
 
     Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
@@ -361,7 +372,7 @@ std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
     std::vector<VtxPair> incumbent, current;
     auto start_time = std::chrono::steady_clock::now();
     solve_rr(g_sorted, h_sorted, incumbent, current, domains, left, right, 1,
-            stats, start_time, abort_due_to_timeout, EqClass, index_right);
+        stats, start_time, abort_due_to_timeout, EqClass, index_right, red_mode);
 
     delete[] EqClass;
 

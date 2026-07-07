@@ -23,15 +23,42 @@ int select_bidomain_ll(const std::vector<Bidomain>& domains, const std::vector<i
 int partition_ll(std::vector<int>& all_vv, int start, int len, const std::vector<unsigned int>& adjrow);
 int remove_matched_vertex_ll(std::vector<int>& arr, int start, int len, const std::vector<int>& matched);
 void remove_vtx_from_array_ll(std::vector<int>& arr, int start_idx, int& len, int remove_idx);
-std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& lgrade, std::vector<gtype>& Qv, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
-void solve_ll(const Graph& g, const Graph& h, std::vector<gtype>& lgrade, std::vector<std::vector<gtype>>& Q, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout);
-std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout);
+
+std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d,
+        std::vector<VtxPair>& current,
+        std::vector<int>& g_matched, std::vector<int>& h_matched,
+        std::vector<int>& left, std::vector<int>& right,
+        std::vector<gtype>& lgrade,
+        std::vector<gtype>& Qv,        // per-pair row Q[v] — used when use_lsm=true
+        std::vector<gtype>& rgrade,    // per-vertex rgrade — used when use_lsm=false
+        const Graph& g, const Graph& h,
+        int v, int w, bool multiway,
+        bool use_lum, bool use_lsm,
+        Stats& stats);
+
+void solve_ll(const Graph& g, const Graph& h,
+        std::vector<gtype>& lgrade,
+        std::vector<std::vector<gtype>>& Q,
+        std::vector<gtype>& rgrade,
+        std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current,
+        std::vector<int>& g_matched, std::vector<int>& h_matched,
+        std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right,
+        unsigned int goal, bool multiway,
+        bool use_lum, bool use_lsm,
+        Stats& stats,
+        std::chrono::time_point<std::chrono::steady_clock> start_time,
+        std::atomic<bool>& abort_due_to_timeout);
+
+std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout,
+        bool use_lum = true, bool use_lsm = true);
+
+// ── Utility functions ─────────────────────────────────────────────────────────
 
 static int calc_bound_ll(const std::vector<Bidomain>& domains) {
     int bound = 0;
-    for (const Bidomain& bd : domains) {
+    for (const Bidomain& bd : domains)
         bound += std::min(bd.left_len, bd.right_len);
-    }
     return bound;
 }
 
@@ -40,7 +67,6 @@ static void remove_bidomain_ll(std::vector<Bidomain>& domains, int idx) {
     domains.pop_back();
 }
 
-// Selects vertex with highest score, ties broken on smallest index.
 int selectV_index_ll(const std::vector<int>& arr, const std::vector<gtype>& grade,
         int start_idx, int len) {
     int idx = -1;
@@ -57,8 +83,6 @@ int selectV_index_ll(const std::vector<int>& arr, const std::vector<gtype>& grad
     return idx;
 }
 
-// Selects w with highest per-pair score St(v,w), skipping already-tried vertices.
-// Uses Qv = Q[v] (the row of the per-pair score table for the current v).
 int selectW_index_ll(const std::vector<int>& arr, const std::vector<gtype>& grade,
         int start_idx, int len, const std::vector<int>& wselected) {
     int idx = -1;
@@ -77,8 +101,6 @@ int selectW_index_ll(const std::vector<int>& arr, const std::vector<gtype>& grad
     return idx;
 }
 
-// Selects bidomain with smallest max(left_len, right_len),
-// ties broken by highest-scored vertex in left set.
 int select_bidomain_ll(const std::vector<Bidomain>& domains, const std::vector<int>& left,
         const std::vector<gtype>& grade, int current_matching_size) {
     int min_size = INT_MAX;
@@ -97,7 +119,6 @@ int select_bidomain_ll(const std::vector<Bidomain>& domains, const std::vector<i
     return best;
 }
 
-// Partitions arr[start..start+len-1] so adjacent vertices come first.
 int partition_ll(std::vector<int>& all_vv, int start, int len,
         const std::vector<unsigned int>& adjrow) {
     int i = 0;
@@ -110,7 +131,6 @@ int partition_ll(std::vector<int>& all_vv, int start, int len,
     return i;
 }
 
-// Removes already-matched vertices from a domain side in-place.
 int remove_matched_vertex_ll(std::vector<int>& arr, int start, int len,
         const std::vector<int>& matched) {
     int p = 0;
@@ -123,55 +143,61 @@ int remove_matched_vertex_ll(std::vector<int>& arr, int start, int len,
     return p;
 }
 
-// Removes a vertex from an array by swapping with last element. O(1).
 void remove_vtx_from_array_ll(std::vector<int>& arr, int start_idx, int& len, int remove_idx) {
     len--;
     std::swap(arr[start_idx + remove_idx], arr[start_idx + len]);
 }
 
-// Combined LUM + LSM reward function.
-// After matching (v, w):
-//   1. Immediately match all compatible leaf pairs (LUM).
-//   2. Compute the RL reward = reduction in the upper bound caused by the split.
-//   3. Update lgrade[v] (short-term, per-vertex S0) and Qv[w] (long-term,
-//      per-pair St(v,w)) by the reward, with independent decay thresholds.
-//      This implements LSM: S0 focuses on short-term reward (threshold Ts=1e5),
-//      St focuses on long-term reward (threshold Tl=1e9), decayed independently
-//      per row of the score table.
-std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d,
+// ── Core reward + domain-split function ──────────────────────────────────────
+// use_lum: if true, bulk-match leaf pairs after matching (v,w)
+// use_lsm: if true, use per-pair Q[v][w] for w-scoring; if false, use per-vertex rgrade[w]
+
+std::vector<Bidomain> rewardfeed_ll(
+        const std::vector<Bidomain>& d,
         std::vector<VtxPair>& current,
         std::vector<int>& g_matched, std::vector<int>& h_matched,
         std::vector<int>& left, std::vector<int>& right,
-        std::vector<gtype>& lgrade, std::vector<gtype>& Qv,
-        const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats) {
+        std::vector<gtype>& lgrade,
+        std::vector<gtype>& Qv,
+        std::vector<gtype>& rgrade,
+        const Graph& g, const Graph& h,
+        int v, int w, bool multiway,
+        bool use_lum, bool use_lsm,
+        Stats& stats) {
+
     current.push_back(VtxPair(v, w));
     g_matched[v] = 1;
     h_matched[w] = 1;
 
-    // LUM: match leaf vertices of v and w in bulk.
+    // ── LUM: bulk-match compatible leaf pairs ─────────────────────────────────
     int leaves_match_size = 0;
-    for (unsigned int i = 0, j = 0; i < g.leaves[v].size() && j < h.leaves[w].size(); ) {
-        if (g.leaves[v][i].first < h.leaves[w][j].first) { i++; }
-        else if (g.leaves[v][i].first > h.leaves[w][j].first) { j++; }
-        else {
-            const std::vector<int>& leaf_g = g.leaves[v][i].second;
-            const std::vector<int>& leaf_h = h.leaves[w][j].second;
-            for (unsigned int p = 0, q = 0; p < leaf_g.size() && q < leaf_h.size(); ) {
-                if (g_matched[leaf_g[p]]) { p++; }
-                else if (h_matched[leaf_h[q]]) { q++; }
-                else {
-                    int v_leaf = leaf_g[p], w_leaf = leaf_h[q];
-                    p++; q++;
-                    current.push_back(VtxPair(v_leaf, w_leaf));
-                    g_matched[v_leaf] = 1;
-                    h_matched[w_leaf] = 1;
-                    leaves_match_size++;
+    if (use_lum) {
+        for (unsigned int i = 0, j = 0;
+             i < g.leaves[v].size() && j < h.leaves[w].size(); ) {
+            if (g.leaves[v][i].first < h.leaves[w][j].first) { i++; }
+            else if (g.leaves[v][i].first > h.leaves[w][j].first) { j++; }
+            else {
+                const std::vector<int>& leaf_g = g.leaves[v][i].second;
+                const std::vector<int>& leaf_h = h.leaves[w][j].second;
+                for (unsigned int p = 0, q = 0;
+                     p < leaf_g.size() && q < leaf_h.size(); ) {
+                    if (g_matched[leaf_g[p]]) { p++; }
+                    else if (h_matched[leaf_h[q]]) { q++; }
+                    else {
+                        int v_leaf = leaf_g[p], w_leaf = leaf_h[q];
+                        p++; q++;
+                        current.push_back(VtxPair(v_leaf, w_leaf));
+                        g_matched[v_leaf] = 1;
+                        h_matched[w_leaf] = 1;
+                        leaves_match_size++;
+                    }
                 }
+                i++; j++;
             }
-            i++; j++;
         }
     }
 
+    // ── Domain split ──────────────────────────────────────────────────────────
     std::vector<Bidomain> new_d;
     new_d.reserve(d.size() * 2);
     int temp = 0, total = 0;
@@ -182,16 +208,16 @@ std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d,
         int r = old_bd.r;
 
         if (leaves_match_size > 0 && !old_bd.is_adjacent) {
-            unmatched_left_len = remove_matched_vertex_ll(left, l, old_bd.left_len, g_matched);
+            unmatched_left_len  = remove_matched_vertex_ll(left,  l, old_bd.left_len,  g_matched);
             unmatched_right_len = remove_matched_vertex_ll(right, r, old_bd.right_len, h_matched);
         } else {
-            unmatched_left_len = old_bd.left_len;
+            unmatched_left_len  = old_bd.left_len;
             unmatched_right_len = old_bd.right_len;
         }
 
-        int left_len = partition_ll(left, l, unmatched_left_len, g.adjmat[v]);
+        int left_len  = partition_ll(left,  l, unmatched_left_len,  g.adjmat[v]);
         int right_len = partition_ll(right, r, unmatched_right_len, h.adjmat[w]);
-        int left_len_noedge = unmatched_left_len - left_len;
+        int left_len_noedge  = unmatched_left_len  - left_len;
         int right_len_noedge = unmatched_right_len - right_len;
 
         temp = std::min(old_bd.left_len, old_bd.right_len)
@@ -199,13 +225,14 @@ std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d,
              - std::min(left_len_noedge, right_len_noedge);
         total += temp;
 
-        if (left_len_noedge && right_len_noedge) {
-            new_d.push_back({l + left_len, r + right_len, left_len_noedge, right_len_noedge, old_bd.is_adjacent});
-        }
+        if (left_len_noedge && right_len_noedge)
+            new_d.push_back({l + left_len, r + right_len,
+                             left_len_noedge, right_len_noedge, old_bd.is_adjacent});
+
         if (multiway && left_len && right_len) {
             auto& adjrow_v = g.adjmat[v];
             auto& adjrow_w = h.adjmat[w];
-            std::sort(left.begin() + l, left.begin() + l + left_len,
+            std::sort(left.begin()  + l, left.begin()  + l + left_len,
                     [&](int a, int b) { return adjrow_v[a] < adjrow_v[b]; });
             std::sort(right.begin() + r, right.begin() + r + right_len,
                     [&](int a, int b) { return adjrow_w[a] < adjrow_w[b]; });
@@ -214,11 +241,11 @@ std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d,
             while (li < l_top && ri < r_top) {
                 unsigned int ll = adjrow_v[left[li]];
                 unsigned int rl = adjrow_w[right[ri]];
-                if (ll < rl) { li++; }
+                if      (ll < rl) { li++; }
                 else if (ll > rl) { ri++; }
                 else {
                     int lmin = li, rmin = ri;
-                    do { li++; } while (li < l_top && adjrow_v[left[li]] == ll);
+                    do { li++; } while (li < l_top && adjrow_v[left[li]]  == ll);
                     do { ri++; } while (ri < r_top && adjrow_w[right[ri]] == ll);
                     new_d.push_back({lmin, rmin, li - lmin, ri - rmin, true});
                 }
@@ -228,45 +255,52 @@ std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d,
         }
     }
 
-    // LSM update:
-    // lgrade[v] = S0(v): short-term per-vertex score, decay threshold Ts=1e5
-    // Qv[w] = St(v,w): long-term per-pair score, decay threshold Tl=1e9
-    // Decay of St is per-row (all St(v,*) halved when St(v,w) exceeds Tl)
+    // ── LSM score update ──────────────────────────────────────────────────────
+    // use_lsm=true:  update lgrade[v] (S0, short-term) and Qv[w] (St, long-term per-pair)
+    // use_lsm=false: update lgrade[v] and rgrade[w] (both per-vertex, McSplit+RL behaviour)
     if (total > 0) {
         stats.conflicts++;
         lgrade[v] += total;
-        Qv[w] += total;
-        if (lgrade[v] > short_memory_threshold_ll) {
-            for (int i = 0; i < g.n; i++) { lgrade[i] /= 2; }
-        }
-        if (Qv[w] > long_memory_threshold_ll) {
-            for (int i = 0; i < h.n; i++) { Qv[i] /= 2; }
+        if (use_lsm) {
+            Qv[w] += total;
+            if (lgrade[v] > short_memory_threshold_ll)
+                for (int i = 0; i < (int)lgrade.size(); i++) lgrade[i] /= 2;
+            if (Qv[w] > long_memory_threshold_ll)
+                for (int i = 0; i < (int)Qv.size(); i++) Qv[i] /= 2;
+        } else {
+            rgrade[w] += total;
+            if (lgrade[v] > short_memory_threshold_ll)
+                for (int i = 0; i < (int)lgrade.size(); i++) lgrade[i] /= 2;
+            if (rgrade[w] > short_memory_threshold_ll)
+                for (int i = 0; i < (int)rgrade.size(); i++) rgrade[i] /= 2;
         }
     }
     return new_d;
 }
 
-// Core BnB recursive search for McSplit+LL.
-// v selection uses lgrade (short-term S0 score).
-// w selection uses Q[v] (long-term per-pair St(v,*) score).
+// ── BnB search ────────────────────────────────────────────────────────────────
+
 void solve_ll(const Graph& g, const Graph& h,
-        std::vector<gtype>& lgrade, std::vector<std::vector<gtype>>& Q,
+        std::vector<gtype>& lgrade,
+        std::vector<std::vector<gtype>>& Q,
+        std::vector<gtype>& rgrade,
         std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current,
         std::vector<int>& g_matched, std::vector<int>& h_matched,
         std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right,
-        unsigned int goal, bool multiway, Stats& stats,
+        unsigned int goal, bool multiway,
+        bool use_lum, bool use_lsm,
+        Stats& stats,
         std::chrono::time_point<std::chrono::steady_clock> start_time,
         std::atomic<bool>& abort_due_to_timeout) {
 
-    if (abort_due_to_timeout) { return; }
-
+    if (abort_due_to_timeout) return;
     stats.nodes++;
 
     if (current.size() > incumbent.size()) {
         incumbent = current;
         stats.incumbent_size = incumbent.size();
-        stats.nodes_to_best = stats.nodes;
-        stats.time_to_best = std::chrono::duration<double>(
+        stats.nodes_to_best  = stats.nodes;
+        stats.time_to_best   = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - start_time).count();
     }
 
@@ -277,13 +311,11 @@ void solve_ll(const Graph& g, const Graph& h,
         return;
     }
 
-    // Select bidomain using lgrade (S0) scores
+    // v selection always uses lgrade (S0 / per-vertex short-term score)
     int bd_idx = select_bidomain_ll(domains, left, lgrade, current.size());
-    if (bd_idx == -1) { return; }
+    if (bd_idx == -1) return;
 
     Bidomain& bd = domains[bd_idx];
-
-    // Select v using lgrade (S0) scores
     int tmp_idx = selectV_index_ll(left, lgrade, bd.l, bd.left_len);
     int v = left[bd.l + tmp_idx];
     remove_vtx_from_array_ll(left, bd.l, bd.left_len, tmp_idx);
@@ -291,10 +323,11 @@ void solve_ll(const Graph& g, const Graph& h,
     std::vector<int> wselected(h.n, 0);
     bd.right_len--;
 
-    // Try matching v with each w, selected by Q[v] (per-pair St score)
     for (int i = 0; i <= bd.right_len; i++) {
-        int w_idx = selectW_index_ll(right, Q[v], bd.r, bd.right_len + 1, wselected);
-        if (w_idx == -1) { break; }
+        // w selection: per-pair Q[v] if use_lsm, per-vertex rgrade otherwise
+        const std::vector<gtype>& w_scores = use_lsm ? Q[v] : rgrade;
+        int w_idx = selectW_index_ll(right, w_scores, bd.r, bd.right_len + 1, wselected);
+        if (w_idx == -1) break;
         int w = right[bd.r + w_idx];
         wselected[w] = 1;
         std::swap(right[bd.r + w_idx], right[bd.r + bd.right_len]);
@@ -302,11 +335,13 @@ void solve_ll(const Graph& g, const Graph& h,
         unsigned int cur_len = current.size();
 
         auto new_domains = rewardfeed_ll(domains, current, g_matched, h_matched,
-                left, right, lgrade, Q[v], g, h, v, w, multiway, stats);
+                left, right, lgrade, Q[v], rgrade, g, h, v, w,
+                multiway, use_lum, use_lsm, stats);
 
-        solve_ll(g, h, lgrade, Q, incumbent, current,
+        solve_ll(g, h, lgrade, Q, rgrade, incumbent, current,
                 g_matched, h_matched, new_domains, left, right,
-                goal, multiway, stats, start_time, abort_due_to_timeout);
+                goal, multiway, use_lum, use_lsm,
+                stats, start_time, abort_due_to_timeout);
 
         while (current.size() > cur_len) {
             VtxPair pr = current.back();
@@ -317,23 +352,29 @@ void solve_ll(const Graph& g, const Graph& h,
     }
 
     bd.right_len++;
-    if (bd.left_len == 0) { remove_bidomain_ll(domains, bd_idx); }
+    if (bd.left_len == 0) remove_bidomain_ll(domains, bd_idx);
 
-    solve_ll(g, h, lgrade, Q, incumbent, current,
+    solve_ll(g, h, lgrade, Q, rgrade, incumbent, current,
             g_matched, h_matched, domains, left, right,
-            goal, multiway, stats, start_time, abort_due_to_timeout);
+            goal, multiway, use_lum, use_lsm,
+            stats, start_time, abort_due_to_timeout);
 }
 
+// ── Entry point ───────────────────────────────────────────────────────────────
+// use_lum=true,  use_lsm=true  → full McSplit+LL
+// use_lum=false, use_lsm=true  → LSM only (no leaf matching)
+// use_lum=true,  use_lsm=false → LUM only (per-vertex w-scoring, McSplit+RL style)
+// use_lum=false, use_lsm=false → plain McSplit+RL (sanity check — should match rl results)
+
 std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
-        Stats& stats, std::atomic<bool>& abort_due_to_timeout) {
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout,
+        bool use_lum, bool use_lsm) {
 
     auto calc_degrees = [](const Graph& g) {
         std::vector<int> degree(g.n, 0);
-        for (int v = 0; v < g.n; v++) {
-            for (int w = 0; w < g.n; w++) {
-                if (g.adjmat[v][w] & 1) { degree[v]++; }
-            }
-        }
+        for (int v = 0; v < g.n; v++)
+            for (int w = 0; w < g.n; w++)
+                if (g.adjmat[v][w] & 1) degree[v]++;
         return degree;
     };
 
@@ -341,8 +382,8 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
     std::vector<int> h_deg = calc_degrees(h);
 
     int g_edges = 0, h_edges = 0;
-    for (int d : g_deg) { g_edges += d; }
-    for (int d : h_deg) { h_edges += d; }
+    for (int d : g_deg) g_edges += d;
+    for (int d : h_deg) h_edges += d;
     bool h_dense = h_edges > h.n * (h.n - 1);
     bool g_dense = g_edges > g.n * (g.n - 1);
 
@@ -359,15 +400,17 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
     Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
     Graph h_sorted = induced_subgraph(const_cast<Graph&>(h), vv1);
 
-    pack_leaves(g_sorted);
-    pack_leaves(h_sorted);
+    if (use_lum) {
+        pack_leaves(g_sorted);
+        pack_leaves(h_sorted);
+    }
 
     std::vector<int> left, right;
     std::vector<Bidomain> domains;
 
     std::set<unsigned int> left_labels, right_labels;
-    for (unsigned int label : g_sorted.label) { left_labels.insert(label); }
-    for (unsigned int label : h_sorted.label) { right_labels.insert(label); }
+    for (unsigned int label : g_sorted.label) left_labels.insert(label);
+    for (unsigned int label : h_sorted.label) right_labels.insert(label);
     std::set<unsigned int> labels;
     std::set_intersection(left_labels.begin(), left_labels.end(),
                           right_labels.begin(), right_labels.end(),
@@ -376,38 +419,38 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
     for (unsigned int label : labels) {
         int start_l = left.size();
         int start_r = right.size();
-        for (int i = 0; i < g_sorted.n; i++) {
-            if (g_sorted.label[i] == label) { left.push_back(i); }
-        }
-        for (int i = 0; i < h_sorted.n; i++) {
-            if (h_sorted.label[i] == label) { right.push_back(i); }
-        }
-        int left_len = left.size() - start_l;
+        for (int i = 0; i < g_sorted.n; i++)
+            if (g_sorted.label[i] == label) left.push_back(i);
+        for (int i = 0; i < h_sorted.n; i++)
+            if (h_sorted.label[i] == label) right.push_back(i);
+        int left_len  = left.size()  - start_l;
         int right_len = right.size() - start_r;
-        if (left_len && right_len) {
+        if (left_len && right_len)
             domains.push_back({start_l, start_r, left_len, right_len, false});
-        }
     }
 
     stats.root_upper_bound = calc_bound_ll(domains);
 
-    // S0: short-term per-vertex score for v selection
-    // Q:  long-term per-pair score table St(v,w) for w selection
+    // S0: short-term per-vertex score for v (and w when use_lsm=false)
     std::vector<gtype> lgrade(g_sorted.n, 0);
+    // St: long-term per-pair score table for w (used when use_lsm=true)
     std::vector<std::vector<gtype>> Q(g_sorted.n, std::vector<gtype>(h_sorted.n, 0));
+    // per-vertex w score (used when use_lsm=false, i.e. McSplit+RL style)
+    std::vector<gtype> rgrade(h_sorted.n, 0);
+
     std::vector<int> g_matched(g_sorted.n, 0);
     std::vector<int> h_matched(h_sorted.n, 0);
-
     std::vector<VtxPair> incumbent, current;
+
     auto start_time = std::chrono::steady_clock::now();
-    solve_ll(g_sorted, h_sorted, lgrade, Q, incumbent, current,
+    solve_ll(g_sorted, h_sorted, lgrade, Q, rgrade, incumbent, current,
             g_matched, h_matched, domains, left, right, 1,
-            multiway, stats, start_time, abort_due_to_timeout);
+            multiway, use_lum, use_lsm,
+            stats, start_time, abort_due_to_timeout);
 
     for (auto& p : incumbent) {
         p.v = vv0[p.v];
         p.w = vv1[p.w];
     }
-
     return incumbent;
 }

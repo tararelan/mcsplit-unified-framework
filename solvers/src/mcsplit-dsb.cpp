@@ -35,7 +35,9 @@ static int index_of_next_smallest_dsb(const std::vector<int>& arr, int start_idx
 static void remove_vtx_from_left_domain_dsb(std::vector<int>& left, Bidomain& bd, int v);
 static void remove_bidomain_dsb(std::vector<Bidomain>& domains, int idx);
 void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, long double* array, bool& bound_enabled, bool& count_enabled, int& called_count, int& success_count, int max_count, int max_success, int* s_degrees);
-std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout);
+std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout,
+        int bound_mode = 0);
 
 static void dsb_init_array(long double* arr, int size) {
     for (int i = 0; i < size; i++) { arr[i] = 1.0; }
@@ -424,7 +426,13 @@ void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
 // Initialises the probability table, sorts vertices, builds per-label bidomains,
 // runs solve_dsb().
 std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
-        Stats& stats, std::atomic<bool>& abort_due_to_timeout) {
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout,
+        int bound_mode)   // 0 = gated (default), 1 = always, 2 = never
+		{
+
+	// bound_mode: 0=gated, 1=always on, 2=never on
+    bool bound_enabled = (bound_mode != 2);   // off only for "never"
+    bool count_enabled = (bound_mode == 0);   // gating active only in mode 0
 
     auto calc_degrees = [](const Graph& g) {
         std::vector<int> degree(g.n, 0);
@@ -496,8 +504,8 @@ std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
     // Initialise DSB probability table and adaptive bound control
     long double array[DSB_ROWS * DSB_BOXES];
     dsb_init_array(array, DSB_ROWS * DSB_BOXES);
-    bool bound_enabled = true;
-    bool count_enabled = true;
+    // bool bound_enabled = true;
+    // bool count_enabled = true;
     int called_count = 0;
     int success_count = 0;
     const int max_count = 100;

@@ -15,15 +15,16 @@
 std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout);
 std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway,
-        Stats& stats, std::atomic<bool>& abort_due_to_timeout);
-std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
-        Stats& stats, std::atomic<bool>& abort_due_to_timeout);
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout,
+        int policy_mode = 0);  // 0=hybrid, 1=RL_only, 2=DAL_only
+std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h, Stats& stats,
+		std::atomic<bool>& abort_due_to_timeout, int red_mode = 7);
 std::vector<VtxPair> mcs_sym(const Graph& g, const Graph& h,
-        Stats& stats, std::atomic<bool>& abort_due_to_timeout);
-std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
-        Stats& stats, std::atomic<bool>& abort_due_to_timeout);
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout, int sym_mode = 3);
+std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway, Stats& stats,
+		std::atomic<bool>& abort_due_to_timeout, bool use_lum = true, bool use_lsm = true);
 std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
-        Stats& stats, std::atomic<bool>& abort_due_to_timeout);
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout, int bound_mode = 0);
 std::vector<VtxPair> mcs_rl(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout);
 std::vector<VtxPair> mcs_rllum(const Graph& g, const Graph& h, bool multiway,
@@ -137,20 +138,45 @@ int main(int argc, char** argv) {
     Stats stats;
     std::vector<VtxPair> solution;
 
-    if (arguments.algorithm == "dal")
-        solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout);
-	else if (arguments.algorithm == "rrsplit")
-		solution = mcs_rr(g, h, stats, abort_due_to_timeout);
-	else if (arguments.algorithm == "symsplit")
-		solution = mcs_sym(g, h, stats, abort_due_to_timeout);
+    if (arguments.algorithm == "rl")
+		solution = mcs_rl(g, h, multiway, stats, abort_due_to_timeout);
+	
 	else if (arguments.algorithm == "ll")
-		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout);
+		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, true, true);
+	else if (arguments.algorithm == "ll_lsm")
+		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, false, true);
+	else if (arguments.algorithm == "ll_lum")
+		solution = solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, true, false);
+	else if (arguments.algorithm == "dal")
+        solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout, 0);
+	else if (arguments.algorithm == "dal_rl")
+		solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout, 1);
+	else if (arguments.algorithm == "dal_dal")
+		solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout, 2);
+	
 	else if (arguments.algorithm == "dsb")
 		solution = mcs_dsb(g, h, multiway, stats, abort_due_to_timeout);
-	else if (arguments.algorithm == "rl")
-		solution = mcs_rl(g, h, multiway, stats, abort_due_to_timeout);
-	else if (arguments.algorithm == "rllum")
-		solution = mcs_rllum(g, h, multiway, stats, abort_due_to_timeout);
+	else if (arguments.algorithm == "dsb_always")
+		solution = mcs_dsb(g, h, multiway, stats, abort_due_to_timeout, 1);
+	else if (arguments.algorithm == "dsb_never")
+		solution = mcs_dsb(g, h, multiway, stats, abort_due_to_timeout, 2);
+	
+	else if (arguments.algorithm == "rrsplit")
+		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 7);  // all on
+	else if (arguments.algorithm == "rrsplit_noveq")
+		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 6);  // max+bound
+	else if (arguments.algorithm == "rrsplit_nomax")
+		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 5);  // veq+bound
+	else if (arguments.algorithm == "rrsplit_nobound")
+		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 3);  // veq+max
+	
+	else if (arguments.algorithm == "symsplit")
+		solution = mcs_sym(g, h, stats, abort_due_to_timeout, 3);  // full
+	else if (arguments.algorithm == "symsplit_valonly")
+		solution = mcs_sym(g, h, stats, abort_due_to_timeout, 2);  // value only
+	else if (arguments.algorithm == "symsplit_varonly")
+		solution = mcs_sym(g, h, stats, abort_due_to_timeout, 1);  // variable only
+	
     else
         solution = mcs(g, h, multiway, stats, abort_due_to_timeout);
 

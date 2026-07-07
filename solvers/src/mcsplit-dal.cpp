@@ -29,8 +29,8 @@ void remove_vtx_from_array(std::vector<int>& arr, int start_idx, int& len, int r
 static void remove_bidomain(std::vector<Bidomain>& domains, int idx);
 std::vector<Bidomain> rewardfeed_RL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, std::vector<int>& g_matched, std::vector<int>& h_matched, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
 std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& V, std::vector<gtype>& Qv, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
-void solve_dal(const Graph& g, const Graph& h, std::vector<gtype>& V, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, std::vector<std::vector<gtype>>& Q, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, int& M, int& num, int Maxnum, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout);
-std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout);
+void solve_dal(const Graph& g, const Graph& h, std::vector<gtype>& V, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, std::vector<std::vector<gtype>>& Q, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, int& M, int& num, int Maxnum, int policy_mode, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout);
+std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout, int policy_mode = 0);  // 0=hybrid, 1=RL_only, 2=DAL_only
 
 // McSplit's upper bound: sum of min(left_len, right_len) over all bidomains.
 // From each bidomain at most min(|L|, |R|) further pairs can be matched.
@@ -357,8 +357,9 @@ void solve_dal(const Graph& g, const Graph& h,
         std::vector<int>& g_matched, std::vector<int>& h_matched,
         std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right,
         unsigned int goal, bool multiway, int& M, int& num, int Maxnum,
-        Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time,
-        std::atomic<bool>& abort_due_to_timeout) {
+        int policy_mode, Stats& stats,
+		std::chrono::time_point<std::chrono::steady_clock> start_time,
+		std::atomic<bool>& abort_due_to_timeout) {
 
     if (abort_due_to_timeout) { return; }
 
@@ -384,7 +385,11 @@ void solve_dal(const Graph& g, const Graph& h,
 
     // Increment branching counter and switch policy if threshold reached
     num++;
-    if (num > Maxnum) { M = M % 2 + 1; num = 0; }
+    if (num > Maxnum) {
+		if (policy_mode == 0) { M = M % 2 + 1; }
+		else { M = policy_mode; }
+		num = 0;
+	}
 
     // Select bidomain using current policy's scores
     int bd_idx = -1;
@@ -410,7 +415,11 @@ void solve_dal(const Graph& g, const Graph& h,
         // Update policy counter for each w tried (not just each v)
         if (i != 0) {
             num++;
-            if (num > Maxnum) { M = M % 2 + 1; num = 0; }
+            if (num > Maxnum) {
+				if (policy_mode == 0) { M = M % 2 + 1; }
+				else { M = policy_mode; }
+				num = 0;
+			}
         }
 
         // Select w using current policy's scores, skipping already-tried vertices
@@ -437,8 +446,8 @@ void solve_dal(const Graph& g, const Graph& h,
         }
 
         solve_dal(g, h, V, lgrade, rgrade, Q, incumbent, current,
-                g_matched, h_matched, new_domains, left, right,
-                goal, multiway, M, num, Maxnum, stats, start_time, abort_due_to_timeout);
+			g_matched, h_matched, domains, left, right, 1,
+			multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout);
 
         // Undo all matches added by the reward function (v,w and any LUM leaves)
         while (current.size() > cur_len) {
@@ -454,8 +463,8 @@ void solve_dal(const Graph& g, const Graph& h,
 
     // Branch where v is not matched at all
     solve_dal(g, h, V, lgrade, rgrade, Q, incumbent, current,
-            g_matched, h_matched, domains, left, right,
-            goal, multiway, M, num, Maxnum, stats, start_time, abort_due_to_timeout);
+        g_matched, h_matched, domains, left, right,
+        goal, multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout);
 }
 
 // Entry point for McSplit+DAL search.
@@ -463,7 +472,8 @@ void solve_dal(const Graph& g, const Graph& h,
 // packs leaf lists for LUM, runs solve_dal(), and converts solution back to
 // original vertex indices.
 std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway,
-        Stats& stats, std::atomic<bool>& abort_due_to_timeout) {
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout,
+        int policy_mode) {
 
     // Calculate degrees for vertex sorting
     auto calc_degrees = [](const Graph& g) {
@@ -550,9 +560,9 @@ std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway,
 
     std::vector<VtxPair> incumbent, current;
     auto start_time = std::chrono::steady_clock::now();
-    solve_dal(g_sorted, h_sorted, V, lgrade, rgrade, Q, incumbent, current,
-            g_matched, h_matched, domains, left, right, 1,
-            multiway, M, num, Maxnum, stats, start_time, abort_due_to_timeout);
+    solve_dal(g, h, V, lgrade, rgrade, Q, incumbent, current,
+        g_matched, h_matched, domains, left, right,
+        1, multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout);
 
     // Convert solution indices back to original (unsorted) vertex indices
     for (auto& p : incumbent) {
