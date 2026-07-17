@@ -446,7 +446,7 @@ void solve_dal(const Graph& g, const Graph& h,
         }
 
         solve_dal(g, h, V, lgrade, rgrade, Q, incumbent, current,
-			g_matched, h_matched, domains, left, right, 1,
+			g_matched, h_matched, new_domains, left, right, goal,
 			multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout);
 
         // Undo all matches added by the reward function (v,w and any LUM leaves)

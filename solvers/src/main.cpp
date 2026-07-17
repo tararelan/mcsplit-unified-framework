@@ -146,7 +146,7 @@ int main(int argc, char** argv) {
 	else if (arguments.algorithm == "ll_lsm")
 		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, false, true);
 	else if (arguments.algorithm == "ll_lum")
-		solution = solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, true, false);
+		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, true, false);
 	else if (arguments.algorithm == "dal")
         solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout, 0);
 	else if (arguments.algorithm == "dal_rl")

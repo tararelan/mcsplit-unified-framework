@@ -1,3 +1,4 @@
+instance_a, instance_b, algo, unified_size, unified_edges, unified_nodes, unified_time, unified_aborted, unified_root_ub, unified_nodes_to_best, unified_time_to_best,unified_cut_branches, unified_bound_pruned, unified_sym_pruned, unified_conflicts,
 mcs10_b03_s100.A00,mcs10_b03_s100.B00,dsb_never,62,49,25379127110,1000.02,1,100,1120695975,44.879,19057157425,19057157425,0,0,
 mcs10_b03_s100.A01,mcs10_b03_s100.B01,dsb_never,64,52,16975833421,1000.02,1,100,5237921372,323.28,14394006571,14394006571,0,0,
 mcs10_b03_s100.A02,mcs10_b03_s100.B02,dsb_never,61,46,25149309248,1000.01,1,100,9512670114,391.655,20172089775,20172089775,0,0,
