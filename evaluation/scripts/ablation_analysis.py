@@ -12,61 +12,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 from pathlib import Path
+from utils import BASE_ALGOS, ALL_ALGOS, GROUPS, LABELS, COLOURS as GROUP_COLORS, TIMEOUT, EASY_THRESHOLD
 
 pd.set_option('display.width', 200)
 pd.set_option('display.float_format', '{:.3f}'.format)
 
-BASE_ALGOS = ['mcsplit', 'rl', 'll', 'dal', 'dsb', 'rrsplit', 'symsplit']
-
-ALL_ALGOS = [
-    'mcsplit',
-    'rl',
-    'll', 'll_lum', 'll_lsm',
-    'dal', 'dal_rl', 'dal_dal',
-    'dsb', 'dsb_never', 'dsb_always',
-    'rrsplit', 'rrsplit_nobound', 'rrsplit_nomax', 'rrsplit_noveq',
-    'symsplit', 'symsplit_varonly', 'symsplit_valonly',
-]
-
-GROUPS = {
-    'McSplit (baseline)': ['mcsplit'],
-    'McSplit+RL':         ['rl'],
-    'McSplit+LL':         ['ll', 'll_lsm', 'll_lum'],
-    'McSplit+DAL':        ['dal', 'dal_rl', 'dal_dal'],
-    'McSplit+DSB':        ['dsb', 'dsb_never', 'dsb_always'],
-    'RRSplit':            ['rrsplit', 'rrsplit_nobound', 'rrsplit_nomax', 'rrsplit_noveq'],
-    'SymSplit':           ['symsplit', 'symsplit_varonly', 'symsplit_valonly'],
-}
-
-LABELS = {
-    'mcsplit': 'McSplit', 'rl': 'McSplit+RL',
-    'll': 'Full', 'll_lsm': 'LSM only', 'll_lum': 'LUM only',
-    'dal': 'Full', 'dal_rl': 'RL policy only', 'dal_dal': 'DAL policy only',
-    'dsb': 'Full (gated)', 'dsb_never': 'Never (sanity)', 'dsb_always': 'Always',
-    'rrsplit': 'Full', 'rrsplit_nobound': 'No bound',
-    'rrsplit_nomax': 'No maximality', 'rrsplit_noveq': 'No vertex-equiv',
-    'symsplit': 'Full', 'symsplit_varonly': 'Var sym only', 'symsplit_valonly': 'Val sym only',
-}
-
-GROUP_COLORS = {
-    'McSplit (baseline)': '#555555', 'McSplit+RL': '#e07b39',
-    'McSplit+LL': '#e0a800', 'McSplit+DAL': '#c94040',
-    'McSplit+DSB': '#7a5c9e', 'RRSplit': '#2e86ab', 'SymSplit': '#3a9e5f',
-}
-
 VALIDATION_DIR = Path('hpc/validation/results')
 ABLATION_DIR   = Path('hpc/ablation/results')
+
+dfs = []
 
 COLS = [
     'instance_a', 'instance_b', 'algo',
     'unified_size', 'unified_edges', 'unified_nodes', 'unified_time',
-    'unified_aborted', 'unified_root_ub', 'unified_nodes_to_best',
+    'unified_aborted', 'unified_nodes_to_best',
     'unified_time_to_best', 'unified_cut_branches', 'unified_bound_pruned',
-    'unified_sym_pruned', 'unified_conflicts',
+    'unified_sym_pruned',
 ]
-
-# ── 2. Load ───────────────────────────────────────────────────────────────────
-dfs = []
 
 # Base algorithms from validation results
 for algo in BASE_ALGOS:
@@ -102,9 +64,6 @@ for col in ['unified_size', 'unified_aborted', 'unified_time', 'unified_nodes',
 inst_key = ['instance_a', 'instance_b']
 
 # ── 3. Difficulty Classification (using base algorithms only) ─────────────────
-TIMEOUT = 1000.0
-EASY_THRESHOLD = 10.0
-
 base_data = all_data[all_data['algo'].isin(BASE_ALGOS)].copy()
 base_data['solve_time'] = base_data.apply(
     lambda r: r['unified_time'] if r['unified_aborted'] == 0 else np.nan, axis=1
@@ -203,7 +162,7 @@ ax.axvline(BASELINE_PCT, color='#555555', linestyle='--', linewidth=1.2,
            label=f'McSplit baseline ({BASELINE_PCT:.1f}%)', zorder=1)
 ax.set_yticks(yticks); ax.set_yticklabels(yticklabels, fontsize=9)
 ax.set_xlabel('Solved (% of medium instances)', fontsize=10)
-ax.set_title('Ablation Study — Medium Instances (MIVIA)', fontsize=11, fontweight='bold')
+ax.set_title('Ablation Study - Medium Instances (MIVIA)', fontsize=11, fontweight='bold')
 ax.legend(fontsize=8, loc='upper left')
 ax.set_xlim(74, 101)
 ax.grid(axis='x', linestyle=':', alpha=0.5)
@@ -227,7 +186,7 @@ print('Saved ablation_dotplot.png')
 
 # ── 7. Symmetry-pruned branches on MIVIA ─────────────────────────────────────
 print('\n=== Symmetry-Pruned Branches (medium instances, MIVIA) ===\n')
-print('Shows how often symmetry mechanisms fire — expected to be low on synthetic graphs.\n')
+print('Shows how often symmetry mechanisms fire - expected to be low on synthetic graphs.\n')
 
 sym_algos = ['rrsplit', 'rrsplit_noveq', 'symsplit', 'symsplit_varonly', 'symsplit_valonly']
 sym_data = medium_data[medium_data['algo'].isin(sym_algos) & (medium_data['unified_aborted'] == 0)]

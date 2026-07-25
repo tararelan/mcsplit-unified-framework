@@ -37,7 +37,7 @@ static int calc_bound(const std::vector<Bidomain>& domains) {
 }
 
 // Finds the smallest vertex index in left[start_idx .. start_idx+len-1].
-// Used as a tiebreaker in bidomain selection — when two bidomains have the
+// Used as a tiebreaker in bidomain selection - when two bidomains have the
 // same max(left_len, right_len), we prefer the one whose left set contains
 // the smallest-indexed vertex. This makes the search deterministic and
 // consistent with the reference implementation.
@@ -51,7 +51,7 @@ int find_min_value(const std::vector<int>& arr, int start_idx, int len) {
 
 // Selects which bidomain to branch on next.
 // McSplit's heuristic: pick the bidomain with the smallest max(left_len, right_len).
-// This is a fail-first strategy — branch on the most constrained choice first,
+// This is a fail-first strategy - branch on the most constrained choice first,
 // which tends to find contradictions earlier and prune more of the search tree.
 // Ties broken by smallest vertex index in the left set.
 int select_bidomain(const std::vector<Bidomain>& domains, const std::vector<int>& left, int current_matching_size) {
@@ -80,7 +80,7 @@ int select_bidomain(const std::vector<Bidomain>& domains, const std::vector<int>
 // adjacent to the vertex represented by adjrow come first, followed by
 // non-adjacent vertices. Returns the count of adjacent vertices (i.e. the
 // length of the adjacent prefix).
-// This is the core operation of filter_domains — it splits one side of a
+// This is the core operation of filter_domains - it splits one side of a
 // bidomain into adjacent and non-adjacent parts in O(len) time without
 // allocating any new memory.
 int partition(std::vector<int>& all_vv, int start, int len, const std::vector<unsigned int>& adjrow) {
@@ -105,7 +105,7 @@ void remove_vtx_from_left_domain(std::vector<int>& left, Bidomain& bd, int v) {
 }
 
 // Removes a bidomain from the list by replacing it with the last element
-// and popping the back. O(1) — order within the list does not matter.
+// and popping the back. O(1) - order within the list does not matter.
 static void remove_bidomain(std::vector<Bidomain>& domains, int idx) {
     domains[idx] = domains[domains.size() - 1];
     domains.pop_back();
@@ -119,7 +119,7 @@ static void remove_bidomain(std::vector<Bidomain>& domains, int idx) {
 // any future match must preserve adjacency/non-adjacency relative to (v,w).
 //
 // In multiway mode (labelled or directed graphs), the adjacent part is further
-// split by edge label value — vertices with different edge labels to v (or w)
+// split by edge label value - vertices with different edge labels to v (or w)
 // go into separate bidomains, since they can only be matched with vertices
 // carrying the same label.
 std::vector<Bidomain> filter_domains(const std::vector<Bidomain>& d, std::vector<int>& left,
@@ -157,7 +157,7 @@ std::vector<Bidomain> filter_domains(const std::vector<Bidomain>& d, std::vector
                 if (left_label < right_label) { li++; }
                 else if (left_label > right_label) { ri++; }
                 else {
-                    // Both sides have the same edge label — create one bidomain
+                    // Both sides have the same edge label - create one bidomain
                     // for this label value, spanning all consecutive vertices with it
                     int lmin = li, rmin = ri;
                     do { li++; } while (li < l_top && adjrow_v[left[li]] == left_label);
@@ -177,7 +177,7 @@ std::vector<Bidomain> filter_domains(const std::vector<Bidomain>& d, std::vector
 // At each node:
 //   1. Check timeout
 //   2. Update incumbent if current solution is larger
-//   3. Compute upper bound — prune if it cannot beat incumbent
+//   3. Compute upper bound - prune if it cannot beat incumbent
 //   4. Select the most constrained bidomain (smallest max(|L|,|R|))
 //   5. Select the smallest-indexed vertex v from its left side
 //   6. Try matching v with each w in the right side in ascending order:
@@ -216,7 +216,7 @@ void solve(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
 
     // Select bidomain to branch on: smallest max(left_len, right_len)
     int bd_idx = select_bidomain(domains, left, current.size());
-    if (bd_idx == -1) return; // No bidomains left — search complete at this node
+    if (bd_idx == -1) return; // No bidomains left - search complete at this node
 
     Bidomain& bd = domains[bd_idx];
 
@@ -257,7 +257,7 @@ void solve(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
     if (bd.left_len == 0)
         remove_bidomain(domains, bd_idx);
 
-    // Branch 2: try not matching v at all — recurse without v in any solution
+    // Branch 2: try not matching v at all - recurse without v in any solution
     solve(g, h, incumbent, current, domains, left, right, goal,
             multiway, stats, start_time, abort_due_to_timeout);
 }
@@ -269,7 +269,7 @@ std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout) {
 
     // Calculate degree of each vertex for sorting.
-    // Only counts outgoing edges (adjmat[v][w] & 1) — consistent with
+    // Only counts outgoing edges (adjmat[v][w] & 1) - consistent with
     // the reference implementation's degree-based vertex ordering.
     auto calc_degrees = [](const Graph& g) {
         std::vector<int> degree(g.n, 0);
@@ -285,7 +285,7 @@ std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway,
     // Determine graph density to decide sort direction.
     // Dense graphs: sort ascending (low-degree vertices first).
     // Sparse graphs: sort descending (high-degree vertices first).
-    // The sort is applied to G using H's density and vice versa — this
+    // The sort is applied to G using H's density and vice versa - this
     // matches the reference implementation's sorting logic.
     int g_edges = 0, h_edges = 0;
     for (int d : g_deg) g_edges += d;
@@ -303,12 +303,12 @@ std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway,
         return g_dense ? h_deg[a] < h_deg[b] : h_deg[a] > h_deg[b];
     });
 
-    // Create sorted copies of both graphs — search runs on these,
+    // Create sorted copies of both graphs - search runs on these,
     // solution is converted back to original indices at the end
     Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
     Graph h_sorted = induced_subgraph(const_cast<Graph&>(h), vv1);
 
-    // Build initial bidomains — one per label value shared by both graphs.
+    // Build initial bidomains - one per label value shared by both graphs.
     // Each bidomain pairs all G-vertices with a given label against all
     // H-vertices with the same label. At the start, no vertices are matched
     // so label compatibility is the only constraint.
@@ -337,10 +337,6 @@ std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway,
         if (left_len && right_len)
             domains.push_back({start_l, start_r, left_len, right_len, false});
     }
-
-    // Record root upper bound before any branching — useful for measuring
-    // how tight the initial bound is relative to the true MCS size
-    stats.root_upper_bound = calc_bound(domains);
 
     std::vector<VtxPair> incumbent, current;
     auto start_time = std::chrono::steady_clock::now();

@@ -1,5 +1,5 @@
 #!/bin/bash
-# submit_lv.sh — submit ONE algorithm for LV
+# submit_lv.sh - submit ONE algorithm for LV
 # Usage: bash hpc/cross-dataset-evaluation/scripts/submit_lv.sh mcsplit
 
 ALGO=$1

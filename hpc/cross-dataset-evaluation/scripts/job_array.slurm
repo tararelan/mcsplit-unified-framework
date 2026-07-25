@@ -15,4 +15,6 @@ INSTANCE=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" $INSTANCE_LIST)
 A=$(echo $INSTANCE | awk '{print $1}')
 B=$(echo $INSTANCE | awk '{print $2}')
 
-bash hpc/cross-dataset-evaluation/scripts/run_instance.sh $ALGO $A $B $DATASET
+# bash hpc/cross-dataset-evaluation/scripts/run_instance.sh $ALGO $A $B $DATASET
+
+bash hpc/cross-dataset-evaluation/scripts/run_instance_reference.sh $ALGO $A $B $DATASET

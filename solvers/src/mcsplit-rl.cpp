@@ -132,7 +132,7 @@ static void remove_vtx_from_array_rl(std::vector<int>& arr, int start_idx, int& 
 // RL reward function without LUM.
 // Matches (v, w), computes the RL reward (bound reduction caused by the split),
 // and updates lgrade[v] and rgrade[w]. Both scores use the same threshold (1e9)
-// — this is the key difference from McSplit+LL which uses asymmetric thresholds
+// - this is the key difference from McSplit+LL which uses asymmetric thresholds
 // (1e5 for lgrade, 1e9 for rgrade).
 static std::vector<Bidomain> rewardfeed_rl(const std::vector<Bidomain>& d,
         std::vector<VtxPair>& current,
@@ -192,9 +192,8 @@ static std::vector<Bidomain> rewardfeed_rl(const std::vector<Bidomain>& d,
         }
     }
 
-    // Update RL scores — both use 1e9 threshold (symmetric, unlike LL)
+    // Update RL scores - both use 1e9 threshold (symmetric, unlike LL)
     if (total > 0) {
-        stats.conflicts++;
         lgrade[v] += total;
         if (lgrade[v] > 1e9) {
             for (int i = 0; i < g.n; i++) { lgrade[i] /= 1e9; }
@@ -210,7 +209,7 @@ static std::vector<Bidomain> rewardfeed_rl(const std::vector<Bidomain>& d,
 // RL reward function with LUM.
 // Extends rewardfeed_rl with leaf union matching: after matching (v, w),
 // immediately match all compatible leaf pairs. Leaf vertices have degree 1
-// so they always end up in the same bidomain — matching them in bulk avoids
+// so they always end up in the same bidomain - matching them in bulk avoids
 // branching on trivial choices.
 // Score update is identical to rewardfeed_rl (symmetric 1e9 threshold).
 static std::vector<Bidomain> rewardfeed_rllum(const std::vector<Bidomain>& d,
@@ -305,9 +304,8 @@ static std::vector<Bidomain> rewardfeed_rllum(const std::vector<Bidomain>& d,
         }
     }
 
-    // Score update identical to RL — symmetric 1e9 threshold on both sides
+    // Score update identical to RL - symmetric 1e9 threshold on both sides
     if (total > 0) {
-        stats.conflicts++;
         lgrade[v] += total;
         if (lgrade[v] > 1e9) {
             for (int i = 0; i < g.n; i++) { lgrade[i] /= 1e9; }
@@ -448,7 +446,7 @@ static std::vector<VtxPair> mcs_rl_common(const Graph& g, const Graph& h,
         pack_leaves(h_sorted);
     }
 
-    // Per-label bidomains — same as McSplit, DAL, LL
+    // Per-label bidomains - same as McSplit, DAL, LL
     std::vector<int> left, right;
     std::vector<Bidomain> domains;
 
@@ -475,8 +473,6 @@ static std::vector<VtxPair> mcs_rl_common(const Graph& g, const Graph& h,
             domains.push_back({start_l, start_r, left_len, right_len, false});
         }
     }
-
-    stats.root_upper_bound = calc_bound_rl(domains);
 
     std::vector<gtype_rl> lgrade(g_sorted.n, 0);
     std::vector<gtype_rl> rgrade(h_sorted.n, 0);

@@ -1,9 +1,9 @@
 """
 4.2 MIVIA Benchmark Results
-4.2.1 Instance Difficulty Classification — easy/medium/hard counts
-4.2.2 Instances Solved on Shared Moderate Set — solve table + cactus plot (time)
-4.2.3 Per-Node Overhead Analysis — nodes vs time scatter
-4.2.4 Hard Instance Analysis — incumbent sizes, flat result motivation
+4.2.1 Instance Difficulty Classification - easy/medium/hard counts
+4.2.2 Instances Solved on Shared Moderate Set - solve table + cactus plot (time)
+4.2.3 Per-Node Overhead Analysis - nodes vs time scatter
+4.2.4 Hard Instance Analysis - incumbent sizes, flat result motivation
 """
 
 import pandas as pd
@@ -31,9 +31,9 @@ COLORS = {
 COLS = [
     'instance_a', 'instance_b', 'algo',
     'unified_size', 'unified_edges', 'unified_nodes', 'unified_time',
-    'unified_aborted', 'unified_root_ub', 'unified_nodes_to_best',
+    'unified_aborted', 'unified_nodes_to_best',
     'unified_time_to_best', 'unified_cut_branches', 'unified_bound_pruned',
-    'unified_sym_pruned', 'unified_conflicts',
+    'unified_sym_pruned',
     'ref_size', 'ref_nodes', 'ref_time', 'match'
 ]
 
@@ -95,6 +95,7 @@ difficulty = pd.Series(
 
 print('Difficulty distribution:')
 print(difficulty.value_counts())
+difficulty.value_counts().to_csv("evaluation/results/mivia_difficulty_distribution.csv")
 
 medium_instances = set(difficulty[difficulty == 'medium'].index)
 hard_instances   = set(difficulty[difficulty == 'hard'].index)
@@ -122,6 +123,7 @@ for algo in ALGOS:
 
 solved_df = pd.DataFrame(rows).set_index('Algorithm')
 print(solved_df)
+solved_df.to_csv("evaluation/results/mivia_solved_difficulty.csv")
 
 # Cactus plot: time vs instances solved
 fig, ax = plt.subplots(figsize=(9, 5))
@@ -177,7 +179,7 @@ print('Saved mivia_cactus_nodes.png')
 
 # ── 4.2.3 Per-Node Overhead Analysis ─────────────────────────────────────────
 print('\n=== 4.2.3 Per-Node Overhead Analysis ===\n')
-print('Time per node (microseconds) — proxy for per-node cost.')
+print('Time per node (microseconds) - proxy for per-node cost.')
 print('Higher = more work done per branching decision.\n')
 
 completed = medium_data[medium_data['unified_aborted'] == 0].copy()
@@ -189,6 +191,7 @@ overhead = completed.groupby('algo')['time_per_node_us'].agg(['median', 'mean'])
 overhead.index = [LABELS[a] for a in overhead.index]
 overhead.columns = ['Median µs/node', 'Mean µs/node']
 print(overhead.round(3))
+overhead.to_csv("evaluation/results/overhead.csv")
 
 completed = medium_data[medium_data['unified_aborted'] == 0].copy()
 completed['time_per_node_us'] = completed['unified_time'] / completed['unified_nodes'] * 1e6
@@ -227,6 +230,7 @@ for algo in ALGOS:
 
 hard_df = pd.DataFrame(rows).set_index('Algorithm')
 print(hard_df)
+hard_df.to_csv("evaluation/results/mivia_hard_instances.csv")
 
 # Check whether any algorithm consistently finds larger incumbents
 # Pivot incumbent sizes and compute pairwise dominance
@@ -243,7 +247,7 @@ for a in ALGOS:
     row = [LABELS[a]]
     for b in ALGOS:
         if a == b:
-            row.append('—')
+            row.append('-')
             continue
         if a not in pivot.columns or b not in pivot.columns:
             row.append('N/A')
@@ -258,6 +262,80 @@ for a in ALGOS:
 
 dom_df = pd.DataFrame(rows_dom, columns=header).set_index('')
 print(dom_df)
+dom_df.to_csv("evaluation/results/mivia_hard_dominates.csv")
 print('\nNo algorithm consistently dominates on MIVIA hard instances.')
 print('This motivates cross-dataset evaluation on BI and LV (Section 4.4),')
 print('where structural properties allow algorithms to meaningfully separate.')
+
+all_data['unified_nodes_to_best'] = pd.to_numeric(all_data['unified_nodes_to_best'], errors='coerce')
+all_data['unified_time_to_best'] = pd.to_numeric(all_data['unified_time_to_best'], errors='coerce')
+all_data['unified_nodes'] = pd.to_numeric(all_data['unified_nodes'], errors='coerce')
+
+for dataset_name, data, instances in [
+    ('MIVIA', all_data, medium_data),
+]:
+    sub = data[data['algo'].isin(['rrsplit', 'symsplit'])].copy()
+    
+    # Pivot nodes_to_best and time_to_best
+    nodes_pivot = sub.pivot_table(
+        index=inst_key, columns='algo', 
+        values='unified_nodes_to_best', aggfunc='first'
+    )
+    time_pivot = sub.pivot_table(
+        index=inst_key, columns='algo',
+        values='unified_time_to_best', aggfunc='first'
+    )
+    
+    # Only instances where both have data
+    mask = nodes_pivot['rrsplit'].notna() & nodes_pivot['symsplit'].notna()
+    nodes_pivot = nodes_pivot[mask]
+    time_pivot = time_pivot[mask]
+    
+    print(f'\n=== {dataset_name} ===')
+    print(f'Instances compared: {mask.sum()}')
+    
+    print('\nNodes to best incumbent:')
+    print(f'  SymSplit median:  {nodes_pivot["symsplit"].median():.0f}')
+    print(f'  RRSplit median:   {nodes_pivot["rrsplit"].median():.0f}')
+    print(f'  SymSplit finds incumbent in fewer nodes: '
+          f'{(nodes_pivot["symsplit"] < nodes_pivot["rrsplit"]).sum()}/{mask.sum()} instances')
+    
+    print('\nTime to best incumbent:')
+    print(f'  SymSplit median:  {time_pivot["symsplit"].median():.3f}s')
+    print(f'  RRSplit median:   {time_pivot["rrsplit"].median():.3f}s')
+    print(f'  SymSplit finds incumbent faster: '
+          f'{(time_pivot["symsplit"] < time_pivot["rrsplit"]).sum()}/{mask.sum()} instances')
+    
+    # Total nodes explored comparison on instances both solved
+    total_nodes = sub.pivot_table(
+        index=inst_key, columns='algo',
+        values='unified_nodes', aggfunc='first'
+    )
+    
+    # Both solved (not aborted)
+    abort_pivot = sub.pivot_table(
+        index=inst_key, columns='algo',
+        values='unified_aborted', aggfunc='first'
+    )
+    both_solved = (abort_pivot['rrsplit'] == 0) & (abort_pivot['symsplit'] == 0)
+    total_nodes_solved = total_nodes[both_solved]
+    
+    print(f'\nTotal nodes explored (instances both solved, n={both_solved.sum()}):')
+    print(f'  SymSplit median:  {total_nodes_solved["symsplit"].median():.0f}')
+    print(f'  RRSplit median:   {total_nodes_solved["rrsplit"].median():.0f}')
+    print(f'  SymSplit explores fewer total nodes: '
+          f'{(total_nodes_solved["symsplit"] < total_nodes_solved["rrsplit"]).sum()}/{both_solved.sum()} instances')
+    
+    # Also check time per node to confirm the per-node cost explanation
+    time_solved = sub[sub['unified_aborted'] == 0].pivot_table(
+        index=inst_key, columns='algo',
+        values='unified_time', aggfunc='first'
+    )
+    nodes_solved = total_nodes_solved
+    common = time_solved.index.intersection(nodes_solved.index)
+    
+    sym_tpn = (time_solved.loc[common, 'symsplit'] / nodes_solved.loc[common, 'symsplit'] * 1e6).median()
+    rr_tpn  = (time_solved.loc[common, 'rrsplit']  / nodes_solved.loc[common, 'rrsplit']  * 1e6).median()
+    print(f'\nMedian time per node on solved instances (µs):')
+    print(f'  SymSplit: {sym_tpn:.3f}')
+    print(f'  RRSplit:  {rr_tpn:.3f}')

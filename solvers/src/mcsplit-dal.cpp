@@ -71,14 +71,14 @@ int remove_matched_vertex(std::vector<int>& arr, int start, int len, const std::
 }
 
 // Removes a vertex from an array by swapping with last element and decrementing len.
-// O(1) removal — used to remove v from the left side of its bidomain before branching.
+// O(1) removal - used to remove v from the left side of its bidomain before branching.
 void remove_vtx_from_array(std::vector<int>& arr, int start_idx, int& len, int remove_idx) {
     len--;
     std::swap(arr[start_idx + remove_idx], arr[start_idx + len]);
 }
 
 // Removes a bidomain by replacing it with the last element and popping.
-// O(1) — order within the list does not matter.
+// O(1) - order within the list does not matter.
 static void remove_bidomain(std::vector<Bidomain>& domains, int idx) {
     domains[idx] = domains[domains.size() - 1];
     domains.pop_back();
@@ -123,7 +123,7 @@ int selectW_index(const std::vector<int>& arr, const std::vector<gtype>& grade, 
 
 // Selects bidomain with smallest max(left_len, right_len).
 // Ties broken by the highest-scored vertex in the left set (not smallest index as in McSplit).
-// This is the key difference from McSplit's select_bidomain — DAL/RL use scores for tiebreaking.
+// This is the key difference from McSplit's select_bidomain - DAL/RL use scores for tiebreaking.
 int select_bidomain_dal(const std::vector<Bidomain>& domains, const std::vector<int>& left, const std::vector<gtype>& grade, int current_matching_size) {
     int min_size = INT_MAX;
     int min_tie_breaker = INT_MAX;
@@ -206,7 +206,6 @@ std::vector<Bidomain> rewardfeed_RL(const std::vector<Bidomain>& d, std::vector<
 
     // Update RL scores and decay if threshold exceeded
     if (total > 0) {
-        stats.conflicts++;
         lgrade[v] += total;
         if (lgrade[v] > short_memory_threshold) {
             for (int i = 0; i < g.n; i++) { lgrade[i] /= 2; }
@@ -328,7 +327,6 @@ std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector
     int domgrade = new_d.size();
     total = total + domgrade;
     if (total > 0) {
-        stats.conflicts++;
         V[v] += total;
         Qv[w] += total;
         // Decay V scores (short-term) if threshold exceeded
@@ -345,8 +343,8 @@ std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector
 
 // Core BnB recursive search for McSplit+DAL.
 // Alternates between two branching policies on a fixed schedule:
-//   M=1: RL policy — select v and w by lgrade/rgrade (bound-reduction scores)
-//   M=2: DAL policy — select v and w by V/Q[v] (bound-reduction + domain-count scores)
+//   M=1: RL policy - select v and w by lgrade/rgrade (bound-reduction scores)
+//   M=2: DAL policy - select v and w by V/Q[v] (bound-reduction + domain-count scores)
 // Policy switches every Maxnum = 2*min(|G|,|H|) branching decisions.
 // This hybrid approach avoids the Matthew effect where a single policy
 // concentrates on a small subset of high-score vertices.
@@ -541,8 +539,6 @@ std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway,
             domains.push_back({start_l, start_r, left_len, right_len, false});
         }
     }
-
-    stats.root_upper_bound = calc_bound(domains);
 
     // Initialise score vectors
     // lgrade/rgrade: per-vertex RL scores (short-term memory)

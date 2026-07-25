@@ -29,8 +29,8 @@ std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d,
         std::vector<int>& g_matched, std::vector<int>& h_matched,
         std::vector<int>& left, std::vector<int>& right,
         std::vector<gtype>& lgrade,
-        std::vector<gtype>& Qv,        // per-pair row Q[v] — used when use_lsm=true
-        std::vector<gtype>& rgrade,    // per-vertex rgrade — used when use_lsm=false
+        std::vector<gtype>& Qv,        // per-pair row Q[v] - used when use_lsm=true
+        std::vector<gtype>& rgrade,    // per-vertex rgrade - used when use_lsm=false
         const Graph& g, const Graph& h,
         int v, int w, bool multiway,
         bool use_lum, bool use_lsm,
@@ -259,7 +259,6 @@ std::vector<Bidomain> rewardfeed_ll(
     // use_lsm=true:  update lgrade[v] (S0, short-term) and Qv[w] (St, long-term per-pair)
     // use_lsm=false: update lgrade[v] and rgrade[w] (both per-vertex, McSplit+RL behaviour)
     if (total > 0) {
-        stats.conflicts++;
         lgrade[v] += total;
         if (use_lsm) {
             Qv[w] += total;
@@ -364,7 +363,7 @@ void solve_ll(const Graph& g, const Graph& h,
 // use_lum=true,  use_lsm=true  → full McSplit+LL
 // use_lum=false, use_lsm=true  → LSM only (no leaf matching)
 // use_lum=true,  use_lsm=false → LUM only (per-vertex w-scoring, McSplit+RL style)
-// use_lum=false, use_lsm=false → plain McSplit+RL (sanity check — should match rl results)
+// use_lum=false, use_lsm=false → plain McSplit+RL (sanity check - should match rl results)
 
 std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
@@ -428,8 +427,6 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
         if (left_len && right_len)
             domains.push_back({start_l, start_r, left_len, right_len, false});
     }
-
-    stats.root_upper_bound = calc_bound_ll(domains);
 
     // S0: short-term per-vertex score for v (and w when use_lsm=false)
     std::vector<gtype> lgrade(g_sorted.n, 0);

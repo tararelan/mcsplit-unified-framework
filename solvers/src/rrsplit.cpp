@@ -165,7 +165,7 @@ std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vec
 //   bit 1 (value 2) = maximality reduction (best_match commit/prune)
 //   bit 2 (value 4) = tighter equivalence-class bound
 // Presets:
-//   7 (111) = full RRSplit — all reductions on
+//   7 (111) = full RRSplit - all reductions on
 //   6 (110) = no vertex-equivalence (max + bound only)
 //   5 (101) = no maximality (veq + bound only)
 //   3 (011) = no tighter bound (veq + max only)
@@ -295,7 +295,7 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
     bd.right_len++;
 
     // Vertex-equivalence reduction (exclude branch):
-    // Remove all G-vertices equivalent to v — their branches are isomorphic
+    // Remove all G-vertices equivalent to v - their branches are isomorphic
     if (red_mode & 1) {   // VEQ enabled
         for (int i = 0; i < bd.left_len; i++) {
             if (EqClass[left[bd.l + i]] == EqClass[v]) {
@@ -360,14 +360,12 @@ std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
     std::vector<int> index_right(h_sorted.n);
     for (int i = 0; i < h_sorted.n; i++) { index_right[i] = i; }
 
-    // Single bidomain — reference does not split by label
+    // Single bidomain - reference does not split by label
     std::vector<int> left, right;
     for (int i = 0; i < g_sorted.n; i++) { left.push_back(i); }
     for (int i = 0; i < h_sorted.n; i++) { right.push_back(i); }
     std::vector<Bidomain> domains;
     domains.push_back({0, 0, g_sorted.n, h_sorted.n, false});
-
-    stats.root_upper_bound = calc_bound(domains);
 
     std::vector<VtxPair> incumbent, current;
     auto start_time = std::chrono::steady_clock::now();

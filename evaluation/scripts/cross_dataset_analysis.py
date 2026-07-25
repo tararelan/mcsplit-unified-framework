@@ -34,9 +34,9 @@ COLORS = {
 COLS = [
     'instance_a', 'instance_b', 'algo',
     'unified_size', 'unified_edges', 'unified_nodes', 'unified_time',
-    'unified_aborted', 'unified_root_ub', 'unified_nodes_to_best',
+    'unified_aborted', 'unified_nodes_to_best',
     'unified_time_to_best', 'unified_cut_branches', 'unified_bound_pruned',
-    'unified_sym_pruned', 'unified_conflicts',
+    'unified_sym_pruned'
 ]
 
 TIMEOUT = 1000.0
@@ -122,7 +122,32 @@ def cactus_time(medium_data, title, fname):
                 label=LABELS[algo], color=COLORS[algo], linewidth=1.8)
     ax.set_xlabel('Wall-clock time (s)', fontsize=11)
     ax.set_ylabel('Instances solved', fontsize=11)
-    ax.set_xscale('log')
+    # ax.set_xscale('log')
+    ax.set_title(title, fontsize=11)
+    ax.legend(fontsize=9, loc='upper left')
+    ax.set_ylim(bottom=0)
+    ax.grid(True, alpha=0.3)
+    ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(fname, bbox_inches='tight')
+    plt.show()
+    print(f'Saved {fname}')
+
+
+def cactus_nodes(medium_data, title, fname):
+    fig, ax = plt.subplots(figsize=(9, 5))
+    for algo in ALGOS:
+        sub = medium_data[
+            (medium_data['algo'] == algo) &
+            (medium_data['unified_aborted'] == 0)
+        ]['unified_nodes'].sort_values().values
+        if len(sub) == 0:
+            continue
+        ax.plot(sub, np.arange(1, len(sub) + 1),
+                label=LABELS[algo], color=COLORS[algo], linewidth=1.8)
+    ax.set_xlabel('Nodes', fontsize=11)
+    ax.set_ylabel('Instances Solved', fontsize=11)
+    # ax.set_xscale('log')
     ax.set_title(title, fontsize=11)
     ax.legend(fontsize=9, loc='upper left')
     ax.set_ylim(bottom=0)
@@ -134,7 +159,6 @@ def cactus_time(medium_data, title, fname):
     print(f'Saved {fname}')
 
 def hard_instance_analysis(data, difficulty, dataset_name):
-    """For hard instances: what incumbent size did each algo find before timeout?"""
     hard_instances = set(difficulty[difficulty == 'hard'].index)
     hard_mask = data.set_index(inst_key).index.isin(hard_instances)
     hard_data = data[hard_mask].copy()
@@ -142,50 +166,66 @@ def hard_instance_analysis(data, difficulty, dataset_name):
     print(f'\n--- Hard Instance Analysis: {dataset_name} ---')
     print(f'Total hard instances: {len(hard_instances)}\n')
 
-    # Incumbent sizes found before timeout
+    # Per-algorithm hard instance counts and incumbent sizes
     rows = []
     for algo in ALGOS:
         sub = hard_data[hard_data['algo'] == algo]
         if sub.empty:
             continue
-        # All hard instances are aborted; unified_size = best incumbent found
         sizes = sub['unified_size'].dropna()
         rows.append({
-            'Algorithm': LABELS[algo],
-            'Mean incumbent': round(sizes.mean(), 2),
-            'Median incumbent': round(sizes.median(), 2),
+            'Algorithm':       LABELS[algo],
+            'Hard instances':  len(sub),
+            'Mean incumbent':  round(sizes.mean(), 2),
+            'Max incumbent':   int(sizes.max()) if len(sizes) > 0 else np.nan,
         })
-    incumbent_df = pd.DataFrame(rows).set_index('Algorithm')
-    print('Incumbent sizes found on hard instances (before timeout):')
-    print(incumbent_df)
 
-    # Delta analysis: for each instance where algos disagree,
-    # how much larger is the best algo's incumbent vs others?
-    # Pivot incumbent sizes
+    hard_df = pd.DataFrame(rows).set_index('Algorithm')
+    print(hard_df)
+
+    # Pairwise dominance matrix
     pivot = hard_data.pivot_table(
         index=inst_key, columns='algo', values='unified_size', aggfunc='first'
     )
 
-    # Pairwise delta between symsplit (best expected) and each other algo
-    if 'symsplit' in pivot.columns:
-        print('\nDelta: SymSplit incumbent - other algorithm (on hard instances where they differ):')
-        for algo in ALGOS:
-            if algo == 'symsplit' or algo not in pivot.columns:
-                continue
-            mask = pivot['symsplit'].notna() & pivot[algo].notna()
-            delta = pivot.loc[mask, 'symsplit'] - pivot.loc[mask, algo]
-            nonzero = delta[delta != 0]
-            if len(nonzero) == 0:
-                print(f'  vs {LABELS[algo]}: no differences')
-                continue
-            print(f'  vs {LABELS[algo]}: mean={nonzero.mean():.2f}, '
-                  f'median={nonzero.median():.1f}, '
-                  f'SymSplit better in {(nonzero > 0).sum()}/{len(nonzero)} cases')
+    print('\nPairwise: fraction of hard instances where algo A finds strictly larger incumbent than algo B:')
+    print('(Only instances where both have a valid incumbent)\n')
 
-    return incumbent_df
+    header = [''] + [LABELS[a] for a in ALGOS if a in pivot.columns]
+    rows_dom = []
+    for a in ALGOS:
+        if a not in pivot.columns:
+            continue
+        row = [LABELS[a]]
+        for b in ALGOS:
+            if b not in pivot.columns:
+                continue
+            if a == b:
+                row.append('-')
+                continue
+            mask = pivot[a].notna() & pivot[b].notna()
+            if mask.sum() == 0:
+                row.append('N/A')
+                continue
+            frac = (pivot.loc[mask, a] > pivot.loc[mask, b]).mean()
+            row.append(f'{frac:.2f}')
+        rows_dom.append(row)
+
+    dom_df = pd.DataFrame(rows_dom, columns=header).set_index('')
+    print(dom_df)
+
+    # SymSplit vs RRSplit on non-equal instances (replicates SymSplit paper Table 2)
+    if 'symsplit' in pivot.columns and 'rrsplit' in pivot.columns:
+        disagree = pivot['symsplit'] != pivot['rrsplit']
+        both_valid = pivot['symsplit'].notna() & pivot['rrsplit'].notna()
+        mask = disagree & both_valid
+        if mask.sum() > 0:
+            sym_wins = (pivot.loc[mask, 'symsplit'] > pivot.loc[mask, 'rrsplit']).mean()
+            print(f'\nSymSplit > RRSplit among disagreeing instances: {sym_wins:.2%} '
+                  f'(n={mask.sum()}) — cf. SymSplit paper Table 2 (>84%)')
 
 def sym_pruned_summary(medium_data, dataset_name):
-    """Symmetry-pruned branches for RRSplit/SymSplit — shows if mechanisms fire."""
+    """Symmetry-pruned branches for RRSplit/SymSplit - shows if mechanisms fire."""
     sym_algos = ['rrsplit', 'symsplit']
     sub = medium_data[
         medium_data['algo'].isin(sym_algos) & (medium_data['unified_aborted'] == 0)
@@ -219,13 +259,16 @@ if not bi_data.empty:
     print(solved_table(bi_medium_data, bi_medium))
 
     cactus_time(bi_medium_data,
-                'Cactus Plot: BI Dataset (Biochemical Reactions)',
+                'BI Dataset (Biochemical Reactions) Time versus Instances',
                 'evaluation/results/bi_cactus_time.png')
-
+    
+    cactus_nodes(bi_medium_data,
+                'BI Dataset (Biochemical Reactions) Nodes versus Instances',
+                'evaluation/results/bi_cactus_nodes.png')
     bi_incumbent = hard_instance_analysis(bi_data, bi_difficulty, 'BI')
     bi_sym = sym_pruned_summary(bi_medium_data, 'BI')
 else:
-    print('No BI data loaded — check file paths.')
+    print('No BI data loaded - check file paths.')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ── 6. LV Dataset ─────────────────────────────────────────────────────────────
@@ -249,13 +292,17 @@ if not lv_data.empty:
     print(solved_table(lv_medium_data, lv_medium))
 
     cactus_time(lv_medium_data,
-                'Cactus Plot: LV Dataset (Biological Networks)',
+                'LV Dataset Time versus Instances',
                 'evaluation/results/lv_cactus_time.png')
+    
+    cactus_nodes(lv_medium_data,
+                'LV Dataset Nodes versus Instances',
+                'evaluation/results/lv_cactus_nodes.png')
 
     lv_incumbent = hard_instance_analysis(lv_data, lv_difficulty, 'LV')
     lv_sym = sym_pruned_summary(lv_medium_data, 'LV')
 else:
-    print('No LV data loaded — check file paths.')
+    print('No LV data loaded - check file paths.')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ── 7. Comparison with MIVIA: symmetry-pruned branches across datasets ─────────
@@ -330,3 +377,94 @@ if mivia_dfs:
     plt.savefig('evaluation/results/sym_pruned_comparison.png', bbox_inches='tight')
     plt.show()
     print('Saved sym_pruned_comparison.png')
+
+
+# Compare nodes_to_best and time_to_best between SymSplit and RRSplit
+# on instances where both completed (medium) or both timed out (hard)
+
+for dataset_name, data, instances in [
+    ('BI', bi_data, bi_medium),
+    ('LV', lv_data, lv_medium),
+]:
+    sub = data[data['algo'].isin(['rrsplit', 'symsplit'])].copy()
+    
+    # Pivot nodes_to_best and time_to_best
+    nodes_pivot = sub.pivot_table(
+        index=inst_key, columns='algo', 
+        values='unified_nodes_to_best', aggfunc='first'
+    )
+    time_pivot = sub.pivot_table(
+        index=inst_key, columns='algo',
+        values='unified_time_to_best', aggfunc='first'
+    )
+    
+    # Only instances where both have data
+    mask = nodes_pivot['rrsplit'].notna() & nodes_pivot['symsplit'].notna()
+    nodes_pivot = nodes_pivot[mask]
+    time_pivot = time_pivot[mask]
+    
+    print(f'\n=== {dataset_name} ===')
+    print(f'Instances compared: {mask.sum()}')
+    
+    print('\nNodes to best incumbent:')
+    print(f'  SymSplit median:  {nodes_pivot["symsplit"].median():.0f}')
+    print(f'  RRSplit median:   {nodes_pivot["rrsplit"].median():.0f}')
+    print(f'  SymSplit finds incumbent in fewer nodes: '
+          f'{(nodes_pivot["symsplit"] < nodes_pivot["rrsplit"]).sum()}/{mask.sum()} instances')
+    
+    print('\nTime to best incumbent:')
+    print(f'  SymSplit median:  {time_pivot["symsplit"].median():.3f}s')
+    print(f'  RRSplit median:   {time_pivot["rrsplit"].median():.3f}s')
+    print(f'  SymSplit finds incumbent faster: '
+          f'{(time_pivot["symsplit"] < time_pivot["rrsplit"]).sum()}/{mask.sum()} instances')
+    
+    # Total nodes explored comparison on instances both solved
+    total_nodes = sub.pivot_table(
+        index=inst_key, columns='algo',
+        values='unified_nodes', aggfunc='first'
+    )
+    
+    # Both solved (not aborted)
+    abort_pivot = sub.pivot_table(
+        index=inst_key, columns='algo',
+        values='unified_aborted', aggfunc='first'
+    )
+    both_solved = (abort_pivot['rrsplit'] == 0) & (abort_pivot['symsplit'] == 0)
+    total_nodes_solved = total_nodes[both_solved]
+    
+    print(f'\nTotal nodes explored (instances both solved, n={both_solved.sum()}):')
+    print(f'  SymSplit median:  {total_nodes_solved["symsplit"].median():.0f}')
+    print(f'  RRSplit median:   {total_nodes_solved["rrsplit"].median():.0f}')
+    print(f'  SymSplit explores fewer total nodes: '
+          f'{(total_nodes_solved["symsplit"] < total_nodes_solved["rrsplit"]).sum()}/{both_solved.sum()} instances')
+    
+    # Also check time per node to confirm the per-node cost explanation
+    time_solved = sub[sub['unified_aborted'] == 0].pivot_table(
+        index=inst_key, columns='algo',
+        values='unified_time', aggfunc='first'
+    )
+    nodes_solved = total_nodes_solved
+    common = time_solved.index.intersection(nodes_solved.index)
+    
+    sym_tpn = (time_solved.loc[common, 'symsplit'] / nodes_solved.loc[common, 'symsplit'] * 1e6).median()
+    rr_tpn  = (time_solved.loc[common, 'rrsplit']  / nodes_solved.loc[common, 'rrsplit']  * 1e6).median()
+    print(f'\nMedian time per node on solved instances (µs):')
+    print(f'  SymSplit: {sym_tpn:.3f}')
+    print(f'  RRSplit:  {rr_tpn:.3f}')
+
+
+for dataset_name, data, medium_instances in [
+    ('BI', bi_data, bi_medium),
+    ('LV', lv_data, lv_medium),
+]:
+    med_mask = data.set_index(inst_key).index.isin(medium_instances)
+    medium_data_ds = data[med_mask].copy()
+    completed = medium_data_ds[medium_data_ds['unified_aborted'] == 0].copy()
+    completed['time_per_node_us'] = (
+        completed['unified_time'] / completed['unified_nodes'] * 1e6
+    )
+    overhead = completed.groupby('algo')['time_per_node_us'].agg(['median', 'mean'])
+    overhead.index = [LABELS.get(a, a) for a in overhead.index]
+    overhead.columns = ['Median µs/node', 'Mean µs/node']
+    print(f'\n=== Per-Node Overhead: {dataset_name} (medium instances) ===')
+    print(overhead.round(3))

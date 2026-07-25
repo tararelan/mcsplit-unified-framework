@@ -105,7 +105,7 @@ static unsigned int calc_bound_dsb(const Graph& g, const Graph& h,
             continue;
         }
 
-        // Special case: bidomain of size 2x2 — check if the two G-vertices
+        // Special case: bidomain of size 2x2 - check if the two G-vertices
         // are adjacent and if the two H-vertices are adjacent. If edge structure
         // differs, at most 1 can be matched.
         if (bd.left_len == 2 && bd.right_len == 2) {
@@ -279,12 +279,12 @@ std::vector<Bidomain> filter_domains_dsb(const std::vector<Bidomain>& d,
 
         if (left_len_noedge && right_len_noedge) {
             if (left_len != 0 || right_len != 0) {
-                // Bidomain split — cache invalidated
+                // Bidomain split - cache invalidated
                 new_d.push_back({l + left_len, r + right_len,
                                  left_len_noedge, right_len_noedge,
                                  old_bd.is_adjacent, -1, false});
             } else {
-                // Bidomain unchanged — inherit cached bound
+                // Bidomain unchanged - inherit cached bound
                 new_d.push_back({l + left_len, r + right_len,
                                  left_len_noedge, right_len_noedge,
                                  old_bd.is_adjacent, old_bd.size, old_bd.is_valid});
@@ -314,10 +314,10 @@ std::vector<Bidomain> filter_domains_dsb(const std::vector<Bidomain>& d,
             }
         } else if (left_len && right_len) {
             if (left_len_noedge != 0 || right_len_noedge != 0) {
-                // Bidomain split — cache invalidated
+                // Bidomain split - cache invalidated
                 new_d.push_back({l, r, left_len, right_len, true, -1, false});
             } else {
-                // Bidomain unchanged — inherit cached bound
+                // Bidomain unchanged - inherit cached bound
                 new_d.push_back({l, r, left_len, right_len,
                                  true, old_bd.size, old_bd.is_valid});
             }
@@ -352,7 +352,7 @@ static void remove_bidomain_dsb(std::vector<Bidomain>& domains, int idx) {
 
 // Core BnB search for McSplit+DSB.
 // Identical structure to McSplit except calc_bound_dsb replaces calc_bound.
-// The DSB bound is tighter on small balanced bidomains — it can prune branches
+// The DSB bound is tighter on small balanced bidomains - it can prune branches
 // that McSplit's bound cannot.
 void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         std::vector<VtxPair>& current, std::vector<Bidomain>& domains,
@@ -466,7 +466,7 @@ std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
     Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
     Graph h_sorted = induced_subgraph(const_cast<Graph&>(h), vv1);
 
-    // Build per-label bidomains — DSB uses label splitting like McSplit
+    // Build per-label bidomains - DSB uses label splitting like McSplit
     std::vector<int> left, right;
     std::vector<Bidomain> domains;
 
@@ -493,13 +493,6 @@ std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
             domains.push_back({start_l, start_r, left_len, right_len, false, -1, false});
         }
     }
-
-    // Compute root upper bound using McSplit's simple bound (before DSB tightening)
-    int root_ub = 0;
-    for (const Bidomain& bd : domains) {
-        root_ub += std::min(bd.left_len, bd.right_len);
-    }
-    stats.root_upper_bound = root_ub;
 
     // Initialise DSB probability table and adaptive bound control
     long double array[DSB_ROWS * DSB_BOXES];

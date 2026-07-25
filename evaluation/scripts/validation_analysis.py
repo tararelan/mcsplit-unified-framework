@@ -1,9 +1,9 @@
 """
 4.1 Validation Against Reference Implementations
-4.1.1 Solution Correctness  — agreement table (PASS/FAIL/MISSING)
-4.1.2 Search Tree Fidelity  — nodes scatter (unified vs reference)
-4.1.3 Runtime Fidelity      — time scatter + speedup table
-4.1.4 McSplit-DAL Bug       — +1 inflation in reference binary
+4.1.1 Solution Correctness  - agreement table (PASS/FAIL/MISSING)
+4.1.2 Search Tree Fidelity  - nodes scatter (unified vs reference)
+4.1.3 Runtime Fidelity      - time scatter + speedup table
+4.1.4 McSplit-DAL Bug       - +1 inflation in reference binary
 """
 
 import pandas as pd
@@ -31,9 +31,9 @@ COLORS = {
 COLS = [
     'instance_a', 'instance_b', 'algo',
     'unified_size', 'unified_edges', 'unified_nodes', 'unified_time',
-    'unified_aborted', 'unified_root_ub', 'unified_nodes_to_best',
+    'unified_aborted', 'unified_nodes_to_best',
     'unified_time_to_best', 'unified_cut_branches', 'unified_bound_pruned',
-    'unified_sym_pruned', 'unified_conflicts',
+    'unified_sym_pruned',
     'ref_size', 'ref_nodes', 'ref_time', 'match'
 ]
 
@@ -100,7 +100,7 @@ if not dal_fails.empty:
     print('\nDistribution of (unified_size - ref_size) on FAIL instances:')
     print(dal_fails['size_diff'].value_counts().sort_index())
     print('\nThe reference binary consistently reports one vertex more than the')
-    print('unified reimplementation — a +1 inflation bug in the reference binary.')
+    print('unified reimplementation - a +1 inflation bug in the reference binary.')
     print('The unified reimplementation is treated as correct.')
 
 # ── 4.1.2 Search Tree Fidelity ────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 #!/bin/bash
-# submit_bi.sh — submit ONE algorithm for BI
+# submit_bi.sh - submit ONE algorithm for BI
 # Usage: bash hpc/cross-dataset-evaluation/scripts/submit_bi.sh mcsplit
 
 ALGO=$1
