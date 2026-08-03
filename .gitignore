@@ -2,6 +2,3 @@
 instances/
 misc/
 reference/
-hpc/ablation/
-hpc/validation/
-hpc/cross-dataset-evaluation/
