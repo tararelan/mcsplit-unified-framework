@@ -10,6 +10,9 @@
 #include <atomic>
 #include <limits.h>
 
+// Forward declarations for McSplit+LL (LSM scoring + LUM leaf matching,
+// both independently toggleable via use_lsm/use_lum for the ablation
+// study - see Section 4.3).
 using gtype = double;
 const int short_memory_threshold_ll = 1e5;
 const long long int long_memory_threshold_ll = 1e9;
@@ -24,6 +27,10 @@ int partition_ll(std::vector<int>& all_vv, int start, int len, const std::vector
 int remove_matched_vertex_ll(std::vector<int>& arr, int start, int len, const std::vector<int>& matched);
 void remove_vtx_from_array_ll(std::vector<int>& arr, int start_idx, int& len, int remove_idx);
 
+// NOTE: Qv and rgrade are alternatives, not both used simultaneously -
+// Qv (per-pair Q[v] row) is read when use_lsm=true, rgrade (per-vertex)
+// is read when use_lsm=false. Both are passed so the caller doesn't need
+// two separate rewardfeed variants for the ablation's LSM-on/off modes.
 std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d,
         std::vector<VtxPair>& current,
         std::vector<int>& g_matched, std::vector<int>& h_matched,
@@ -53,8 +60,8 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
         bool use_lum = true, bool use_lsm = true);
 
-// ── Utility functions ─────────────────────────────────────────────────────────
 
+// McSplit's upper bound: sum of min(left_len, right_len) over all bidomains
 static int calc_bound_ll(const std::vector<Bidomain>& domains) {
     int bound = 0;
     for (const Bidomain& bd : domains)
@@ -62,11 +69,16 @@ static int calc_bound_ll(const std::vector<Bidomain>& domains) {
     return bound;
 }
 
+// Removes a bidomain by replacing it with the last element and popping;
+// order within the list does not matter
 static void remove_bidomain_ll(std::vector<Bidomain>& domains, int idx) {
     domains[idx] = domains[domains.size() - 1];
     domains.pop_back();
 }
 
+// Selects the vertex with the highest accumulated score in grade[],
+// breaking ties on smallest vertex index. max_g starts at -1 so the
+// first candidate is always accepted even if all scores are still 0.
 int selectV_index_ll(const std::vector<int>& arr, const std::vector<gtype>& grade,
         int start_idx, int len) {
     int idx = -1;
@@ -83,6 +95,9 @@ int selectV_index_ll(const std::vector<int>& arr, const std::vector<gtype>& grad
     return idx;
 }
 
+// Same as selectV_index_ll but skips vertices already tried in the
+// current branching loop (wselected). Returns -1 if all candidates
+// in range have already been tried - callers must check for this.
 int selectW_index_ll(const std::vector<int>& arr, const std::vector<gtype>& grade,
         int start_idx, int len, const std::vector<int>& wselected) {
     int idx = -1;
@@ -101,6 +116,10 @@ int selectW_index_ll(const std::vector<int>& arr, const std::vector<gtype>& grad
     return idx;
 }
 
+// Selects bidomain with smallest max(left_len, right_len). Ties broken
+// by comparing each domain's highest-scored left vertex (via
+// selectV_index_ll), then taking the domain whose best vertex has the
+// smallest index.
 int select_bidomain_ll(const std::vector<Bidomain>& domains, const std::vector<int>& left,
         const std::vector<gtype>& grade, int current_matching_size) {
     int min_size = INT_MAX;
@@ -119,6 +138,8 @@ int select_bidomain_ll(const std::vector<Bidomain>& domains, const std::vector<i
     return best;
 }
 
+// Boolean pre-partition (adjacent vs non-adjacent); direction handled
+// correctly by the multiway split downstream, same as elsewhere
 int partition_ll(std::vector<int>& all_vv, int start, int len,
         const std::vector<unsigned int>& adjrow) {
     int i = 0;
@@ -131,6 +152,9 @@ int partition_ll(std::vector<int>& all_vv, int start, int len,
     return i;
 }
 
+// Removes already-matched vertices from a domain side in-place.
+// Returns the new length after removal. Used by LUM to clean up
+// non-adjacent bidomains after leaf matching.
 int remove_matched_vertex_ll(std::vector<int>& arr, int start, int len,
         const std::vector<int>& matched) {
     int p = 0;
@@ -143,15 +167,20 @@ int remove_matched_vertex_ll(std::vector<int>& arr, int start, int len,
     return p;
 }
 
+// O(1) removal by swap-with-last-and-shrink; side-agnostic (works for
+// either the G-side or H-side array)
 void remove_vtx_from_array_ll(std::vector<int>& arr, int start_idx, int& len, int remove_idx) {
     len--;
     std::swap(arr[start_idx + remove_idx], arr[start_idx + len]);
 }
 
-// ── Core reward + domain-split function ──────────────────────────────────────
 // use_lum: if true, bulk-match leaf pairs after matching (v,w)
 // use_lsm: if true, use per-pair Q[v][w] for w-scoring; if false, use per-vertex rgrade[w]
-
+//
+// NOTE: correctly marks each LUM-matched leaf pair as matched immediately
+// (g_matched[v_leaf]=1, h_matched[w_leaf]=1 below), same as
+// rewardfeed_RL/rewardfeed_DAL. Does not have the reference DAL binary's
+// missing-update bug documented in Section 4.1.4.
 std::vector<Bidomain> rewardfeed_ll(
         const std::vector<Bidomain>& d,
         std::vector<VtxPair>& current,
@@ -169,7 +198,7 @@ std::vector<Bidomain> rewardfeed_ll(
     g_matched[v] = 1;
     h_matched[w] = 1;
 
-    // ── LUM: bulk-match compatible leaf pairs ─────────────────────────────────
+    // LUM: bulk-match compatible leaf pairs
     int leaves_match_size = 0;
     if (use_lum) {
         for (unsigned int i = 0, j = 0;
@@ -187,7 +216,7 @@ std::vector<Bidomain> rewardfeed_ll(
                         int v_leaf = leaf_g[p], w_leaf = leaf_h[q];
                         p++; q++;
                         current.push_back(VtxPair(v_leaf, w_leaf));
-                        g_matched[v_leaf] = 1;
+                        g_matched[v_leaf] = 1; // matched immediately - correct, unlike reference
                         h_matched[w_leaf] = 1;
                         leaves_match_size++;
                     }
@@ -197,7 +226,7 @@ std::vector<Bidomain> rewardfeed_ll(
         }
     }
 
-    // ── Domain split ──────────────────────────────────────────────────────────
+    // Domain split
     std::vector<Bidomain> new_d;
     new_d.reserve(d.size() * 2);
     int temp = 0, total = 0;
@@ -230,6 +259,7 @@ std::vector<Bidomain> rewardfeed_ll(
                              left_len_noedge, right_len_noedge, old_bd.is_adjacent});
 
         if (multiway && left_len && right_len) {
+            // direction-aware label split (see rewardfeed_RL in mcsplit-dal.cpp)
             auto& adjrow_v = g.adjmat[v];
             auto& adjrow_w = h.adjmat[w];
             std::sort(left.begin()  + l, left.begin()  + l + left_len,
@@ -255,7 +285,7 @@ std::vector<Bidomain> rewardfeed_ll(
         }
     }
 
-    // ── LSM score update ──────────────────────────────────────────────────────
+    // LSM score update
     // use_lsm=true:  update lgrade[v] (S0, short-term) and Qv[w] (St, long-term per-pair)
     // use_lsm=false: update lgrade[v] and rgrade[w] (both per-vertex, McSplit+RL behaviour)
     if (total > 0) {
@@ -277,7 +307,7 @@ std::vector<Bidomain> rewardfeed_ll(
     return new_d;
 }
 
-// ── BnB search ────────────────────────────────────────────────────────────────
+// BnB search
 
 void solve_ll(const Graph& g, const Graph& h,
         std::vector<gtype>& lgrade,
@@ -322,6 +352,9 @@ void solve_ll(const Graph& g, const Graph& h,
     std::vector<int> wselected(h.n, 0);
     bd.right_len--;
 
+    // visits each right-side candidate once (same guaranteed-non-negative
+    // idx pattern as solve_dal/solve_dsb, but here uses an explicit
+    // wselected mask rather than the increasing-order trick)
     for (int i = 0; i <= bd.right_len; i++) {
         // w selection: per-pair Q[v] if use_lsm, per-vertex rgrade otherwise
         const std::vector<gtype>& w_scores = use_lsm ? Q[v] : rgrade;
@@ -353,13 +386,14 @@ void solve_ll(const Graph& g, const Graph& h,
     bd.right_len++;
     if (bd.left_len == 0) remove_bidomain_ll(domains, bd_idx);
 
+    // branch where v is not matched at all
     solve_ll(g, h, lgrade, Q, rgrade, incumbent, current,
             g_matched, h_matched, domains, left, right,
             goal, multiway, use_lum, use_lsm,
             stats, start_time, abort_due_to_timeout);
 }
 
-// ── Entry point ───────────────────────────────────────────────────────────────
+// Entry point
 // use_lum=true,  use_lsm=true  → full McSplit+LL
 // use_lum=false, use_lsm=true  → LSM only (no leaf matching)
 // use_lum=true,  use_lsm=false → LUM only (per-vertex w-scoring, McSplit+RL style)
@@ -369,6 +403,7 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
         bool use_lum, bool use_lsm) {
 
+    // total degree (out + in), matching the reference's calculate_degrees
     auto calc_degrees = [](const Graph& g) {
 		std::vector<int> degree(g.n, 0);
 		for (int v = 0; v < g.n; v++)
@@ -402,6 +437,8 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
     Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
     Graph h_sorted = induced_subgraph(const_cast<Graph&>(h), vv1);
 
+    // leaf lists only needed when LUM is enabled - skipped otherwise to
+    // avoid unnecessary O(n^2) work in the LSM-only ablation variant
     if (use_lum) {
         pack_leaves(g_sorted);
         pack_leaves(h_sorted);
@@ -443,6 +480,7 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
     std::vector<VtxPair> incumbent, current;
 
     auto start_time = std::chrono::steady_clock::now();
+    // correctly uses g_sorted/h_sorted, matching domains/left/right
     solve_ll(g_sorted, h_sorted, lgrade, Q, rgrade, incumbent, current,
             g_matched, h_matched, domains, left, right, 1,
             multiway, use_lum, use_lsm,
