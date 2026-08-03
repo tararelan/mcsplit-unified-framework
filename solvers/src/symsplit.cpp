@@ -11,6 +11,14 @@
 #include <limits.h>
 #include <boost/functional/hash.hpp>
 
+// NOTE: like RRSplit, SymSplit does not implement the multiway
+// (direction/label-aware) split - see Section 4.1.2.2. SymSplit uses
+// its own equivalence-class computation (find_vertices_with_common_
+// neighbors, below) rather than graph.h's GetEqClass, which RRSplit
+// uses exclusively - the two are separate implementations, not shared
+// code, so any direction-blindness in one is not automatically present
+// in the other and needs separately confirming.
+
 // Forward declarations
 static int calc_bound_sym(const std::vector<Bidomain> &domains);
 static void remove_bidomain_sym(std::vector<Bidomain> &domains, int idx);
@@ -175,6 +183,10 @@ static int index_of_next_smallest_sym(const std::vector<int> &arr, int start_idx
  * Uses a two-pointer sweep (stable relative to the adjacent group,
  * unstable for the non-adjacent group) and runs in O(len).
  *
+ * NOTE: adjrow[v] is tested as a boolean (nonzero = adjacent), not
+ * compared by exact value - direction is not distinguished here. See
+ * the note at the top of this file / Section 4.1.2.2.
+ *
  * @param all_vv   Shared permutation array (G-side or H-side)
  * @param start    Start offset of the subarray to partition
  * @param len      Length of the subarray
@@ -205,6 +217,9 @@ int partition_sym(std::vector<int> &all_vv, int start, int len, const std::vecto
  * symmetry breaking rule uses to check in O(1) whether a vertex
  * equivalent to the current candidate has already been placed in the
  * adjacent partition (and therefore already considered).
+ *
+ * Same boolean-only (direction-blind) adjacency test as partition_sym -
+ * see note above.
  *
  * @param all_vv       H-side permutation array
  * @param start        Start offset of the subarray to partition
@@ -291,6 +306,9 @@ int partition_sparse_sym(std::vector<int> &all_vv, int start, int len,
  * mapping cannot be extended further - used by the maximality reduction
  * in SymSplit to detect and record maximal solutions early.
  *
+ * No multiway/direction-aware split - see the note at the top of this
+ * file re: SymSplit's direction-blindness (Section 4.1.2.2).
+ *
  * @param d            Current bidomain list
  * @param left         G-side permutation array (modified in place)
  * @param right        H-side permutation array (modified in place)
@@ -355,9 +373,9 @@ std::vector<Bidomain> filter_domains_sym(const std::vector<Bidomain> &d, std::ve
  * Combines a hash value into an existing seed using the same mixing
  * function as boost::hash_combine.
  *
- *
- * Used by GetEqClass to hash vertex neighbourhoods for O(n) symmetry
- * class detection instead of O(n^2) pairwise comparison.
+ * Used by find_vertices_with_common_neighbors to hash vertex
+ * neighbourhoods for O(n) symmetry class detection instead of O(n^2)
+ * pairwise comparison.
  *
  * @param seed  Hash accumulator, modified in place
  * @param v     Value to mix into the seed
@@ -369,7 +387,6 @@ static void hash_combine(std::size_t &seed, std::size_t v)
 
 /**
  * Computes modular symmetry equivalence classes using neighbourhood hashing.
- *
  *
  * For each vertex v, two hashes are computed:
  *   - n_hash: hash of v's neighbours only - detects negative symmetry
@@ -385,6 +402,18 @@ static void hash_combine(std::size_t &seed, std::size_t v)
  * Time complexity is O(n^2) due to the full adjacency row scan per vertex,
  * consistent with the O(n^2) symmetry detection bound stated in the
  * SymSplit paper.
+ *
+ * NOTE: g.adjmat[v][u] is tested as a boolean (nonzero = adjacent), not
+ * compared by exact value, so this does not distinguish edge direction
+ * on directed graphs - same limitation as graph.cpp's GetEqClass (used
+ * by RRSplit), independently implemented here rather than shared code.
+ * See Section 4.1.2.2.
+ *
+ * NOTE: n_syms may double-count vertices that fall into a non-trivial
+ * group under both n_hash and p_hash, since each vertex is pushed into
+ * both groups unconditionally and n_syms is incremented once per group
+ * membership, not once per unique vertex. VERIFY whether this return
+ * value is used anywhere that depends on an exact count.
  *
  * @param g            Input graph with adjmat initialised
  * @param eqn_classes  Output vector of length g.n; eqn_classes[v] is the
@@ -486,6 +515,8 @@ bool break_h_sym(const std::vector<int> &arr, int start_idx, int len, int w,
  *    For each candidate w, skips it if a smaller H-vertex equivalent to w
  *    is still present in the bidomain (break_h_sym). Only the smallest
  *    representative of each H-symmetry class needs to be explored.
+ *    break_h_sym is only called when h_eqn_classes[w] != -1 is already
+ *    confirmed, so its "no partner" sentinel case is never reached here.
  *
  * 3. Maximality reduction:
  *    If filter_domains_sym sets best_match (no bidomain can be extended),
@@ -580,7 +611,7 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
 	int w = w_lower;
 
 	bool best_match = false;
-	bool skip_exclude = false; // ← NEW
+	bool skip_exclude = false; // set when the include-branch search already proved maximality/bound-exhaustion
 
 	for (int i = bd.right_len; i >= 0; --i)
 	{
@@ -612,13 +643,15 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
 		if (best_match || bound <= (int)incumbent.size())
 		{
 			stats.sym_pruned++;
-			skip_exclude = true; // ← NEW: skip exclude branch, matching reference
+			skip_exclude = true; // exclude branch would be redundant/futile
 			break;
 		}
 	}
 
 	bd.right_len++;
 
+	// (outer g_eqn_classes[v] != -1 check duplicates the inner one below;
+	// harmless but redundant - could be simplified in a cleanup pass)
 	if (g_eqn_classes[v] != -1)
 	{
 		if ((sym_mode & 1) && g_eqn_classes[v] != -1)
@@ -642,7 +675,7 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
 	}
 
 	if (!skip_exclude)
-	{ // ← NEW: only explore exclude branch if not pruned
+	{
 		solve_sym(g, h, incumbent, current, domains, left, right, goal,
 				  stats, start_time, abort_due_to_timeout,
 				  g_eqn_classes, h_eqn_classes, index_right, sym_mode);
