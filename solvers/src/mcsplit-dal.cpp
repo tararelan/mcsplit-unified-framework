@@ -594,9 +594,7 @@ std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway,
     // (domains/left/right, g_matched/h_matched, score vectors) is built
     // from g_sorted/h_sorted. rewardfeed_RL/DAL index g.adjmat[v]/h.adjmat[w]
     // using v/w values drawn from left/right, which are sorted-space
-    // indices - this looks like it should be solve_dal(g_sorted, h_sorted, ...).
-    // VERIFY against actual source before treating this as confirmed.
-    solve_dal(g, h, V, lgrade, rgrade, Q, incumbent, current,
+    solve_dal(g_sorted, h_sorted, V, lgrade, rgrade, Q, incumbent, current,
         g_matched, h_matched, domains, left, right,
         1, multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout);
 

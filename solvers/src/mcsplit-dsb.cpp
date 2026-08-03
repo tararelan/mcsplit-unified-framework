@@ -10,18 +10,18 @@
 #include <atomic>
 #include <limits.h>
 
-// DSB constants
-static const int DSB_THRESHOLD = 16;
-static const int DSB_INDEX_PARTITION_SIZE = 2;
-static const int DSB_BEST_PARTITION_UB = DSB_THRESHOLD;
-static const int DSB_BEST_PARTITION_DIFF = 10;
-static const int DSB_ROWS = DSB_THRESHOLD - DSB_INDEX_PARTITION_SIZE + 2;
-static const int DSB_BOXES = 2;
+// DSB constants (values match the reference's THRESHOLD/boxes/etc. globals)
+static const int DSB_THRESHOLD = 16;             // upper bound on degree-sequence values tracked
+static const int DSB_INDEX_PARTITION_SIZE = 2;    // partition granularity for the degree-sequence index
+static const int DSB_BEST_PARTITION_UB = DSB_THRESHOLD; // size of s_degrees (per-vertex degree cache)
+static const int DSB_BEST_PARTITION_DIFF = 10;    // gating threshold, used in the bound-tightening check
+static const int DSB_ROWS = DSB_THRESHOLD - DSB_INDEX_PARTITION_SIZE + 2; // sizes the ProbabilityTable array
+static const int DSB_BOXES = 2;                   // ProbabilityTable is DSB_ROWS x DSB_BOXES (long double array below)
 
 // Forward declarations
 static void dsb_init_array(long double* arr, int size);
 static unsigned int calc_bound_dsb(const Graph& g, const Graph& h,
-        std::vector<Bidomain>& domains,    // ← remove const
+        std::vector<Bidomain>& domains,    // non-const: mutated for the degree-sequence bound cache (see calc_bound_dsb definition)
         const std::vector<int>& left, const std::vector<int>& right,
         const std::vector<VtxPair>& incumbent, const std::vector<VtxPair>& current,
         long double* array, bool& bound_enabled, bool& count_enabled,
@@ -35,10 +35,12 @@ static int index_of_next_smallest_dsb(const std::vector<int>& arr, int start_idx
 static void remove_vtx_from_left_domain_dsb(std::vector<int>& left, Bidomain& bd, int v);
 static void remove_bidomain_dsb(std::vector<Bidomain>& domains, int idx);
 void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, long double* array, bool& bound_enabled, bool& count_enabled, int& called_count, int& success_count, int max_count, int max_success, int* s_degrees);
+// max_count/max_success default to the reference's MAX_COUNT=100, MAX_SUCCESS=30 at the mcs_dsb call site
 std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
         int bound_mode = 0);
 
+// Initialises a probability array to a neutral prior (1.0 everywhere)
 static void dsb_init_array(long double* arr, int size) {
     for (int i = 0; i < size; i++) { arr[i] = 1.0; }
 }
@@ -49,7 +51,7 @@ static void dsb_init_array(long double* arr, int size) {
 // Uses a learned probability table to decide when to spend time on the tighter computation.
 // For large or unbalanced bidomains, falls back to McSplit's min(left, right) bound.
 static unsigned int calc_bound_dsb(const Graph& g, const Graph& h,
-        std::vector<Bidomain>& domains,    // ← remove const
+        std::vector<Bidomain>& domains,
         const std::vector<int>& left, const std::vector<int>& right,
         const std::vector<VtxPair>& incumbent, const std::vector<VtxPair>& current,
         long double* array, bool& bound_enabled, bool& count_enabled,
@@ -68,6 +70,9 @@ static unsigned int calc_bound_dsb(const Graph& g, const Graph& h,
         return mcsplit_bound;
     }
 
+    // first pass: estimate whether the tighter bound is worth computing,
+    // using the learned per-(size, diff) probability table (array) rather
+    // than recomputing the exact reduction for every eligible bidomain
     for (const Bidomain& bd : domains) {
         const auto [min_len, max_len] = std::minmax(bd.left_len, bd.right_len);
         const int size_diff = std::abs(bd.left_len - bd.right_len);
@@ -75,6 +80,7 @@ static unsigned int calc_bound_dsb(const Graph& g, const Graph& h,
             if (bd.is_valid) {
                 possible_reductions = min_len - bd.size;
             } else {
+                // array index: (size bucket) * partition_size + (0 or 1 for small/large diff)
                 possible_reductions += array[((max_len - DSB_INDEX_PARTITION_SIZE) * DSB_INDEX_PARTITION_SIZE) + (size_diff > 2 ? 1 : 0)];
             }
         }
@@ -87,6 +93,7 @@ static unsigned int calc_bound_dsb(const Graph& g, const Graph& h,
         return mcsplit_bound;
     }
 
+    // gate: stop paying for the tighter bound if it hasn't been paying off
     if (count_enabled && called_count == max_count) {
         count_enabled = false;
         if (success_count < max_success) {
@@ -108,6 +115,8 @@ static unsigned int calc_bound_dsb(const Graph& g, const Graph& h,
         // Special case: bidomain of size 2x2 - check if the two G-vertices
         // are adjacent and if the two H-vertices are adjacent. If edge structure
         // differs, at most 1 can be matched.
+        // Uses exact adjmat value equality (not boolean), so this case is
+        // direction-aware for directed graphs.
         if (bd.left_len == 2 && bd.right_len == 2) {
             if (g.adjmat[left[bd.l]][left[bd.l + 1]] != h.adjmat[right[bd.r]][right[bd.r + 1]]) {
                 bound += 1;
@@ -128,6 +137,11 @@ static unsigned int calc_bound_dsb(const Graph& g, const Graph& h,
         // Compares internal edge counts of both sides. If one side has more
         // edges than the other, vertices with the highest degree must be
         // excluded to make a valid matching possible, reducing the bound.
+        // NOTE: unlike the 2x2 case above, this uses a boolean adjacency
+        // test (g.adjmat[v1][v2] truthy), not exact value equality, so it
+        // does not distinguish direction on directed graphs. This matches
+        // the reference implementation exactly (verified against source),
+        // so it is faithful, not a fidelity bug - see Section 4.1.2.
         if (min_len > 2 && max_len <= DSB_BEST_PARTITION_UB && size_diff <= DSB_BEST_PARTITION_DIFF) {
             int s_len, b_len;
             int val = min_len;
@@ -183,6 +197,10 @@ static unsigned int calc_bound_dsb(const Graph& g, const Graph& h,
             int s_non_connections = s_len * (s_len - 1) / 2 - s_connections;
             int b_non_connections = b_len * (b_len - 1) / 2 - b_connections;
 
+            // if the smaller side is more densely connected than the larger
+            // side, the highest-degree smaller-side vertices are the ones
+            // that can't be matched; symmetric logic applies to the
+            // non-connected case below when the larger side is denser
             int diff = s_connections - b_connections;
             if (diff > 0) {
                 std::sort(s_degrees, s_degrees + s_len);
@@ -214,6 +232,8 @@ static unsigned int calc_bound_dsb(const Graph& g, const Graph& h,
     return bound;
 }
 
+// Same tie-break rule as plain McSplit's select_bidomain: smallest
+// max(left_len, right_len), ties broken by smallest vertex index
 static int find_min_value_dsb(const std::vector<int>& arr, int start_idx, int len) {
     int min_v = INT_MAX;
     for (int i = 0; i < len; i++) {
@@ -245,6 +265,9 @@ static int select_bidomain_dsb(const std::vector<Bidomain>& domains,
     return best;
 }
 
+// Boolean pre-partition (adjacent vs non-adjacent); direction handled
+// correctly by the multiway split downstream, same as elsewhere - see
+// rewardfeed_RL in mcsplit-dal.cpp for details
 static int partition_dsb(std::vector<int>& all_vv, int start, int len,
         const std::vector<unsigned int>& adjrow) {
     int i = 0;
@@ -292,6 +315,8 @@ std::vector<Bidomain> filter_domains_dsb(const std::vector<Bidomain>& d,
         }
 
         if (multiway && left_len && right_len) {
+            // label split by exact edge value (direction-aware) - see
+            // rewardfeed_RL in mcsplit-dal.cpp for the identical pattern
             auto& adjrow_v = g.adjmat[v];
             auto& adjrow_w = h.adjmat[w];
             std::sort(left.begin() + l, left.begin() + l + left_len,
@@ -309,7 +334,7 @@ std::vector<Bidomain> filter_domains_dsb(const std::vector<Bidomain>& d,
                     int lmin = li, rmin = ri;
                     do { li++; } while (li < l_top && adjrow_v[left[li]] == ll);
                     do { ri++; } while (ri < r_top && adjrow_w[right[ri]] == ll);
-                    new_d.push_back({lmin, rmin, li - lmin, ri - rmin, true, -1, false});
+                    new_d.push_back({lmin, rmin, li - lmin, ri - rmin, true, -1, false}); // cache always invalidated, see note above
                 }
             }
         } else if (left_len && right_len) {
@@ -326,6 +351,10 @@ std::vector<Bidomain> filter_domains_dsb(const std::vector<Bidomain>& d,
     return new_d;
 }
 
+// Finds the index of the smallest value in arr[start_idx..start_idx+len-1]
+// that is strictly greater than w. Used to iterate right-side candidates
+// in increasing order one at a time, without needing to pre-sort the array.
+// Returns -1 if no such value exists (w is already the maximum).
 static int index_of_next_smallest_dsb(const std::vector<int>& arr, int start_idx, int len, int w) {
     int idx = -1;
     int smallest = INT_MAX;
@@ -338,6 +367,7 @@ static int index_of_next_smallest_dsb(const std::vector<int>& arr, int start_idx
     return idx;
 }
 
+// O(n) removal by linear scan for v, then O(1) swap-to-end and shrink
 static void remove_vtx_from_left_domain_dsb(std::vector<int>& left, Bidomain& bd, int v) {
     int i = 0;
     while (left[bd.l + i] != v) { i++; }
@@ -345,6 +375,8 @@ static void remove_vtx_from_left_domain_dsb(std::vector<int>& left, Bidomain& bd
     bd.left_len--;
 }
 
+// Removes a bidomain by replacing it with the last element and popping;
+// order within the list does not matter
 static void remove_bidomain_dsb(std::vector<Bidomain>& domains, int idx) {
     domains[idx] = domains[domains.size() - 1];
     domains.pop_back();
@@ -395,8 +427,13 @@ void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
     remove_vtx_from_left_domain_dsb(left, domains[bd_idx], v);
 
     int w = -1;
-    bd.right_len--;
+    bd.right_len--; // reserve one slot at the end for the swap-based "removal" below
 
+    // Visits each right-side candidate exactly once, in increasing order,
+    // via index_of_next_smallest_dsb (smallest value > previous w). This
+    // implicitly tracks "already used" without shrinking the search range,
+    // so idx is guaranteed non-negative for all right_len+1 iterations here
+    // - same pattern as rrsplit.cpp's solve_rr.
     for (int i = 0; i <= bd.right_len; i++) {
         int idx = index_of_next_smallest_dsb(right, bd.r, bd.right_len + 1, w);
         w = right[bd.r + idx];
@@ -416,6 +453,7 @@ void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
     bd.right_len++;
     if (bd.left_len == 0) { remove_bidomain_dsb(domains, bd_idx); }
 
+    // Branch where v is not matched at all
     solve_dsb(g, h, incumbent, current, domains, left, right, goal,
             multiway, stats, start_time, abort_due_to_timeout,
             array, bound_enabled, count_enabled, called_count, success_count,
@@ -434,6 +472,7 @@ std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
     bool bound_enabled = (bound_mode != 2);   // off only for "never"
     bool count_enabled = (bound_mode == 0);   // gating active only in mode 0
 
+    // total degree (out + in), matching the reference's calculate_degrees
     auto calc_degrees = [](const Graph& g) {
 		std::vector<int> degree(g.n, 0);
 		for (int v = 0; v < g.n; v++)
@@ -498,8 +537,6 @@ std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
     // Initialise DSB probability table and adaptive bound control
     long double array[DSB_ROWS * DSB_BOXES];
     dsb_init_array(array, DSB_ROWS * DSB_BOXES);
-    // bool bound_enabled = true;
-    // bool count_enabled = true;
     int called_count = 0;
     int success_count = 0;
     const int max_count = 100;
