@@ -1,5 +1,9 @@
 #pragma once
 
+// Shared core types used across all seven algorithm implementations:
+// the matched-pair struct, the bidomain (label class) struct, and the
+// per-run statistics struct written out to CSV after each search.
+
 #include <vector>
 #include <chrono>
 

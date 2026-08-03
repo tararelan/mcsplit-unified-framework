@@ -25,22 +25,26 @@ using ui = unsigned int;
  *   { (edge_label, vertex_label) -> [leaf vertex indices] }
  *
  * degree and adjlist are owning raw pointers allocated by set_adjlist()
- * and freed by the destructor. They are nullptr until set_adjlist() is called.
+ * and freed by the destructor. They are nullptr until set_adjlist() is called
+ * (assuming the constructor initialises them - see graph.cpp).
  */
 struct Graph
 {
-	int n;										   // number of vertices
-	std::vector<std::vector<unsigned int>> adjmat; // n x n adjacency matrix; adjmat[u][v] = edge label (0 = no edge)
-	std::vector<unsigned int> label;			   // vertex labels; label[v] = 0 for unlabelled graphs
+	int n;
+	std::vector<std::vector<unsigned int>> adjmat;
+	std::vector<unsigned int> label;
 
-	unsigned int *degree;	// degree[v] = number of neighbours of v
-	unsigned int **adjlist; // adjlist[v] = array of neighbour indices, length degree[v]
+	unsigned int *degree;
+	unsigned int **adjlist;
 
 	std::vector<std::vector<std::pair<std::pair<unsigned int, unsigned int>, std::vector<int>>>> leaves;
-	// leaves[u] = list of { (edge_label, vertex_label), [leaf neighbour indices] }
 
 	Graph(unsigned int n);
 	~Graph();
+	Graph(const Graph&) = delete;            // owns raw pointers; copying after
+	Graph& operator=(const Graph&) = delete; // set_adjlist() would double-free
+	Graph(Graph&&) = default;                // moves are fine (pointers transfer, not duplicate)
+	Graph& operator=(Graph&&) = default;
 };
 
 // Constructs the induced subgraph of g on the vertex subset vv, reindexed 0..vv.size()-1

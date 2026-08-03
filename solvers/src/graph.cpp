@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <climits>
 #include <algorithm>
+#include <utility>
 #include <string>
 
 // Constructor
@@ -17,7 +18,7 @@ Graph::~Graph()
 	{
 		for (int i = 0; i < n; i++)
 		{
-			delete[] adjlist[i];
+			delete[] adjlist[i]; // each row was individually allocated
 		}
 		delete[] adjlist;
 	}
@@ -59,7 +60,7 @@ static void add_edge(Graph &g, int v, int w, unsigned int edge_val, bool directe
 			if (directed)
 			{
 				g.adjmat[v][w] |= edge_val;
-				g.adjmat[w][v] |= (edge_val << 16);
+				g.adjmat[w][v] |= (edge_val << 16); // reverse direction, shifted to its own bit range
 			}
 			else
 			{
@@ -69,6 +70,8 @@ static void add_edge(Graph &g, int v, int w, unsigned int edge_val, bool directe
 		}
 		else
 		{
+			// unlabelled directed case uses fixed bits instead of edge_val:
+			// bit 0 = forward, bit 1 = reverse (see docstring above)
 			if (directed)
 			{
 				g.adjmat[v][w] |= 1;
@@ -133,7 +136,7 @@ static int read_word(FILE *fp)
 	{
 		throw std::runtime_error("Error reading file.");
 	}
-	return (int)a[0] | (((int)a[1]) << 8);
+	return (int)a[0] | (((int)a[1]) << 8); // little-endian: low byte first
 }
 
 /**
@@ -171,6 +174,7 @@ static Graph readBinaryGraph(char *filename, bool directed, bool labelled)
 	int n = read_word(f);
 	Graph g(n);
 
+	// derive k1: smallest shift such that 2^k1 >= 33% of n, capped at 16 bits
 	int m = n * 33 / 100;
 	int p = 1, k1 = 0, k2 = 0;
 	while (p < m && k1 < 16)
@@ -195,7 +199,7 @@ static Graph readBinaryGraph(char *filename, bool directed, bool labelled)
 		for (int j = 0; j < len; j++)
 		{
 			int target = read_word(f);
-			int label = (read_word(f) >> (16 - k1)) + 1;
+			int label = (read_word(f) >> (16 - k1)) + 1; // +1 so label 0 is reserved for "no edge"
 			add_edge(g, i, target, labelled ? label : 1, directed, labelled);
 		}
 	}
@@ -289,8 +293,8 @@ static Graph readDimacsGraph(char *filename, bool directed, bool labelled)
 
 	char *line = NULL;
 	size_t nchar = 0;
-	int n = 0, m = 0, edges_read = 0;
-	Graph *g = nullptr;
+	int n = 0, m = 0, edges_read = 0; // m/edges_read parsed but not cross-checked
+	Graph *g = nullptr;			   // heap-allocated since size isn't known until the 'p' line
 
 	while (getline(&line, &nchar, f) != -1)
 	{
@@ -350,7 +354,7 @@ static Graph readDimacsGraph(char *filename, bool directed, bool labelled)
 		throw std::runtime_error("Empty graph file.");
 	}
 
-	Graph result = *g;
+	Graph result = std::move(*g); // move out before freeing the heap allocation
 	delete g;
 	return result;
 }
@@ -399,6 +403,13 @@ Graph readGraph(char *filename, char format, bool directed, bool edge_labelled, 
  * of g.adjmat. A non-zero entry at adjmat[i][j] indicates an edge from
  * i to j, which is recorded in adjlist[i]. For undirected graphs this
  * means both adjlist[i] and adjlist[j] will contain each other.
+ *
+ * NOTE: for directed graphs, this only tests adjmat[i][j] != 0, so
+ * forward-only, reverse-only, and bidirectional relationships are all
+ * treated identically as "adjacent" - see Section 4.1.2.2's discussion
+ * of the same boolean-adjacency limitation in RRSplit/SymSplit's
+ * filter_domains, which relies on the equivalence classes this
+ * function's adjlist output feeds into.
  *
  * Caller is responsible for freeing g.degree, each g.adjlist[i], and
  * g.adjlist when no longer needed.
@@ -449,6 +460,10 @@ void set_adjlist(Graph &g)
  * Vertices with degree 0 are skipped and left with class label 0,
  * as isolated vertices cannot share a neighbourhood with others.
  *
+ * NOTE: relies on g.adjmat/g.adjlist, which (per set_adjlist) do not
+ * distinguish edge direction - see Section 4.1.2.2 for the resulting
+ * limitation on directed graphs.
+ *
  * @param g        Graph with adjmat, adjlist, and degree initialised
  * @param EqClass  Output array of length g.n; EqClass[v] holds the
  *                 symmetry class label of vertex v. Vertices in the
@@ -470,12 +485,17 @@ void GetEqClass(Graph &g, ui *&EqClass)
 		{
 			continue;
 		}
+		// candidates for sharing i's neighbourhood must themselves be
+		// adjacent to one of i's neighbours - pick any neighbour of i
+		// and scan its neighbours as the candidate pool
 		node = g.adjlist[i][0];
 		for (ui j = 0; j < g.degree[node]; j++)
 		{
 			node_neg = g.adjlist[node][j];
 			if (g.degree[i] == g.degree[node_neg] && node_neg > i)
 			{
+				// verify every neighbour of the candidate is also
+				// a neighbour of i (i.e. neighbourhoods match exactly)
 				equiv = true;
 				for (ui k = 0; k < g.degree[node_neg]; k++)
 				{
@@ -517,6 +537,11 @@ void GetEqClass(Graph &g, ui *&EqClass)
  * Degree is computed locally here from adjmat rather than using
  * g.degree, as pack_leaves may be called before set_adjlist.
  *
+ * NOTE: like set_adjlist, this treats any non-zero adjmat[i][j] as an
+ * edge regardless of direction, so "degree 1" (and hence "leaf") does
+ * not distinguish a vertex with one outgoing edge from one with one
+ * incoming edge on directed graphs - see Section 4.1.2.2.
+ *
  * @param g  Graph to process; g.adjmat, g.label, and g.leaves must
  *           be initialised. g.leaves[u] is populated in place.
  */
@@ -536,6 +561,8 @@ void pack_leaves(Graph &g)
 			{
 				std::pair<unsigned int, unsigned int> labels(g.adjmat[u][v], g.label[v]);
 				int pos = -1;
+				// linear scan for an existing group with this (edge, vertex)
+				// label pair; appends a new group if none is found yet
 				for (int k = 0;; k++)
 				{
 					if (k == (int)g.leaves[u].size())

@@ -15,7 +15,7 @@ std::vector<VtxPair> mcs(const Graph &g, const Graph &h, bool multiway,
 						 Stats &stats, std::atomic<bool> &abort_due_to_timeout);
 std::vector<VtxPair> mcs_rl(const Graph &g, const Graph &h, bool multiway,
 							Stats &stats, std::atomic<bool> &abort_due_to_timeout);
-// use_lsm: enable long-short memory scoring; use_lum: enable leaf union matching
+// use_lum: enable leaf union matching; use_lsm: enable long-short memory scoring
 std::vector<VtxPair> mcs_ll(const Graph &g, const Graph &h, bool multiway, Stats &stats,
 							std::atomic<bool> &abort_due_to_timeout, bool use_lum = true, bool use_lsm = true);
 // policy_mode: 0 = hybrid (alternating), 1 = RL only, 2 = DAL only
@@ -38,6 +38,9 @@ static char args_doc[] = "FILENAME1 FILENAME2";
 // Command-line options accepted by the solver.
 // Graph format defaults to MIVIA binary ('B') if neither --dimacs nor --lad is specified.
 // Timeout of 0 means no limit. Algorithm names correspond to the mcs_* function variants.
+// -A accepts more values than shown below (ablation sub-variants like ll_lsm,
+// dal_rl, dsb_always, rrsplit_noveq, symsplit_varonly, etc.) - see the dispatch
+// logic later in this file, or the User Manual appendix, for the full list.
 static struct argp_option options[] = {
 	{"quiet", 'q', 0, 0, "Suppress per-instance output; print only the solution size"},
 	{"dimacs", 'd', 0, 0, "Read graphs in DIMACS format (default: MIVIA binary)"},
@@ -95,6 +98,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		arguments.directed = true;
 		break;
 	case 'a':
+		// -a/--labelled sets both flags: "labelled" means both vertex
+		// and edge labels are used together, unlike -x which is vertex-only
 		arguments.edge_labelled = true;
 		arguments.vertex_labelled = true;
 		break;
@@ -155,6 +160,8 @@ int main(int argc, char **argv)
 	Graph h = readGraph(arguments.filename2, format, arguments.directed,
 						arguments.edge_labelled, arguments.vertex_labelled);
 
+	// convention: g is always the smaller graph; several algorithms'
+	// complexity bounds (see Section 2.13) assume |V(G)| <= |V(H)|
 	if (g.n > h.n)
 		std::swap(g, h);
 
@@ -170,6 +177,8 @@ int main(int argc, char **argv)
 	std::condition_variable timeout_cv;
 	bool aborted = false;
 
+	// background watchdog thread: sleeps until either the timeout elapses
+	// or the search finishes first (abort_due_to_timeout set elsewhere)
 	if (arguments.timeout > 0)
 	{
 		timeout_thread = std::thread([&]
@@ -192,6 +201,9 @@ int main(int argc, char **argv)
 	Stats stats;
 	std::vector<VtxPair> solution;
 
+	// dispatch table: algorithm name -> mcs_* call with the matching
+	// mode/bitmask (see the declarations and options[] table above for
+	// what each mode value means)
 	if (arguments.algorithm == "rl")
 		solution = mcs_rl(g, h, multiway, stats, abort_due_to_timeout);
 
@@ -238,7 +250,8 @@ int main(int argc, char **argv)
 	stats.time_elapsed = std::chrono::duration<double>(stop - start).count();
 	stats.aborted = aborted;
 
-	// Count edges in solution
+	// Count edges in solution (boolean adjacency check only - does not
+	// distinguish direction on directed graphs, see Section 4.1.2.2)
 	int solution_edges = 0;
 	for (int i = 0; i < (int)solution.size(); i++)
 		for (int j = i + 1; j < (int)solution.size(); j++)
