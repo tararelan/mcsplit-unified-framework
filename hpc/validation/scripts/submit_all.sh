@@ -1,5 +1,5 @@
 #!/bin/bash
-ALGOS="mcsplit rl rllum dal ll dsb rrsplit symsplit"
+ALGOS="mcsplit rl dal ll dsb rrsplit symsplit"
 
 INSTANCE_DIRS=(
     "instances/MIVIA/mcs10/bvg/b03"

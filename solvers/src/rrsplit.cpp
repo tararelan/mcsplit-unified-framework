@@ -10,6 +10,18 @@
 #include <limits.h>
 #include <iostream>
 
+// NOTE: RRSplit does not implement the multiway (direction/label-aware)
+// split used by the other six algorithms - see Section 4.1.2.2. A fix was
+// attempted (patching filter_domains_rr with the same split used
+// elsewhere) and confirmed sound via brute-force testing, but it
+// surfaced a deeper issue: EqClass (structural equivalence, see graph.cpp)
+// is itself computed without regard to edge direction, so the equivalence
+// reduction can discard vertices that are not actually redundant on
+// directed graphs, producing valid-but-suboptimal solutions. Fixing this
+// properly would require making EqClass direction-aware, which was out
+// of scope for this project's timeline. RRSplit is validated and used
+// for undirected datasets (MIVIA, LV) only; it is excluded from BI.
+
 // Forward declarations
 static int calc_bound(const std::vector<Bidomain>& domains);
 static void remove_bidomain(std::vector<Bidomain>& domains, int idx);
@@ -23,6 +35,7 @@ std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vec
 void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, const ui* EqClass, std::vector<int>& index_right, int red_mode);
 std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h, Stats& stats, std::atomic<bool>& abort_due_to_timeout, int red_mode = 7);
 
+// McSplit's upper bound: sum of min(left_len, right_len) over all bidomains
 static int calc_bound(const std::vector<Bidomain>& domains) {
     int bound = 0;
     for (const Bidomain& bd : domains) {
@@ -31,11 +44,15 @@ static int calc_bound(const std::vector<Bidomain>& domains) {
     return bound;
 }
 
+// Removes a bidomain by replacing it with the last element and popping;
+// order within the list does not matter
 static void remove_bidomain(std::vector<Bidomain>& domains, int idx) {
     domains[idx] = domains[domains.size() - 1];
     domains.pop_back();
 }
 
+// Finds the smallest vertex index in arr[start_idx..start_idx+len-1];
+// used as select_bidomain's tie-break
 static int find_min_value(const std::vector<int>& arr, int start_idx, int len) {
     int min_v = INT_MAX;
     for (int i = 0; i < len; i++) {
@@ -46,6 +63,8 @@ static int find_min_value(const std::vector<int>& arr, int start_idx, int len) {
     return min_v;
 }
 
+// Selects bidomain with smallest max(left_len, right_len), ties broken
+// by smallest vertex index in the left set - same rule as plain McSplit
 static int select_bidomain(const std::vector<Bidomain>& domains, const std::vector<int>& left, int current_matching_size) {
     int min_size = INT_MAX;
     int min_tie_breaker = INT_MAX;
@@ -69,6 +88,9 @@ static int select_bidomain(const std::vector<Bidomain>& domains, const std::vect
 }
 
 // Returns index of smallest value in arr[start_idx..start_idx+len-1] that is > w.
+// Used by solve_rr to visit right-side candidates in increasing order one at
+// a time without pre-sorting, same pattern as index_of_next_smallest_dsb in
+// mcsplit-dsb.cpp. Returns -1 if no such value exists (w is the maximum).
 static int index_of_next_smallest(const std::vector<int>& arr, int start_idx, int len, int w) {
     int idx = -1;
     int smallest = INT_MAX;
@@ -81,6 +103,9 @@ static int index_of_next_smallest(const std::vector<int>& arr, int start_idx, in
     return idx;
 }
 
+// Boolean pre-partition (adjacent vs non-adjacent), G-side only - no
+// direction awareness (see Section 4.1.2.2, and the note at the top of
+// this file re: RRSplit's EqClass limitation)
 int partition_rr(std::vector<int>& all_vv, int start, int len, const std::vector<unsigned int>& adjrow) {
     int i = 0;
     for (int j = 0; j < len; j++) {
@@ -92,6 +117,10 @@ int partition_rr(std::vector<int>& all_vv, int start, int len, const std::vector
     return i;
 }
 
+// H-side partition, additionally maintaining index_right (a reverse
+// lookup: index_right[vertex] = its current position in the right array)
+// so that other RRSplit machinery (e.g. index_of_next_smallest, EqClass
+// lookups) can find a vertex's position in O(1) without a linear scan
 int partition_right_rr(std::vector<int>& all_vv, int start, int len,
         const std::vector<unsigned int>& adjrow, std::vector<int>& index_right) {
     int i = 0;
@@ -105,6 +134,10 @@ int partition_right_rr(std::vector<int>& all_vv, int start, int len,
     return i;
 }
 
+// Sparse variant of partition_right_rr: when w's degree is small relative
+// to the bidomain size, it is cheaper to iterate w's adjacency list
+// directly (via adjlist) and look up each neighbour's current position
+// (via index_right) than to scan the whole bidomain checking adjrow
 int partition_sparse_rr(std::vector<int>& all_vv, int start, int len,
         int degree, const unsigned int* adjlist, std::vector<int>& index_right) {
     int j = 0;
@@ -119,6 +152,17 @@ int partition_sparse_rr(std::vector<int>& all_vv, int start, int len,
     return j;
 }
 
+// Splits bidomains after matching (v, w). No multiway/direction-aware
+// split - see the note at the top of this file re: RRSplit's
+// direction-blindness (Section 4.1.2.2).
+//
+// best_match (via ccount) implements RRSplit's maximality reduction:
+// ccount counts, across all bidomains, how many were either fully
+// consumed (both sides split entirely to adjacent or entirely to
+// non-adjacent) or were already empty before this match. If every
+// bidomain satisfies this, best_match is set true, signalling to the
+// caller (solve_rr) that (v,w) is guaranteed part of an optimal
+// solution here - no other branch at this node needs exploring.
 std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vector<int>& left,
         std::vector<int>& right, const Graph& g, const Graph& h, int v, int w,
         bool& best_match, std::vector<int>& index_right) {
@@ -132,6 +176,9 @@ std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vec
 
         int left_len = partition_rr(left, l, old_bd.left_len, g.adjmat[v]);
 
+        // choose the cheaper H-side partition strategy based on w's degree
+        // relative to the bidomain size - see partition_sparse_rr/
+        // partition_right_rr comments
         int right_len;
         if (old_bd.right_len > (int)h.degree[w]) {
             right_len = partition_sparse_rr(right, r, old_bd.right_len, h.degree[w], h.adjlist[w], index_right);
@@ -142,6 +189,8 @@ std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vec
         int left_len_noedge = old_bd.left_len - left_len;
         int right_len_noedge = old_bd.right_len - right_len;
 
+        // this bidomain contributes to a "clean" split (or was already
+        // empty) - see docstring above for what this means for best_match
         if ((left_len == 0 && right_len == 0) ||
             (left_len_noedge == 0 && right_len_noedge == 0) ||
             old_bd.left_len == 0) {
@@ -218,6 +267,10 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         }
     }
 
+    // reserve v's/w's slot: bd.left_len already shrunk above when v was
+    // pulled out; bd.right_len is shrunk here so the later main loop
+    // (right_len down to 0, index_of_next_smallest) sees exactly the
+    // remaining unmatched candidates
     bd.right_len--;
 
     // Tighter equivalence-class bound check (from reference):
@@ -231,6 +284,8 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         }
         if (bd.left_len <= bd.right_len && count_left > count_right) {
             if (bound + count_right - count_left <= (int)incumbent.size()) {
+                // full undo of both v-removal and right_len decrement
+                // before pruning this branch
                 bd.right_len++;
                 left[bd.l + bd.left_len] = v;
                 bd.left_len++;
@@ -309,14 +364,22 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
 
     if (bd.left_len == 0) { remove_bidomain(domains, bd_idx); }
 
+    // branch where v is excluded entirely from the mapping
     solve_rr(g, h, incumbent, current, domains, left, right, goal,
             stats, start_time, abort_due_to_timeout, EqClass, index_right, red_mode);
 }
 
+// Entry point for RRSplit.
+// Note the density comparison direction here (sum < n*(n-1), with the
+// sort lambdas using !h_dense/!g_dense) is the opposite convention from
+// mcsplit-dal.cpp/mcsplit-dsb.cpp's density check (sum > n*(n-1)) - this
+// matches the reference's own convention for RRSplit specifically, not
+// an inconsistency; see comment below.
 std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
         int red_mode) {
 
+    // total degree (out + in), matching the reference's calculate_degrees
     auto calc_degrees = [](const Graph& g) {
 		std::vector<int> degree(g.n, 0);
 		for (int v = 0; v < g.n; v++)
@@ -352,6 +415,9 @@ std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
     Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
     Graph h_sorted = induced_subgraph(const_cast<Graph&>(h), vv1);
 
+    // adjacency lists + structural equivalence classes, both required by
+    // RRSplit's reductions (see the direction-blindness note at the top
+    // of this file - both set_adjlist and GetEqClass are boolean-only)
     set_adjlist(g_sorted);
     set_adjlist(h_sorted);
 
@@ -370,6 +436,7 @@ std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
 
     std::vector<VtxPair> incumbent, current;
     auto start_time = std::chrono::steady_clock::now();
+    // correctly uses g_sorted/h_sorted, matching domains/left/right/EqClass
     solve_rr(g_sorted, h_sorted, incumbent, current, domains, left, right, 1,
         stats, start_time, abort_due_to_timeout, EqClass, index_right, red_mode);
 

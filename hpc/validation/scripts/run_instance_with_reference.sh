@@ -45,13 +45,6 @@ case "$ALGO" in
         REF_TIME_MS=$(echo "$REF_OUT" | grep "^CPU time" | awk '{print $NF}')
         REF_TIME=$(echo "$REF_TIME_MS" | awk '{printf "%.6f", $1/1000}')
         ;;
-    rllum)
-        REF_OUT=$(timeout 1000 ./reference/mcsplit-rl/mcsp+RL min_max -q "$A" "$B" 2>/dev/null)
-        REF_SIZE=$(echo "$REF_OUT" | grep "Solution size" | awk '{print $3}')
-        REF_NODES=$(echo "$REF_OUT" | grep "^Nodes:" | awk '{print $NF}')
-        REF_TIME_MS=$(echo "$REF_OUT" | grep "^CPU time" | awk '{print $NF}')
-        REF_TIME=$(echo "$REF_TIME_MS" | awk '{printf "%.6f", $1/1000}')
-        ;;
     dal)
         REF_OUT=$(timeout 1000 ./reference/mcsplit-dal/mcspDAL min_max -q "$A" "$B" 2>/dev/null)
         REF_SIZE=$(echo "$REF_OUT" | grep "^#2:" | awk '{print $2}')
