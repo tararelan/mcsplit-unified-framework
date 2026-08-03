@@ -61,7 +61,12 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
         bool use_lum = true, bool use_lsm = true);
 
 
-// McSplit's upper bound: sum of min(left_len, right_len) over all bidomains
+/**
+ * McSplit's upper bound: sum of min(left_len, right_len) over all bidomains
+ *
+ * @param domains Current list of bidomains.
+ * @return Upper bound on the number of additional pairs that could be matched.
+ */
 static int calc_bound_ll(const std::vector<Bidomain>& domains) {
     int bound = 0;
     for (const Bidomain& bd : domains)
@@ -69,16 +74,29 @@ static int calc_bound_ll(const std::vector<Bidomain>& domains) {
     return bound;
 }
 
-// Removes a bidomain by replacing it with the last element and popping;
-// order within the list does not matter
+/**
+ * Removes a bidomain by replacing it with the last element and popping;
+ * order within the list does not matter
+ *
+ * @param domains List of bidomains to remove from, modified in-place.
+ * @param idx Index of the bidomain to remove.
+ */
 static void remove_bidomain_ll(std::vector<Bidomain>& domains, int idx) {
     domains[idx] = domains[domains.size() - 1];
     domains.pop_back();
 }
 
-// Selects the vertex with the highest accumulated score in grade[],
-// breaking ties on smallest vertex index. max_g starts at -1 so the
-// first candidate is always accepted even if all scores are still 0.
+/**
+ * Selects the vertex with the highest accumulated score in grade[],
+ * breaking ties on smallest vertex index. max_g starts at -1 so the
+ * first candidate is always accepted even if all scores are still 0.
+ *
+ * @param arr Array to search (typically the `left` vertex array).
+ * @param grade Per-vertex score table, indexed by vertex id.
+ * @param start_idx Index of the first element of the slice to search.
+ * @param len Number of elements in the slice.
+ * @return Index (relative to start_idx) of the highest-scoring vertex.
+ */
 int selectV_index_ll(const std::vector<int>& arr, const std::vector<gtype>& grade,
         int start_idx, int len) {
     int idx = -1;
@@ -95,9 +113,18 @@ int selectV_index_ll(const std::vector<int>& arr, const std::vector<gtype>& grad
     return idx;
 }
 
-// Same as selectV_index_ll but skips vertices already tried in the
-// current branching loop (wselected). Returns -1 if all candidates
-// in range have already been tried - callers must check for this.
+/**
+ * Same as selectV_index_ll but skips vertices already tried in the
+ * current branching loop (wselected). Returns -1 if all candidates
+ * in range have already been tried - callers must check for this.
+ *
+ * @param arr Array to search (typically the `right` vertex array).
+ * @param grade Per-vertex or per-pair score table, indexed by vertex id.
+ * @param start_idx Index of the first element of the slice to search.
+ * @param len Number of elements in the slice.
+ * @param wselected Mask of already-tried vertices, indexed by vertex id.
+ * @return Index (relative to start_idx) of the highest-scoring untried vertex, or -1 if none remain.
+ */
 int selectW_index_ll(const std::vector<int>& arr, const std::vector<gtype>& grade,
         int start_idx, int len, const std::vector<int>& wselected) {
     int idx = -1;
@@ -116,10 +143,18 @@ int selectW_index_ll(const std::vector<int>& arr, const std::vector<gtype>& grad
     return idx;
 }
 
-// Selects bidomain with smallest max(left_len, right_len). Ties broken
-// by comparing each domain's highest-scored left vertex (via
-// selectV_index_ll), then taking the domain whose best vertex has the
-// smallest index.
+/**
+ * Selects bidomain with smallest max(left_len, right_len). Ties broken
+ * by comparing each domain's highest-scored left vertex (via
+ * selectV_index_ll), then taking the domain whose best vertex has the
+ * smallest index.
+ *
+ * @param domains Current list of bidomains to choose from.
+ * @param left G-side vertex array (used for the tie-break lookup).
+ * @param grade Per-vertex score table used to find each domain's best vertex.
+ * @param current_matching_size Size of the partial solution so far (unused directly, kept for interface consistency).
+ * @return Index into domains of the selected bidomain, or -1 if domains is empty.
+ */
 int select_bidomain_ll(const std::vector<Bidomain>& domains, const std::vector<int>& left,
         const std::vector<gtype>& grade, int current_matching_size) {
     int min_size = INT_MAX;
@@ -138,8 +173,16 @@ int select_bidomain_ll(const std::vector<Bidomain>& domains, const std::vector<i
     return best;
 }
 
-// Boolean pre-partition (adjacent vs non-adjacent); direction handled
-// correctly by the multiway split downstream, same as elsewhere
+/**
+ * Boolean pre-partition (adjacent vs non-adjacent); direction handled
+ * correctly by the multiway split downstream, same as elsewhere
+ *
+ * @param all_vv Vertex array to partition in-place (either `left` or `right`).
+ * @param start Index of the first element of the slice to partition.
+ * @param len Number of elements in the slice.
+ * @param adjrow Adjacency row of the vertex being matched, indexed by vertex id.
+ * @return Number of adjacent vertices, i.e. the length of the adjacent prefix.
+ */
 int partition_ll(std::vector<int>& all_vv, int start, int len,
         const std::vector<unsigned int>& adjrow) {
     int i = 0;
@@ -152,9 +195,17 @@ int partition_ll(std::vector<int>& all_vv, int start, int len,
     return i;
 }
 
-// Removes already-matched vertices from a domain side in-place.
-// Returns the new length after removal. Used by LUM to clean up
-// non-adjacent bidomains after leaf matching.
+/**
+ * Removes already-matched vertices from a domain side in-place.
+ * Returns the new length after removal. Used by LUM to clean up
+ * non-adjacent bidomains after leaf matching.
+ *
+ * @param arr Array to compact in-place (either `left` or `right`).
+ * @param start Index of the first element of the slice.
+ * @param len Number of elements in the slice.
+ * @param matched Mask of already-matched vertices, indexed by vertex id.
+ * @return New length of the slice after removing matched vertices.
+ */
 int remove_matched_vertex_ll(std::vector<int>& arr, int start, int len,
         const std::vector<int>& matched) {
     int p = 0;
@@ -167,20 +218,48 @@ int remove_matched_vertex_ll(std::vector<int>& arr, int start, int len,
     return p;
 }
 
-// O(1) removal by swap-with-last-and-shrink; side-agnostic (works for
-// either the G-side or H-side array)
+/**
+ * O(1) removal by swap-with-last-and-shrink; side-agnostic (works for
+ * either the G-side or H-side array)
+ *
+ * @param arr Array to remove from, modified in-place.
+ * @param start_idx Index of the first element of the slice.
+ * @param len Length of the slice, decremented in-place.
+ * @param remove_idx Index (relative to start_idx) of the element to remove.
+ */
 void remove_vtx_from_array_ll(std::vector<int>& arr, int start_idx, int& len, int remove_idx) {
     len--;
     std::swap(arr[start_idx + remove_idx], arr[start_idx + len]);
 }
 
-// use_lum: if true, bulk-match leaf pairs after matching (v,w)
-// use_lsm: if true, use per-pair Q[v][w] for w-scoring; if false, use per-vertex rgrade[w]
-//
-// NOTE: correctly marks each LUM-matched leaf pair as matched immediately
-// (g_matched[v_leaf]=1, h_matched[w_leaf]=1 below), same as
-// rewardfeed_RL/rewardfeed_DAL. Does not have the reference DAL binary's
-// missing-update bug documented in Section 4.1.4.
+/**
+ * use_lum: if true, bulk-match leaf pairs after matching (v,w)
+ * use_lsm: if true, use per-pair Q[v][w] for w-scoring; if false, use per-vertex rgrade[w]
+ *
+ * NOTE: correctly marks each LUM-matched leaf pair as matched immediately
+ * (g_matched[v_leaf]=1, h_matched[w_leaf]=1 below), same as
+ * rewardfeed_RL/rewardfeed_DAL. Does not have the reference DAL binary's
+ * missing-update bug documented in Section 4.1.4.
+ *
+ * @param d Bidomains to split, as they stood before matching (v, w).
+ * @param current Partial solution; (v, w) and any LUM leaf pairs are appended.
+ * @param g_matched Mask of matched G-side vertices, updated in-place.
+ * @param h_matched Mask of matched H-side vertices, updated in-place.
+ * @param left G-side vertex array, reordered in-place during partitioning.
+ * @param right H-side vertex array, reordered in-place during partitioning.
+ * @param lgrade Short-term per-vertex score for v, updated in-place.
+ * @param Qv Per-pair row Q[v] for w, updated in-place when use_lsm=true.
+ * @param rgrade Per-vertex score for w, updated in-place when use_lsm=false.
+ * @param g Graph G.
+ * @param h Graph H.
+ * @param v G-side vertex just matched.
+ * @param w H-side vertex just matched.
+ * @param multiway Whether to further split adjacent bidomains by edge label.
+ * @param use_lum Whether to bulk-match compatible leaf pairs after matching (v,w).
+ * @param use_lsm Whether to score w using per-pair Qv (true) or per-vertex rgrade (false).
+ * @param stats Search statistics, updated in-place.
+ * @return The new list of bidomains after the split.
+ */
 std::vector<Bidomain> rewardfeed_ll(
         const std::vector<Bidomain>& d,
         std::vector<VtxPair>& current,
@@ -307,7 +386,29 @@ std::vector<Bidomain> rewardfeed_ll(
     return new_d;
 }
 
-// BnB search
+/**
+ * BnB search
+ *
+ * @param g Graph G.
+ * @param h Graph H.
+ * @param lgrade Short-term per-vertex score for v.
+ * @param Q Long-term per-pair score table for w (used when use_lsm=true).
+ * @param rgrade Per-vertex score for w (used when use_lsm=false).
+ * @param incumbent Best solution found so far, updated in-place.
+ * @param current Partial solution being built along this search path.
+ * @param g_matched Mask of matched G-side vertices.
+ * @param h_matched Mask of matched H-side vertices.
+ * @param domains Bidomains available at this node.
+ * @param left G-side vertex array.
+ * @param right H-side vertex array.
+ * @param goal Minimum solution size required to keep searching.
+ * @param multiway Whether to use label/direction-aware domain splitting.
+ * @param use_lum Whether to bulk-match compatible leaf pairs after each match.
+ * @param use_lsm Whether to score w using per-pair Q (true) or per-vertex rgrade (false).
+ * @param stats Search statistics, updated in-place.
+ * @param start_time Time the search began, used for timing incumbent updates.
+ * @param abort_due_to_timeout Flag checked to abort the search early.
+ */
 
 void solve_ll(const Graph& g, const Graph& h,
         std::vector<gtype>& lgrade,
@@ -393,11 +494,22 @@ void solve_ll(const Graph& g, const Graph& h,
             stats, start_time, abort_due_to_timeout);
 }
 
-// Entry point
-// use_lum=true,  use_lsm=true  → full McSplit+LL
-// use_lum=false, use_lsm=true  → LSM only (no leaf matching)
-// use_lum=true,  use_lsm=false → LUM only (per-vertex w-scoring, McSplit+RL style)
-// use_lum=false, use_lsm=false → plain McSplit+RL (sanity check - should match rl results)
+/**
+ * Entry point
+ * use_lum=true,  use_lsm=true  → full McSplit+LL
+ * use_lum=false, use_lsm=true  → LSM only (no leaf matching)
+ * use_lum=true,  use_lsm=false → LUM only (per-vertex w-scoring, McSplit+RL style)
+ * use_lum=false, use_lsm=false → plain McSplit+RL (sanity check - should match rl results)
+ *
+ * @param g Graph G.
+ * @param h Graph H.
+ * @param multiway Whether to use label/direction-aware domain splitting.
+ * @param stats Search statistics, updated in-place.
+ * @param abort_due_to_timeout Flag checked to abort the search early.
+ * @param use_lum Whether to bulk-match compatible leaf pairs after each match.
+ * @param use_lsm Whether to score w using per-pair Q (true) or per-vertex rgrade (false).
+ * @return The largest common subgraph solution found, as vertex pairs in the original graphs' indices.
+ */
 
 std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,

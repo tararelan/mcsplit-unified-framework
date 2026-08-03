@@ -24,11 +24,16 @@ std::vector<Bidomain> filter_domains(const std::vector<Bidomain>& d, std::vector
 void solve(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout);
 std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout);
 
-// McSplit's upper bound.
-// For each bidomain, at most min(|G-side|, |H-side|) further pairs can be matched
-// since each vertex can only be used once. Summing over all bidomains gives the
-// maximum number of additional pairs that could possibly be added to the current
-// partial solution.
+/**
+ * McSplit's upper bound.
+ * For each bidomain, at most min(|G-side|, |H-side|) further pairs can be matched
+ * since each vertex can only be used once. Summing over all bidomains gives the
+ * maximum number of additional pairs that could possibly be added to the current
+ * partial solution.
+ *
+ * @param domains Current list of bidomains.
+ * @return Upper bound on the number of additional pairs that could be matched.
+ */
 static int calc_bound(const std::vector<Bidomain>& domains) {
     int bound = 0;
     for (const Bidomain& bd : domains)
@@ -36,11 +41,18 @@ static int calc_bound(const std::vector<Bidomain>& domains) {
     return bound;
 }
 
-// Finds the smallest vertex index in left[start_idx .. start_idx+len-1].
-// Used as a tiebreaker in bidomain selection - when two bidomains have the
-// same max(left_len, right_len), we prefer the one whose left set contains
-// the smallest-indexed vertex. This makes the search deterministic and
-// consistent with the reference implementation.
+/**
+ * Finds the smallest vertex index in left[start_idx .. start_idx+len-1].
+ * Used as a tiebreaker in bidomain selection - when two bidomains have the
+ * same max(left_len, right_len), we prefer the one whose left set contains
+ * the smallest-indexed vertex. This makes the search deterministic and
+ * consistent with the reference implementation.
+ *
+ * @param arr Array to search (typically the `left` vertex array).
+ * @param start_idx Index of the first element of the slice to search.
+ * @param len Number of elements in the slice.
+ * @return The smallest value found in arr[start_idx .. start_idx+len-1].
+ */
 int find_min_value(const std::vector<int>& arr, int start_idx, int len) {
     int min_v = INT_MAX;
     for (int i = 0; i < len; i++)
@@ -49,11 +61,18 @@ int find_min_value(const std::vector<int>& arr, int start_idx, int len) {
     return min_v;
 }
 
-// Selects which bidomain to branch on next.
-// McSplit's heuristic: pick the bidomain with the smallest max(left_len, right_len).
-// This is a fail-first strategy - branch on the most constrained choice first,
-// which tends to find contradictions earlier and prune more of the search tree.
-// Ties broken by smallest vertex index in the left set.
+/**
+ * Selects which bidomain to branch on next.
+ * McSplit's heuristic: pick the bidomain with the smallest max(left_len, right_len).
+ * This is a fail-first strategy - branch on the most constrained choice first,
+ * which tends to find contradictions earlier and prune more of the search tree.
+ * Ties broken by smallest vertex index in the left set.
+ *
+ * @param domains Current list of bidomains to choose from.
+ * @param left G-side vertex array (used for the tie-break lookup).
+ * @param current_matching_size Size of the partial solution so far (unused directly, kept for interface consistency).
+ * @return Index into domains of the selected bidomain, or -1 if domains is empty.
+ */
 int select_bidomain(const std::vector<Bidomain>& domains, const std::vector<int>& left, int current_matching_size) {
     int min_size = INT_MAX;
     int min_tie_breaker = INT_MAX;
@@ -76,13 +95,21 @@ int select_bidomain(const std::vector<Bidomain>& domains, const std::vector<int>
     return best;
 }
 
-// Partitions the slice all_vv[start .. start+len-1] in-place so that vertices
-// adjacent to the vertex represented by adjrow come first, followed by
-// non-adjacent vertices. Returns the count of adjacent vertices (i.e. the
-// length of the adjacent prefix).
-// This is the core operation of filter_domains - it splits one side of a
-// bidomain into adjacent and non-adjacent parts in O(len) time without
-// allocating any new memory.
+/**
+ * Partitions the slice all_vv[start .. start+len-1] in-place so that vertices
+ * adjacent to the vertex represented by adjrow come first, followed by
+ * non-adjacent vertices. Returns the count of adjacent vertices (i.e. the
+ * length of the adjacent prefix).
+ * This is the core operation of filter_domains - it splits one side of a
+ * bidomain into adjacent and non-adjacent parts in O(len) time without
+ * allocating any new memory.
+ *
+ * @param all_vv Vertex array to partition in-place (either `left` or `right`).
+ * @param start Index of the first element of the slice to partition.
+ * @param len Number of elements in the slice.
+ * @param adjrow Adjacency row of the vertex being matched, indexed by vertex id.
+ * @return Number of adjacent vertices, i.e. the length of the adjacent prefix.
+ */
 int partition(std::vector<int>& all_vv, int start, int len, const std::vector<unsigned int>& adjrow) {
     int i = 0;
     for (int j = 0; j < len; j++) {
@@ -94,9 +121,15 @@ int partition(std::vector<int>& all_vv, int start, int len, const std::vector<un
     return i;
 }
 
-// Removes vertex v from the left side of its bidomain by swapping it with
-// the last element and decrementing left_len. This is O(n) in the bidomain
-// size but avoids shifting elements. v must be in the bidomain.
+/**
+ * Removes vertex v from the left side of its bidomain by swapping it with
+ * the last element and decrementing left_len. This is O(n) in the bidomain
+ * size but avoids shifting elements. v must be in the bidomain.
+ *
+ * @param left G-side vertex array containing the bidomain's elements.
+ * @param bd Bidomain to remove v from; its left_len is decremented in-place.
+ * @param v Vertex to remove.
+ */
 void remove_vtx_from_left_domain(std::vector<int>& left, Bidomain& bd, int v) {
     int i = 0;
     while (left[bd.l + i] != v) i++;
@@ -104,24 +137,41 @@ void remove_vtx_from_left_domain(std::vector<int>& left, Bidomain& bd, int v) {
     bd.left_len--;
 }
 
-// Removes a bidomain from the list by replacing it with the last element
-// and popping the back. O(1) - order within the list does not matter.
+/**
+ * Removes a bidomain from the list by replacing it with the last element
+ * and popping the back. O(1) - order within the list does not matter.
+ *
+ * @param domains List of bidomains to remove from, modified in-place.
+ * @param idx Index of the bidomain to remove.
+ */
 static void remove_bidomain(std::vector<Bidomain>& domains, int idx) {
     domains[idx] = domains[domains.size() - 1];
     domains.pop_back();
 }
 
-// Computes the new set of bidomains after committing to the match (v, w).
-// For each existing bidomain (L, R), splits it into:
-//   - vertices in L adjacent to v, paired with vertices in R adjacent to w
-//   - vertices in L not adjacent to v, paired with vertices in R not adjacent to w
-// Only non-empty splits are kept. This enforces the induced subgraph constraint:
-// any future match must preserve adjacency/non-adjacency relative to (v,w).
-//
-// In multiway mode (labelled or directed graphs), the adjacent part is further
-// split by edge label value - vertices with different edge labels to v (or w)
-// go into separate bidomains, since they can only be matched with vertices
-// carrying the same label.
+/**
+ * Computes the new set of bidomains after committing to the match (v, w).
+ * For each existing bidomain (L, R), splits it into:
+ *   - vertices in L adjacent to v, paired with vertices in R adjacent to w
+ *   - vertices in L not adjacent to v, paired with vertices in R not adjacent to w
+ * Only non-empty splits are kept. This enforces the induced subgraph constraint:
+ * any future match must preserve adjacency/non-adjacency relative to (v,w).
+ *
+ * In multiway mode (labelled or directed graphs), the adjacent part is further
+ * split by edge label value - vertices with different edge labels to v (or w)
+ * go into separate bidomains, since they can only be matched with vertices
+ * carrying the same label.
+ *
+ * @param d Bidomains to split, as they stood before matching (v, w).
+ * @param left G-side vertex array, reordered in-place during partitioning.
+ * @param right H-side vertex array, reordered in-place during partitioning.
+ * @param g Graph G.
+ * @param h Graph H.
+ * @param v G-side vertex just matched.
+ * @param w H-side vertex just matched.
+ * @param multiway Whether to further split adjacent bidomains by edge label.
+ * @return The new list of bidomains after the split.
+ */
 std::vector<Bidomain> filter_domains(const std::vector<Bidomain>& d, std::vector<int>& left,
         std::vector<int>& right, const Graph& g, const Graph& h, int v, int w, bool multiway) {
     std::vector<Bidomain> new_d;
@@ -173,18 +223,33 @@ std::vector<Bidomain> filter_domains(const std::vector<Bidomain>& d, std::vector
     return new_d;
 }
 
-// Core branch-and-bound recursive search.
-// At each node:
-//   1. Check timeout
-//   2. Update incumbent if current solution is larger
-//   3. Compute upper bound - prune if it cannot beat incumbent
-//   4. Select the most constrained bidomain (smallest max(|L|,|R|))
-//   5. Select the smallest-indexed vertex v from its left side
-//   6. Try matching v with each w in the right side in ascending order:
-//      - compute new domains after committing to (v,w)
-//      - recurse
-//      - backtrack
-//   7. Also try not matching v at all (the "exclude v" branch)
+/**
+ * Core branch-and-bound recursive search.
+ * At each node:
+ *   1. Check timeout
+ *   2. Update incumbent if current solution is larger
+ *   3. Compute upper bound - prune if it cannot beat incumbent
+ *   4. Select the most constrained bidomain (smallest max(|L|,|R|))
+ *   5. Select the smallest-indexed vertex v from its left side
+ *   6. Try matching v with each w in the right side in ascending order:
+ *      - compute new domains after committing to (v,w)
+ *      - recurse
+ *      - backtrack
+ *   7. Also try not matching v at all (the "exclude v" branch)
+ *
+ * @param g Graph G.
+ * @param h Graph H.
+ * @param incumbent Best solution found so far, updated in-place.
+ * @param current Partial solution being built along this search path.
+ * @param domains Bidomains available at this node.
+ * @param left G-side vertex array.
+ * @param right H-side vertex array.
+ * @param goal Minimum solution size required to keep searching.
+ * @param multiway Whether to use label/direction-aware domain splitting.
+ * @param stats Search statistics, updated in-place.
+ * @param start_time Time the search began, used for timing incumbent updates.
+ * @param abort_due_to_timeout Flag checked to abort the search early.
+ */
 void solve(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         std::vector<VtxPair>& current, std::vector<Bidomain>& domains,
         std::vector<int>& left, std::vector<int>& right, unsigned int goal,
@@ -262,9 +327,18 @@ void solve(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
             multiway, stats, start_time, abort_due_to_timeout);
 }
 
-// Entry point for McSplit search.
-// Sorts vertices by degree, builds initial bidomains, runs solve(), and
-// converts the solution back to original vertex indices.
+/**
+ * Entry point for McSplit search.
+ * Sorts vertices by degree, builds initial bidomains, runs solve(), and
+ * converts the solution back to original vertex indices.
+ *
+ * @param g Graph G.
+ * @param h Graph H.
+ * @param multiway Whether to use label/direction-aware domain splitting.
+ * @param stats Search statistics, updated in-place.
+ * @param abort_due_to_timeout Flag checked to abort the search early.
+ * @return The largest common subgraph solution found, as vertex pairs in the original graphs' indices.
+ */
 std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout) {
 

@@ -35,7 +35,12 @@ std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vec
 void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, const ui* EqClass, std::vector<int>& index_right, int red_mode);
 std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h, Stats& stats, std::atomic<bool>& abort_due_to_timeout, int red_mode = 7);
 
-// McSplit's upper bound: sum of min(left_len, right_len) over all bidomains
+/**
+ * McSplit's upper bound: sum of min(left_len, right_len) over all bidomains
+ *
+ * @param domains Current list of bidomains.
+ * @return Upper bound on the number of additional pairs that could be matched.
+ */
 static int calc_bound(const std::vector<Bidomain>& domains) {
     int bound = 0;
     for (const Bidomain& bd : domains) {
@@ -44,15 +49,27 @@ static int calc_bound(const std::vector<Bidomain>& domains) {
     return bound;
 }
 
-// Removes a bidomain by replacing it with the last element and popping;
-// order within the list does not matter
+/**
+ * Removes a bidomain by replacing it with the last element and popping;
+ * order within the list does not matter
+ *
+ * @param domains List of bidomains to remove from, modified in-place.
+ * @param idx Index of the bidomain to remove.
+ */
 static void remove_bidomain(std::vector<Bidomain>& domains, int idx) {
     domains[idx] = domains[domains.size() - 1];
     domains.pop_back();
 }
 
-// Finds the smallest vertex index in arr[start_idx..start_idx+len-1];
-// used as select_bidomain's tie-break
+/**
+ * Finds the smallest vertex index in arr[start_idx..start_idx+len-1];
+ * used as select_bidomain's tie-break
+ *
+ * @param arr Array to search (typically the `left` vertex array).
+ * @param start_idx Index of the first element of the slice to search.
+ * @param len Number of elements in the slice.
+ * @return The smallest value found in arr[start_idx .. start_idx+len-1].
+ */
 static int find_min_value(const std::vector<int>& arr, int start_idx, int len) {
     int min_v = INT_MAX;
     for (int i = 0; i < len; i++) {
@@ -63,8 +80,15 @@ static int find_min_value(const std::vector<int>& arr, int start_idx, int len) {
     return min_v;
 }
 
-// Selects bidomain with smallest max(left_len, right_len), ties broken
-// by smallest vertex index in the left set - same rule as plain McSplit
+/**
+ * Selects bidomain with smallest max(left_len, right_len), ties broken
+ * by smallest vertex index in the left set - same rule as plain McSplit
+ *
+ * @param domains Current list of bidomains to choose from.
+ * @param left G-side vertex array (used for the tie-break lookup).
+ * @param current_matching_size Size of the partial solution so far (unused directly, kept for interface consistency).
+ * @return Index into domains of the selected bidomain, or -1 if domains is empty.
+ */
 static int select_bidomain(const std::vector<Bidomain>& domains, const std::vector<int>& left, int current_matching_size) {
     int min_size = INT_MAX;
     int min_tie_breaker = INT_MAX;
@@ -87,10 +111,18 @@ static int select_bidomain(const std::vector<Bidomain>& domains, const std::vect
     return best;
 }
 
-// Returns index of smallest value in arr[start_idx..start_idx+len-1] that is > w.
-// Used by solve_rr to visit right-side candidates in increasing order one at
-// a time without pre-sorting, same pattern as index_of_next_smallest_dsb in
-// mcsplit-dsb.cpp. Returns -1 if no such value exists (w is the maximum).
+/**
+ * Returns index of smallest value in arr[start_idx..start_idx+len-1] that is > w.
+ * Used by solve_rr to visit right-side candidates in increasing order one at
+ * a time without pre-sorting, same pattern as index_of_next_smallest_dsb in
+ * mcsplit-dsb.cpp. Returns -1 if no such value exists (w is the maximum).
+ *
+ * @param arr Array to search (typically the `right` vertex array).
+ * @param start_idx Index of the first element of the slice to search.
+ * @param len Number of elements in the slice.
+ * @param w Lower bound; the returned value must be strictly greater than w.
+ * @return Index (relative to start_idx) of the smallest qualifying value, or -1 if none exists.
+ */
 static int index_of_next_smallest(const std::vector<int>& arr, int start_idx, int len, int w) {
     int idx = -1;
     int smallest = INT_MAX;
@@ -103,9 +135,17 @@ static int index_of_next_smallest(const std::vector<int>& arr, int start_idx, in
     return idx;
 }
 
-// Boolean pre-partition (adjacent vs non-adjacent), G-side only - no
-// direction awareness (see Section 4.1.2.2, and the note at the top of
-// this file re: RRSplit's EqClass limitation)
+/**
+ * Boolean pre-partition (adjacent vs non-adjacent), G-side only - no
+ * direction awareness (see Section 4.1.2.2, and the note at the top of
+ * this file re: RRSplit's EqClass limitation)
+ *
+ * @param all_vv Vertex array to partition in-place (the `left` array).
+ * @param start Index of the first element of the slice to partition.
+ * @param len Number of elements in the slice.
+ * @param adjrow Adjacency row of the vertex being matched, indexed by vertex id.
+ * @return Number of adjacent vertices, i.e. the length of the adjacent prefix.
+ */
 int partition_rr(std::vector<int>& all_vv, int start, int len, const std::vector<unsigned int>& adjrow) {
     int i = 0;
     for (int j = 0; j < len; j++) {
@@ -117,10 +157,19 @@ int partition_rr(std::vector<int>& all_vv, int start, int len, const std::vector
     return i;
 }
 
-// H-side partition, additionally maintaining index_right (a reverse
-// lookup: index_right[vertex] = its current position in the right array)
-// so that other RRSplit machinery (e.g. index_of_next_smallest, EqClass
-// lookups) can find a vertex's position in O(1) without a linear scan
+/**
+ * H-side partition, additionally maintaining index_right (a reverse
+ * lookup: index_right[vertex] = its current position in the right array)
+ * so that other RRSplit machinery (e.g. index_of_next_smallest, EqClass
+ * lookups) can find a vertex's position in O(1) without a linear scan
+ *
+ * @param all_vv Vertex array to partition in-place (the `right` array).
+ * @param start Index of the first element of the slice to partition.
+ * @param len Number of elements in the slice.
+ * @param adjrow Adjacency row of the vertex being matched, indexed by vertex id.
+ * @param index_right Reverse lookup (vertex -> current position in `right`), updated in-place.
+ * @return Number of adjacent vertices, i.e. the length of the adjacent prefix.
+ */
 int partition_right_rr(std::vector<int>& all_vv, int start, int len,
         const std::vector<unsigned int>& adjrow, std::vector<int>& index_right) {
     int i = 0;
@@ -134,10 +183,20 @@ int partition_right_rr(std::vector<int>& all_vv, int start, int len,
     return i;
 }
 
-// Sparse variant of partition_right_rr: when w's degree is small relative
-// to the bidomain size, it is cheaper to iterate w's adjacency list
-// directly (via adjlist) and look up each neighbour's current position
-// (via index_right) than to scan the whole bidomain checking adjrow
+/**
+ * Sparse variant of partition_right_rr: when w's degree is small relative
+ * to the bidomain size, it is cheaper to iterate w's adjacency list
+ * directly (via adjlist) and look up each neighbour's current position
+ * (via index_right) than to scan the whole bidomain checking adjrow
+ *
+ * @param all_vv Vertex array to partition in-place (the `right` array).
+ * @param start Index of the first element of the slice to partition.
+ * @param len Number of elements in the slice.
+ * @param degree Degree of w, i.e. the length of adjlist.
+ * @param adjlist w's adjacency list (neighbour vertex ids).
+ * @param index_right Reverse lookup (vertex -> current position in `right`), updated in-place.
+ * @return Number of adjacent vertices, i.e. the length of the adjacent prefix.
+ */
 int partition_sparse_rr(std::vector<int>& all_vv, int start, int len,
         int degree, const unsigned int* adjlist, std::vector<int>& index_right) {
     int j = 0;
@@ -152,17 +211,30 @@ int partition_sparse_rr(std::vector<int>& all_vv, int start, int len,
     return j;
 }
 
-// Splits bidomains after matching (v, w). No multiway/direction-aware
-// split - see the note at the top of this file re: RRSplit's
-// direction-blindness (Section 4.1.2.2).
-//
-// best_match (via ccount) implements RRSplit's maximality reduction:
-// ccount counts, across all bidomains, how many were either fully
-// consumed (both sides split entirely to adjacent or entirely to
-// non-adjacent) or were already empty before this match. If every
-// bidomain satisfies this, best_match is set true, signalling to the
-// caller (solve_rr) that (v,w) is guaranteed part of an optimal
-// solution here - no other branch at this node needs exploring.
+/**
+ * Splits bidomains after matching (v, w). No multiway/direction-aware
+ * split - see the note at the top of this file re: RRSplit's
+ * direction-blindness (Section 4.1.2.2).
+ *
+ * best_match (via ccount) implements RRSplit's maximality reduction:
+ * ccount counts, across all bidomains, how many were either fully
+ * consumed (both sides split entirely to adjacent or entirely to
+ * non-adjacent) or were already empty before this match. If every
+ * bidomain satisfies this, best_match is set true, signalling to the
+ * caller (solve_rr) that (v,w) is guaranteed part of an optimal
+ * solution here - no other branch at this node needs exploring.
+ *
+ * @param d Bidomains to split, as they stood before matching (v, w).
+ * @param left G-side vertex array, reordered in-place during partitioning.
+ * @param right H-side vertex array, reordered in-place during partitioning.
+ * @param g Graph G.
+ * @param h Graph H.
+ * @param v G-side vertex just matched.
+ * @param w H-side vertex just matched.
+ * @param best_match Set to true if (v,w) is guaranteed part of an optimal solution here.
+ * @param index_right Reverse lookup (vertex -> current position in `right`), updated in-place.
+ * @return The new list of bidomains after the split.
+ */
 std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vector<int>& left,
         std::vector<int>& right, const Graph& g, const Graph& h, int v, int w,
         bool& best_match, std::vector<int>& index_right) {
@@ -209,15 +281,32 @@ std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vec
     return new_d;
 }
 
-// red_mode: bitmask controlling which RRSplit reductions are enabled
-//   bit 0 (value 1) = vertex-equivalence reduction (w_lower skip + exclude-branch removal)
-//   bit 1 (value 2) = maximality reduction (best_match commit/prune)
-//   bit 2 (value 4) = tighter equivalence-class bound
-// Presets:
-//   7 (111) = full RRSplit - all reductions on
-//   6 (110) = no vertex-equivalence (max + bound only)
-//   5 (101) = no maximality (veq + bound only)
-//   3 (011) = no tighter bound (veq + max only)
+/**
+ * red_mode: bitmask controlling which RRSplit reductions are enabled
+ *   bit 0 (value 1) = vertex-equivalence reduction (w_lower skip + exclude-branch removal)
+ *   bit 1 (value 2) = maximality reduction (best_match commit/prune)
+ *   bit 2 (value 4) = tighter equivalence-class bound
+ * Presets:
+ *   7 (111) = full RRSplit - all reductions on
+ *   6 (110) = no vertex-equivalence (max + bound only)
+ *   5 (101) = no maximality (veq + bound only)
+ *   3 (011) = no tighter bound (veq + max only)
+ *
+ * @param g Graph G.
+ * @param h Graph H.
+ * @param incumbent Best solution found so far, updated in-place.
+ * @param current Partial solution being built along this search path.
+ * @param domains Bidomains available at this node.
+ * @param left G-side vertex array.
+ * @param right H-side vertex array.
+ * @param goal Minimum solution size required to keep searching.
+ * @param stats Search statistics, updated in-place.
+ * @param start_time Time the search began, used for timing incumbent updates.
+ * @param abort_due_to_timeout Flag checked to abort the search early.
+ * @param EqClass Structural equivalence class of each G-side vertex.
+ * @param index_right Reverse lookup (vertex -> current position in `right`), updated in-place.
+ * @param red_mode Bitmask controlling which RRSplit reductions are enabled.
+ */
 void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         std::vector<VtxPair>& current, std::vector<Bidomain>& domains,
         std::vector<int>& left, std::vector<int>& right, unsigned int goal,
@@ -369,12 +458,21 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
             stats, start_time, abort_due_to_timeout, EqClass, index_right, red_mode);
 }
 
-// Entry point for RRSplit.
-// Note the density comparison direction here (sum < n*(n-1), with the
-// sort lambdas using !h_dense/!g_dense) is the opposite convention from
-// mcsplit-dal.cpp/mcsplit-dsb.cpp's density check (sum > n*(n-1)) - this
-// matches the reference's own convention for RRSplit specifically, not
-// an inconsistency; see comment below.
+/**
+ * Entry point for RRSplit.
+ * Note the density comparison direction here (sum < n*(n-1), with the
+ * sort lambdas using !h_dense/!g_dense) is the opposite convention from
+ * mcsplit-dal.cpp/mcsplit-dsb.cpp's density check (sum > n*(n-1)) - this
+ * matches the reference's own convention for RRSplit specifically, not
+ * an inconsistency; see comment below.
+ *
+ * @param g Graph G.
+ * @param h Graph H.
+ * @param stats Search statistics, updated in-place.
+ * @param abort_due_to_timeout Flag checked to abort the search early.
+ * @param red_mode Bitmask controlling which RRSplit reductions are enabled.
+ * @return The largest common subgraph solution found, as vertex pairs in the original graphs' indices.
+ */
 std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
         int red_mode) {

@@ -14,15 +14,9 @@
 #include <limits.h>
 #include <iterator>
 
-// Forward declarations for McSplit+DAL. Includes both the RL-mode reward
-// path (rewardfeed_RL, shared in spirit with mcsplit-rl.cpp) and the
-// DAL-mode reward path (rewardfeed_DAL, using the value function V/Q
-// described in Section 2.11), switched between by solve_dal based on
-// the hybrid policy counter (M/num/Maxnum, matching NbApp/MaxNbApp
-// in the pseudocode).
 using gtype = double;
-const int short_memory_threshold = 1e5;       // decay threshold for short-term RL scores
-const long long int long_memory_threshold = 1e9; // decay threshold for long-term DAL scores (1e9 is exact as a double, safe to assign to long long)
+const int short_memory_threshold = 1e5;		   ///< decay threshold for short-term RL scores
+const long long int long_memory_threshold = 1e9; ///< decay threshold for long-term DAL scores (1e9 is exact as a double, safe to assign to long long)
 
 // Forward declarations
 static int calc_bound(const std::vector<Bidomain>& domains);
@@ -36,9 +30,14 @@ static void remove_bidomain(std::vector<Bidomain>& domains, int idx);
 std::vector<Bidomain> rewardfeed_RL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, std::vector<int>& g_matched, std::vector<int>& h_matched, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
 std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& V, std::vector<gtype>& Qv, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
 void solve_dal(const Graph& g, const Graph& h, std::vector<gtype>& V, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, std::vector<std::vector<gtype>>& Q, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, int& M, int& num, int Maxnum, int policy_mode, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout);
-std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout, int policy_mode = 0);  // 0=hybrid, 1=RL_only, 2=DAL_only
-// McSplit's upper bound: sum of min(left_len, right_len) over all bidomains.
-// From each bidomain at most min(|L|, |R|) further pairs can be matched.
+std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout, int policy_mode = 0); // 0=hybrid, 1=RL_only, 2=DAL_only
+
+/**
+ * McSplit's upper bound: sum of min(left_len, right_len) over all bidomains.
+ * From each bidomain at most min(|L|, |R|) further pairs can be matched.
+ * @param domains  Current list of bidomains
+ * @return         Upper bound on remaining matchable vertex pairs
+ */
 static int calc_bound(const std::vector<Bidomain>& domains) {
     int bound = 0;
     for (const Bidomain& bd : domains) {
@@ -47,12 +46,19 @@ static int calc_bound(const std::vector<Bidomain>& domains) {
     return bound;
 }
 
-// Partitions arr[start..start+len-1] so adjacent vertices come first.
-// Returns count of adjacent vertices.
-// Renamed to partition_dal to avoid conflict with std::partition from <algorithm>.
-// Boolean-only check here is fine (unlike RRSplit/SymSplit's equivalent) -
-// this is only the coarse pre-partition; the multiway label split that
-// follows downstream distinguishes direction correctly (see Section 4.1.2.2).
+/**
+ * Partitions arr[start..start+len-1] so adjacent vertices come first.
+ * Renamed to partition_dal to avoid conflict with std::partition from
+ * <algorithm>. Boolean-only check here is fine (unlike RRSplit/SymSplit's
+ * equivalent) - this is only the coarse pre-partition; the multiway label
+ * split that follows downstream distinguishes direction correctly (see
+ * Section 4.1.2.2).
+ * @param all_vv  Shared permutation array (G-side or H-side)
+ * @param start   Start offset of the subarray to partition
+ * @param len     Length of the subarray
+ * @param adjrow  Adjacency row of the matched vertex
+ * @return        Count of adjacent vertices (size of the left partition)
+ */
 int partition_dal(std::vector<int>& all_vv, int start, int len, const std::vector<unsigned int>& adjrow) {
     int i = 0;
     for (int j = 0; j < len; j++) {
@@ -64,9 +70,15 @@ int partition_dal(std::vector<int>& all_vv, int start, int len, const std::vecto
     return i;
 }
 
-// Removes already-matched vertices from a domain side in-place.
-// Returns the new length after removal.
-// Used by LUM to clean up non-adjacent bidomains after leaf matching.
+/**
+ * Removes already-matched vertices from a domain side in-place.
+ * Used by LUM to clean up non-adjacent bidomains after leaf matching.
+ * @param arr      Permutation array (G-side or H-side)
+ * @param start    Start offset of the subarray
+ * @param len      Length of the subarray
+ * @param matched  Matched-flag array, indexed by vertex
+ * @return         New length after removal
+ */
 int remove_matched_vertex(std::vector<int>& arr, int start, int len, const std::vector<int>& matched) {
     int p = 0;
     for (int i = 0; i < len; i++) {
@@ -78,26 +90,43 @@ int remove_matched_vertex(std::vector<int>& arr, int start, int len, const std::
     return p;
 }
 
-// Removes a vertex from an array by swapping with last element and decrementing len.
-// O(1) removal - side-agnostic (works for either the G-side or H-side array).
-// Used to remove v from the left side of its bidomain before branching.
+/**
+ * Removes a vertex from an array by swapping with the last element and
+ * decrementing len. O(1) removal - side-agnostic (works for either the
+ * G-side or H-side array).
+ * @param arr         Permutation array to modify
+ * @param start_idx   Start offset of the bidomain within arr
+ * @param len         Bidomain length, decremented in place
+ * @param remove_idx  Offset within the bidomain of the vertex to remove
+ */
 void remove_vtx_from_array(std::vector<int>& arr, int start_idx, int& len, int remove_idx) {
     len--;
     std::swap(arr[start_idx + remove_idx], arr[start_idx + len]);
 }
 
-// Removes a bidomain by replacing it with the last element and popping.
-// O(1) - order within the list does not matter.
+/**
+ * Removes a bidomain by replacing it with the last element and popping.
+ * O(1) - order within the list does not matter.
+ * @param domains  Bidomain list to modify
+ * @param idx      Index of the bidomain to remove
+ */
 static void remove_bidomain(std::vector<Bidomain>& domains, int idx) {
     domains[idx] = domains[domains.size() - 1];
     domains.pop_back();
 }
 
-// Selects the vertex with the highest accumulated score in grade[],
-// breaking ties on smallest vertex index.
-// Used for both v selection (G-side) and bidomain tiebreaking.
-// max_g starts at -1 so the first candidate is always accepted, even
-// if all scores are still 0 (e.g. before any reward has accumulated).
+/**
+ * Selects the vertex with the highest accumulated score in grade[],
+ * breaking ties on smallest vertex index. Used for both v selection
+ * (G-side) and bidomain tie-breaking. max_g starts at -1 so the first
+ * candidate is always accepted, even if all scores are still 0 (e.g.
+ * before any reward has accumulated).
+ * @param arr        Permutation array (G-side or H-side)
+ * @param grade      Score array, indexed by vertex
+ * @param start_idx  Start offset of the bidomain within arr
+ * @param len        Bidomain length
+ * @return           Offset within the bidomain of the selected vertex
+ */
 int selectV_index(const std::vector<int>& arr, const std::vector<gtype>& grade, int start_idx, int len) {
     int idx = -1;
     gtype max_g = -1;
@@ -113,10 +142,19 @@ int selectV_index(const std::vector<int>& arr, const std::vector<gtype>& grade, 
     return idx;
 }
 
-// Selects the w vertex (H-side) with the highest score, skipping already-selected vertices.
-// wselected tracks which w values have already been tried in the current branching loop.
-// Returns -1 if every candidate in this range has already been selected -
-// callers must check for this (loop termination condition).
+/**
+ * Selects the w vertex (H-side) with the highest score, skipping
+ * already-selected vertices. wselected tracks which w values have
+ * already been tried in the current branching loop. Returns -1 if
+ * every candidate in this range has already been selected - callers
+ * must check for this (loop termination condition).
+ * @param arr        Permutation array (H-side)
+ * @param grade      Score array, indexed by vertex
+ * @param start_idx  Start offset of the bidomain within arr
+ * @param len        Bidomain length
+ * @param wselected  Already-tried flag array, indexed by vertex
+ * @return           Offset within the bidomain of the selected vertex, or -1
+ */
 int selectW_index(const std::vector<int>& arr, const std::vector<gtype>& grade, int start_idx, int len, const std::vector<int>& wselected) {
     int idx = -1;
     gtype max_g = -1;
@@ -134,12 +172,20 @@ int selectW_index(const std::vector<int>& arr, const std::vector<gtype>& grade, 
     return idx;
 }
 
-// Selects bidomain with smallest max(left_len, right_len).
-// Ties broken by comparing each domain's highest-scored left vertex
-// (via selectV_index), then taking the domain whose best vertex has
-// the smallest index - not simply "highest score wins" between domains.
-// This is the key difference from McSplit's select_bidomain - DAL/RL use
-// per-vertex scores to pick each domain's representative before tie-breaking.
+/**
+ * Selects bidomain with smallest max(left_len, right_len). Ties broken
+ * by comparing each domain's highest-scored left vertex (via
+ * selectV_index), then taking the domain whose best vertex has the
+ * smallest index - not simply "highest score wins" between domains.
+ * This is the key difference from McSplit's select_bidomain - DAL/RL use
+ * per-vertex scores to pick each domain's representative before
+ * tie-breaking.
+ * @param domains               Current list of bidomains
+ * @param left                  G-side permutation array
+ * @param grade                 Score array used to select each domain's representative vertex
+ * @param current_matching_size Current mapping size (unused, reserved)
+ * @return                      Index into domains of the selected bidomain, or -1 if empty
+ */
 int select_bidomain_dal(const std::vector<Bidomain>& domains, const std::vector<int>& left, const std::vector<gtype>& grade, int current_matching_size) {
     int min_size = INT_MAX;
     int min_tie_breaker = INT_MAX;
@@ -157,12 +203,32 @@ int select_bidomain_dal(const std::vector<Bidomain>& domains, const std::vector<
     return best;
 }
 
-// RL reward function: splits bidomains after matching (v, w) and updates lgrade/rgrade.
-// The RL reward is the reduction in the upper bound caused by the match:
-//   reward = sum over bidomains of (old_min - new_adj_min - new_nadj_min)
-// If reward > 0, add it to lgrade[v] and rgrade[w].
-// Decay all scores by half if any score exceeds short_memory_threshold,
-// preventing historical scores from dominating future decisions.
+/**
+ * RL reward function: splits bidomains after matching (v, w) and updates
+ * lgrade/rgrade.
+ *
+ * The RL reward is the reduction in the upper bound caused by the match:
+ *   reward = sum over bidomains of (old_min - new_adj_min - new_nadj_min)
+ * If reward > 0, add it to lgrade[v] and rgrade[w]. Decay all scores by
+ * half if any score exceeds short_memory_threshold, preventing historical
+ * scores from dominating future decisions.
+ *
+ * @param d         Current bidomain list
+ * @param current   Current partial mapping, extended in place with (v, w)
+ * @param left      G-side permutation array (modified in place)
+ * @param right     H-side permutation array (modified in place)
+ * @param lgrade    Per-vertex RL score for G, updated in place
+ * @param rgrade    Per-vertex RL score for H, updated in place
+ * @param g_matched G-side matched-flag array, updated in place
+ * @param h_matched H-side matched-flag array, updated in place
+ * @param g         Pattern graph
+ * @param h         Target graph
+ * @param v         Matched vertex in G
+ * @param w         Matched vertex in H
+ * @param multiway  If true, further split adjacent bidomains by exact edge label (direction-aware)
+ * @param stats     Search statistics (unused here, reserved for future use)
+ * @return          New bidomain list after splitting
+ */
 std::vector<Bidomain> rewardfeed_RL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current,
         std::vector<int>& left, std::vector<int>& right,
         std::vector<gtype>& lgrade, std::vector<gtype>& rgrade,
@@ -239,26 +305,48 @@ std::vector<Bidomain> rewardfeed_RL(const std::vector<Bidomain>& d, std::vector<
     return new_d;
 }
 
-// DAL reward function: splits bidomains after matching (v, w) and updates V/Q scores.
-// DAL reward = bound reduction + number of new domains after the split.
-// The domain count term rewards matches that fragment the problem into more independent
-// subproblems, addressing the limitation of RL which only rewards bound reduction.
-//
-// Also performs LUM (Leaf Vertex Union Match): when (v, w) is matched, immediately
-// match all compatible leaf pairs in bulk without branching. A leaf vertex has exactly
-// one neighbour. Leaf pairs always end up in the same bidomain regardless of other
-// decisions, so matching them all at once collapses many branching decisions into one.
-//
-// NOTE: this function correctly marks each LUM-matched leaf pair as matched
-// immediately (g_matched[v_leaf]=1, h_matched[w_leaf]=1 below) before any
-// further processing. The reference binary's equivalent function omits this
-// update, causing already-matched vertices to be re-matched by later LUM
-// calls - the +1 solution-size inflation bug documented in Section 4.1.4.
-// This is the fix referenced there.
+/**
+ * DAL reward function: splits bidomains after matching (v, w) and updates
+ * V/Q scores.
+ *
+ * DAL reward = bound reduction + number of new domains after the split.
+ * The domain count term rewards matches that fragment the problem into
+ * more independent subproblems, addressing the limitation of RL which
+ * only rewards bound reduction.
+ *
+ * Also performs LUM (Leaf Vertex Union Match): when (v, w) is matched,
+ * immediately match all compatible leaf pairs in bulk without branching.
+ * A leaf vertex has exactly one neighbour. Leaf pairs always end up in
+ * the same bidomain regardless of other decisions, so matching them all
+ * at once collapses many branching decisions into one.
+ *
+ * Each LUM-matched leaf pair is marked as matched (g_matched/h_matched)
+ * immediately when added, before any further processing - the reference
+ * DAL binary's equivalent function omits this update, causing
+ * already-matched vertices to be re-matched by later LUM calls, which is
+ * the +1 solution-size inflation bug documented in Section 4.1.4. This
+ * is the fix referenced there.
+ *
+ * @param d         Current bidomain list
+ * @param current   Current partial mapping, extended in place with (v, w) and any LUM leaves
+ * @param g_matched G-side matched-flag array, updated in place
+ * @param h_matched H-side matched-flag array, updated in place
+ * @param left      G-side permutation array (modified in place)
+ * @param right     H-side permutation array (modified in place)
+ * @param V         Per-vertex DAL score for G, updated in place
+ * @param Qv        Per-pair DAL score row for v (i.e. Q[v]); Qv[w] == DAL(v, w), updated in place
+ * @param g         Pattern graph
+ * @param h         Target graph
+ * @param v         Matched vertex in G
+ * @param w         Matched vertex in H
+ * @param multiway  If true, further split adjacent bidomains by exact edge label (direction-aware)
+ * @param stats     Search statistics (unused here, reserved for future use)
+ * @return          New bidomain list after splitting
+ */
 std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current,
         std::vector<int>& g_matched, std::vector<int>& h_matched,
         std::vector<int>& left, std::vector<int>& right,
-        std::vector<gtype>& V, std::vector<gtype>& Qv, // Qv is the per-v row of Q, i.e. Qv[w] == DAL(v, w)
+        std::vector<gtype>& V, std::vector<gtype>& Qv,
         const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats) {
     current.push_back(VtxPair(v, w));
     g_matched[v] = 1;
@@ -282,7 +370,7 @@ std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector
                     int v_leaf = leaf_g[p], w_leaf = leaf_h[q];
                     p++; q++;
                     current.push_back(VtxPair(v_leaf, w_leaf));
-                    g_matched[v_leaf] = 1; // <- the update the reference bug omits
+                    g_matched[v_leaf] = 1; // matched immediately - correct, unlike reference
                     h_matched[w_leaf] = 1;
                     leaves_match_size++;
                 }
@@ -325,7 +413,7 @@ std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector
             new_d.push_back({l + left_len, r + right_len, left_len_noedge, right_len_noedge, old_bd.is_adjacent});
         }
         if (multiway && left_len && right_len) {
-            // direction-aware label split (see rewardfeed_RL for details)
+            // direction-aware label split (see rewardfeed_RL above)
             auto& adjrow_v = g.adjmat[v];
             auto& adjrow_w = h.adjmat[w];
             std::sort(left.begin() + l, left.begin() + l + left_len,
@@ -370,13 +458,39 @@ std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector
     return new_d;
 }
 
-// Core BnB recursive search for McSplit+DAL.
-// Alternates between two branching policies on a fixed schedule:
-//   M=1: RL policy - select v and w by lgrade/rgrade (bound-reduction scores)
-//   M=2: DAL policy - select v and w by V/Q[v] (bound-reduction + domain-count scores)
-// Policy switches every Maxnum = 2*min(|G|,|H|) branching decisions.
-// This hybrid approach avoids the Matthew effect where a single policy
-// concentrates on a small subset of high-score vertices.
+/**
+ * Core branch-and-bound recursive search for McSplit+DAL.
+ *
+ * Alternates between two branching policies on a fixed schedule:
+ *   - M=1: RL policy - select v and w by lgrade/rgrade (bound-reduction scores)
+ *   - M=2: DAL policy - select v and w by V/Q[v] (bound-reduction + domain-count scores)
+ * Policy switches every Maxnum = 2*min(|G|,|H|) branching decisions. This
+ * hybrid approach avoids the Matthew effect where a single policy
+ * concentrates on a small subset of high-score vertices.
+ *
+ * @param g                    Pattern graph (must be the degree-sorted graph, see mcs_dal)
+ * @param h                    Target graph (must be the degree-sorted graph, see mcs_dal)
+ * @param V                    Per-vertex DAL score for G
+ * @param lgrade               Per-vertex RL score for G
+ * @param rgrade               Per-vertex RL score for H
+ * @param Q                    Per-pair DAL score table, Q[v][w]
+ * @param incumbent            Best solution found so far (updated in place)
+ * @param current              Current partial mapping being extended
+ * @param g_matched            G-side matched-flag array
+ * @param h_matched            H-side matched-flag array
+ * @param domains              Current bidomain list
+ * @param left                 G-side permutation array
+ * @param right                H-side permutation array
+ * @param goal                 Target solution size (for top-down search variant)
+ * @param multiway             If true, split adjacent bidomains by exact edge label (direction-aware)
+ * @param M                    Current active policy (1 = RL, 2 = DAL), updated in place
+ * @param num                  Branching-decision counter since the last policy switch, updated in place
+ * @param Maxnum               Number of branching decisions before the policy switches
+ * @param policy_mode          0 = hybrid alternation, 1 = force RL only, 2 = force DAL only
+ * @param stats                Search statistics (updated in place)
+ * @param start_time           Search start time for elapsed time computation
+ * @param abort_due_to_timeout Atomic flag set by timeout thread; checked at entry
+ */
 void solve_dal(const Graph& g, const Graph& h,
         std::vector<gtype>& V, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade,
         std::vector<std::vector<gtype>>& Q,
@@ -435,7 +549,7 @@ void solve_dal(const Graph& g, const Graph& h,
     remove_vtx_from_array(left, bd.l, bd.left_len, tmp_idx);
 
     std::vector<int> wselected(h.n, 0);
-    bd.right_len--; // decremented up front so the loop below (i <= bd.right_len)
+    bd.right_len--; // reserved up front so the loop below (i <= bd.right_len)
                      // still visits exactly the original right_len candidates
 
     // Try matching v with each w in the right side of the bidomain
@@ -460,9 +574,9 @@ void solve_dal(const Graph& g, const Graph& h,
         wselected[w] = 1;
         std::swap(right[bd.r + w_idx], right[bd.r + bd.right_len]);
 
-        // Record current solution length before reward functions add LUM matches,
-        // so all of them (the v-w pair plus any bulk leaf matches) can be undone
-        // together on backtrack, regardless of how many LUM added
+        // Record current solution length before reward functions add LUM
+        // matches, so all of them (the v-w pair plus any bulk leaf matches)
+        // can be undone together on backtrack, regardless of how many LUM added
         unsigned int cur_len = current.size();
         std::vector<Bidomain> new_domains;
 
@@ -493,20 +607,32 @@ void solve_dal(const Graph& g, const Graph& h,
 
     // Branch where v is not matched at all
     solve_dal(g, h, V, lgrade, rgrade, Q, incumbent, current,
-        g_matched, h_matched, domains, left, right,
-        goal, multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout);
+        g_matched, h_matched, domains, left, right, goal,
+        multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout);
 }
 
-// Entry point for McSplit+DAL search.
-// Sorts vertices by degree, builds initial bidomains, initialises score vectors,
-// packs leaf lists for LUM, runs solve_dal(), and converts solution back to
-// original vertex indices.
+/**
+ * Entry point for McSplit+DAL search.
+ *
+ * Sorts vertices by degree, builds initial bidomains, initialises score
+ * vectors, packs leaf lists for LUM, runs solve_dal(), and converts the
+ * solution back to original vertex indices.
+ *
+ * @param g                    Pattern graph
+ * @param h                    Target graph
+ * @param multiway             If true, enable direction/label-aware bidomain splitting
+ * @param stats                Search statistics (updated in place)
+ * @param abort_due_to_timeout Atomic flag set by timeout thread
+ * @param policy_mode          0 = hybrid alternation, 1 = force RL only, 2 = force DAL only
+ * @return                     Maximum common induced subgraph as matched vertex pairs,
+ *                             indexed into the original unsorted graphs
+ */
 std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
         int policy_mode) {
 
     // Calculate degrees for vertex sorting (total degree: outgoing + incoming,
-    // matching the reference's calculate_degrees - see graph_calc_degrees fix)
+    // matching the reference's calculate_degrees)
     auto calc_degrees = [](const Graph& g) {
 		std::vector<int> degree(g.n, 0);
 		for (int v = 0; v < g.n; v++)
@@ -590,10 +716,12 @@ std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway,
 
     std::vector<VtxPair> incumbent, current;
     auto start_time = std::chrono::steady_clock::now();
-    // NOTE: passes g, h (original graphs) here, but every other argument
-    // (domains/left/right, g_matched/h_matched, score vectors) is built
-    // from g_sorted/h_sorted. rewardfeed_RL/DAL index g.adjmat[v]/h.adjmat[w]
-    // using v/w values drawn from left/right, which are sorted-space
+    // FIX: previously called with the original (unsorted) g, h, while
+    // domains/left/right/g_matched/h_matched/score vectors were all built
+    // from g_sorted/h_sorted - this mismatch meant rewardfeed_RL/DAL's
+    // g.adjmat[v]/h.adjmat[w] lookups used sorted-space indices against
+    // the unsorted adjacency matrix. Now correctly passes g_sorted/h_sorted,
+    // consistent with every other argument.
     solve_dal(g_sorted, h_sorted, V, lgrade, rgrade, Q, incumbent, current,
         g_matched, h_matched, domains, left, right,
         1, multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout);

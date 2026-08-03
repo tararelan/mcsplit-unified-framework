@@ -40,16 +40,40 @@ std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
         int bound_mode = 0);
 
-// Initialises a probability array to a neutral prior (1.0 everywhere)
+/**
+ * Initialises a probability array to a neutral prior (1.0 everywhere)
+ *
+ * @param arr Array to initialise.
+ * @param size Number of elements in arr.
+ */
 static void dsb_init_array(long double* arr, int size) {
     for (int i = 0; i < size; i++) { arr[i] = 1.0; }
 }
 
-// DSB's tighter upper bound.
-// For small bidomains (size <= THRESHOLD, diff <= BEST_PARTITION_DIFF),
-// analyses internal edge structure to find a tighter bound than min(left, right).
-// Uses a learned probability table to decide when to spend time on the tighter computation.
-// For large or unbalanced bidomains, falls back to McSplit's min(left, right) bound.
+/**
+ * DSB's tighter upper bound.
+ * For small bidomains (size <= THRESHOLD, diff <= BEST_PARTITION_DIFF),
+ * analyses internal edge structure to find a tighter bound than min(left, right).
+ * Uses a learned probability table to decide when to spend time on the tighter computation.
+ * For large or unbalanced bidomains, falls back to McSplit's min(left, right) bound.
+ *
+ * @param g Graph G.
+ * @param h Graph H.
+ * @param domains Current list of bidomains; mutated to cache per-bidomain bound values.
+ * @param left G-side vertex array.
+ * @param right H-side vertex array.
+ * @param incumbent Best solution found so far.
+ * @param current Partial solution being built along this search path.
+ * @param array Learned probability table used to decide when to compute the tighter bound.
+ * @param bound_enabled Whether the tighter DSB bound is currently active.
+ * @param count_enabled Whether call/success counts are still being gated.
+ * @param called_count Number of times the tighter bound has been computed so far.
+ * @param success_count Number of times the tighter bound actually helped so far.
+ * @param max_count Call-count threshold at which gating is (re-)evaluated.
+ * @param max_success Success-count threshold required to keep the bound enabled.
+ * @param s_degrees Scratch buffer for per-vertex degree counts within a bidomain.
+ * @return Upper bound on the number of additional pairs that could be matched.
+ */
 static unsigned int calc_bound_dsb(const Graph& g, const Graph& h,
         std::vector<Bidomain>& domains,
         const std::vector<int>& left, const std::vector<int>& right,
@@ -232,8 +256,15 @@ static unsigned int calc_bound_dsb(const Graph& g, const Graph& h,
     return bound;
 }
 
-// Same tie-break rule as plain McSplit's select_bidomain: smallest
-// max(left_len, right_len), ties broken by smallest vertex index
+/**
+ * Same tie-break rule as plain McSplit's select_bidomain: smallest
+ * max(left_len, right_len), ties broken by smallest vertex index
+ *
+ * @param arr Array to search (typically the `left` vertex array).
+ * @param start_idx Index of the first element of the slice to search.
+ * @param len Number of elements in the slice.
+ * @return The smallest value found in arr[start_idx .. start_idx+len-1].
+ */
 static int find_min_value_dsb(const std::vector<int>& arr, int start_idx, int len) {
     int min_v = INT_MAX;
     for (int i = 0; i < len; i++) {
@@ -265,9 +296,17 @@ static int select_bidomain_dsb(const std::vector<Bidomain>& domains,
     return best;
 }
 
-// Boolean pre-partition (adjacent vs non-adjacent); direction handled
-// correctly by the multiway split downstream, same as elsewhere - see
-// rewardfeed_RL in mcsplit-dal.cpp for details
+/**
+ * Boolean pre-partition (adjacent vs non-adjacent); direction handled
+ * correctly by the multiway split downstream, same as elsewhere - see
+ * rewardfeed_RL in mcsplit-dal.cpp for details
+ *
+ * @param all_vv Vertex array to partition in-place (either `left` or `right`).
+ * @param start Index of the first element of the slice to partition.
+ * @param len Number of elements in the slice.
+ * @param adjrow Adjacency row of the vertex being matched, indexed by vertex id.
+ * @return Number of adjacent vertices, i.e. the length of the adjacent prefix.
+ */
 static int partition_dsb(std::vector<int>& all_vv, int start, int len,
         const std::vector<unsigned int>& adjrow) {
     int i = 0;
@@ -280,11 +319,23 @@ static int partition_dsb(std::vector<int>& all_vv, int start, int len,
     return i;
 }
 
-// Splits bidomains after matching (v, w).
-// Key difference from McSplit: when a bidomain splits cleanly (all vertices
-// go to one side), the cached bound (size, is_valid) can be carried over to
-// the child bidomain since the internal structure is unchanged.
-// When the split mixes vertices, the cache is invalidated.
+/**
+ * Splits bidomains after matching (v, w).
+ * Key difference from McSplit: when a bidomain splits cleanly (all vertices
+ * go to one side), the cached bound (size, is_valid) can be carried over to
+ * the child bidomain since the internal structure is unchanged.
+ * When the split mixes vertices, the cache is invalidated.
+ *
+ * @param d Bidomains to split, as they stood before matching (v, w).
+ * @param left G-side vertex array, reordered in-place during partitioning.
+ * @param right H-side vertex array, reordered in-place during partitioning.
+ * @param g Graph G.
+ * @param h Graph H.
+ * @param v G-side vertex just matched.
+ * @param w H-side vertex just matched.
+ * @param multiway Whether to further split adjacent bidomains by edge label.
+ * @return The new list of bidomains after the split.
+ */
 std::vector<Bidomain> filter_domains_dsb(const std::vector<Bidomain>& d,
         std::vector<int>& left, std::vector<int>& right,
         const Graph& g, const Graph& h, int v, int w, bool multiway) {
@@ -351,10 +402,18 @@ std::vector<Bidomain> filter_domains_dsb(const std::vector<Bidomain>& d,
     return new_d;
 }
 
-// Finds the index of the smallest value in arr[start_idx..start_idx+len-1]
-// that is strictly greater than w. Used to iterate right-side candidates
-// in increasing order one at a time, without needing to pre-sort the array.
-// Returns -1 if no such value exists (w is already the maximum).
+/**
+ * Finds the index of the smallest value in arr[start_idx..start_idx+len-1]
+ * that is strictly greater than w. Used to iterate right-side candidates
+ * in increasing order one at a time, without needing to pre-sort the array.
+ * Returns -1 if no such value exists (w is already the maximum).
+ *
+ * @param arr Array to search (typically the `right` vertex array).
+ * @param start_idx Index of the first element of the slice to search.
+ * @param len Number of elements in the slice.
+ * @param w Lower bound; the returned value must be strictly greater than w.
+ * @return Index (relative to start_idx) of the smallest qualifying value, or -1 if none exists.
+ */
 static int index_of_next_smallest_dsb(const std::vector<int>& arr, int start_idx, int len, int w) {
     int idx = -1;
     int smallest = INT_MAX;
@@ -367,7 +426,13 @@ static int index_of_next_smallest_dsb(const std::vector<int>& arr, int start_idx
     return idx;
 }
 
-// O(n) removal by linear scan for v, then O(1) swap-to-end and shrink
+/**
+ * O(n) removal by linear scan for v, then O(1) swap-to-end and shrink
+ *
+ * @param left G-side vertex array containing the bidomain's elements.
+ * @param bd Bidomain to remove v from; its left_len is decremented in-place.
+ * @param v Vertex to remove.
+ */
 static void remove_vtx_from_left_domain_dsb(std::vector<int>& left, Bidomain& bd, int v) {
     int i = 0;
     while (left[bd.l + i] != v) { i++; }
@@ -375,17 +440,45 @@ static void remove_vtx_from_left_domain_dsb(std::vector<int>& left, Bidomain& bd
     bd.left_len--;
 }
 
-// Removes a bidomain by replacing it with the last element and popping;
-// order within the list does not matter
+/**
+ * Removes a bidomain by replacing it with the last element and popping;
+ * order within the list does not matter
+ *
+ * @param domains List of bidomains to remove from, modified in-place.
+ * @param idx Index of the bidomain to remove.
+ */
 static void remove_bidomain_dsb(std::vector<Bidomain>& domains, int idx) {
     domains[idx] = domains[domains.size() - 1];
     domains.pop_back();
 }
 
-// Core BnB search for McSplit+DSB.
-// Identical structure to McSplit except calc_bound_dsb replaces calc_bound.
-// The DSB bound is tighter on small balanced bidomains - it can prune branches
-// that McSplit's bound cannot.
+/**
+ * Core BnB search for McSplit+DSB.
+ * Identical structure to McSplit except calc_bound_dsb replaces calc_bound.
+ * The DSB bound is tighter on small balanced bidomains - it can prune branches
+ * that McSplit's bound cannot.
+ *
+ * @param g Graph G.
+ * @param h Graph H.
+ * @param incumbent Best solution found so far, updated in-place.
+ * @param current Partial solution being built along this search path.
+ * @param domains Bidomains available at this node.
+ * @param left G-side vertex array.
+ * @param right H-side vertex array.
+ * @param goal Minimum solution size required to keep searching.
+ * @param multiway Whether to use label/direction-aware domain splitting.
+ * @param stats Search statistics, updated in-place.
+ * @param start_time Time the search began, used for timing incumbent updates.
+ * @param abort_due_to_timeout Flag checked to abort the search early.
+ * @param array Learned probability table used by calc_bound_dsb.
+ * @param bound_enabled Whether the tighter DSB bound is currently active.
+ * @param count_enabled Whether call/success counts are still being gated.
+ * @param called_count Number of times the tighter bound has been computed so far.
+ * @param success_count Number of times the tighter bound actually helped so far.
+ * @param max_count Call-count threshold at which gating is (re-)evaluated.
+ * @param max_success Success-count threshold required to keep the bound enabled.
+ * @param s_degrees Scratch buffer for per-vertex degree counts within a bidomain.
+ */
 void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         std::vector<VtxPair>& current, std::vector<Bidomain>& domains,
         std::vector<int>& left, std::vector<int>& right, unsigned int goal,
@@ -460,9 +553,19 @@ void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
             max_count, max_success, s_degrees);
 }
 
-// Entry point for McSplit+DSB.
-// Initialises the probability table, sorts vertices, builds per-label bidomains,
-// runs solve_dsb().
+/**
+ * Entry point for McSplit+DSB.
+ * Initialises the probability table, sorts vertices, builds per-label bidomains,
+ * runs solve_dsb().
+ *
+ * @param g Graph G.
+ * @param h Graph H.
+ * @param multiway Whether to use label/direction-aware domain splitting.
+ * @param stats Search statistics, updated in-place.
+ * @param abort_due_to_timeout Flag checked to abort the search early.
+ * @param bound_mode Controls the DSB bound gating: 0 = gated (default), 1 = always on, 2 = never on.
+ * @return The largest common subgraph solution found, as vertex pairs in the original graphs' indices.
+ */
 std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
         int bound_mode)   // 0 = gated (default), 1 = always, 2 = never
