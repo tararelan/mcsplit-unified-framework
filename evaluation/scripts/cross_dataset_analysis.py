@@ -47,12 +47,14 @@ inst_key = ['instance_a', 'instance_b']
 def load_dataset(tag):
     dfs = []
     for algo in ALGOS:
-        path = DATA_DIR / f'{algo}_{tag}_all.csv'
+        path = DATA_DIR / f'{algo}_bi_all.csv'
         if not path.exists():
             print(f'WARNING: {path} not found, skipping {algo}')
             continue
-        df = pd.read_csv(path, header=None, names=COLS)
+        df = pd.read_csv(path, skipinitialspace=True)
+        df = df.reindex(columns=COLS)
         dfs.append(df)
+        print(len(df))
     if not dfs:
         return pd.DataFrame()
     data = pd.concat(dfs, ignore_index=True)

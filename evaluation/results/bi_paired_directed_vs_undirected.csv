@@ -1,0 +1,5 @@
+Algorithm,n_paired,r_log10_undirected,r_log10_directed,delta_r,within_2x_undirected,within_2x_directed,delta_within_2x_pp,cut_per_node_undirected,cut_per_node_directed
+McSplit,6157,0.9372,0.7919,-0.1452,66.7,50.3,-16.4,0.729,0.784
+McSplit+RL,6234,0.9416,0.7672,-0.1744,68.4,54.0,-14.4,0.733,0.785
+McSplit+LL,6264,0.9406,0.7646,-0.176,68.7,54.7,-14.0,0.732,0.789
+McSplit+DSB,6131,0.9375,0.8003,-0.1372,67.1,50.6,-16.5,0.728,0.784

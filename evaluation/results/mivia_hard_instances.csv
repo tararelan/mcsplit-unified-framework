@@ -1,8 +1,0 @@
-Algorithm,Hard instances,Mean incumbent,Median incumbent,Max incumbent
-McSplit,4160,43.9,44.0,92
-McSplit+RL,4160,43.77,44.0,92
-McSplit+LL,4160,43.93,44.0,92
-McSplit+DAL,4160,43.8,44.0,92
-McSplit+DSB,4160,43.88,44.0,92
-RRSplit,4160,44.24,44.0,92
-SymSplit,4160,44.34,44.0,92

@@ -1,8 +1,0 @@
-Algorithm,Solved,Solved %
-McSplit,1037,95.84
-McSplit+RL,976,90.2
-McSplit+LL,1026,94.82
-McSplit+DAL,996,92.05
-McSplit+DSB,1030,95.19
-RRSplit,1057,97.69
-SymSplit,1071,98.98

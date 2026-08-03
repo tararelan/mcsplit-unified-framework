@@ -265,7 +265,7 @@ int main(int argc, char **argv)
 			  << stats.time_to_best << " "
 			  << stats.cut_branches << " "
 			  << stats.bound_pruned << " "
-			  << stats.sym_pruned << " "
+			  << stats.sym_pruned << " ";
 
 	return 0;
 }

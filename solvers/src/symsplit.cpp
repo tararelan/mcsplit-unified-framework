@@ -686,19 +686,14 @@ std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h,
                               Stats &stats, std::atomic<bool> &abort_due_to_timeout, int sym_mode)
 {
 
-	auto calc_degrees = [](const Graph &g)
-	{
+	auto calc_degrees = [](const Graph& g) {
 		std::vector<int> degree(g.n, 0);
 		for (int v = 0; v < g.n; v++)
-		{
-			for (int w = 0; w < g.n; w++)
-			{
-				if (g.adjmat[v][w] & 1)
-				{
-					degree[v]++;
-				}
+			for (int w = 0; w < g.n; w++) {
+				unsigned int mask = 0xFFFFu;
+				if (g.adjmat[v][w] & mask)  degree[v]++;
+				if (g.adjmat[v][w] & ~mask) degree[v]++;
 			}
-		}
 		return degree;
 	};
 

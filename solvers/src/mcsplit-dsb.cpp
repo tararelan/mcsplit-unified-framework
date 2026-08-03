@@ -435,14 +435,15 @@ std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
     bool count_enabled = (bound_mode == 0);   // gating active only in mode 0
 
     auto calc_degrees = [](const Graph& g) {
-        std::vector<int> degree(g.n, 0);
-        for (int v = 0; v < g.n; v++) {
-            for (int w = 0; w < g.n; w++) {
-                if (g.adjmat[v][w] & 1) { degree[v]++; }
-            }
-        }
-        return degree;
-    };
+		std::vector<int> degree(g.n, 0);
+		for (int v = 0; v < g.n; v++)
+			for (int w = 0; w < g.n; w++) {
+				unsigned int mask = 0xFFFFu;
+				if (g.adjmat[v][w] & mask)  degree[v]++;
+				if (g.adjmat[v][w] & ~mask) degree[v]++;
+			}
+		return degree;
+	};
 
     std::vector<int> g_deg = calc_degrees(g);
     std::vector<int> h_deg = calc_degrees(h);

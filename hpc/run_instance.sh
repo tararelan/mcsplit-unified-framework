@@ -21,7 +21,9 @@ fi
 
 # Format flag: LAD for BI/LV, binary for MIVIA
 FORMAT_FLAG=""
-if [ "$DATASET" = "bi" ] || [ "$DATASET" = "lv" ]; then
+if [ "$DATASET" = "bi" ]; then
+    FORMAT_FLAG="-l -i"
+elif [ "$DATASET" = "lv" ]; then
     FORMAT_FLAG="-l"
 fi
 
