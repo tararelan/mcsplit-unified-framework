@@ -11,11 +11,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+plt.rcParams.update({
+    'font.size': 14,
+    'axes.titlesize': 18,
+    'axes.labelsize': 16,
+    'xtick.labelsize': 13,
+    'ytick.labelsize': 13,
+})
+
 pd.set_option('display.width', 200)
 pd.set_option('display.float_format', '{:.3f}'.format)
 
-ALGOS = ['mcsplit', 'rl', 'll', 'dsb']
-DATA_DIR = Path('hpc/cross-dataset-evaluation/results')
+ALGOS = ['mcsplit', 'rl', 'll', 'dsb', 'rrsplit', 'symsplit']
+DATA_DIR = Path('hpc/validation/results')
 
 LABELS = {
     'mcsplit': 'McSplit', 'rl': 'McSplit+RL', 'll': 'McSplit+LL',
@@ -44,7 +52,7 @@ RATIO_BANDS = [2, 5, 10, 100]
 # ── Load ──────────────────────────────────────────────────────────────────────
 dfs = []
 for algo in ALGOS:
-    path = DATA_DIR / f'{algo}_bi_all.csv'
+    path = DATA_DIR / f'{algo}_all.csv'
     if not path.exists():
         print(f'WARNING: {path} not found, skipping {algo}')
         continue
@@ -267,7 +275,7 @@ print('\nSummary table (4.1.2):')
 print(node_fidelity_df)
 # node_fidelity_df.to_csv('evaluation/results/bi_node_fidelity_summary.csv')
 
-fig, axes = plt.subplots(2, 2, figsize=(14, 7))
+fig, axes = plt.subplots(2, 3, figsize=(14, 7))
 axes = axes.flatten()
 for i, algo in enumerate(ALGOS):
     ax = axes[i]
@@ -280,15 +288,15 @@ for i, algo in enumerate(ALGOS):
     lim = max(sub['ref_nodes'].max(), sub['unified_nodes'].max()) * 1.1
     ax.plot([1, lim], [1, lim], 'k--', linewidth=0.8, alpha=0.5)
     ax.set_xscale('log'); ax.set_yscale('log')
-    ax.set_title(LABELS[algo], fontsize=9)
-    ax.set_xlabel('Reference nodes', fontsize=7)
-    ax.set_ylabel('Unified nodes', fontsize=7)
-    ax.tick_params(labelsize=7)
+    ax.set_title(LABELS[algo])
+    ax.set_xlabel('Reference nodes')
+    ax.set_ylabel('Unified nodes')
+    
 # axes[-1].set_visible(False)
-fig.suptitle('4.1.2 Search Tree Fidelity: Nodes Explored (unified vs reference)\n'
-             'Dashed line = perfect agreement', fontsize=10)
+# fig.suptitle('4.1.2 Search Tree Fidelity: Nodes Explored (unified vs reference)\n'
+#              'Dashed line = perfect agreement', fontsize=10)
 plt.tight_layout()
-plt.savefig('evaluation/results/bi_nodes_scatter_with_flag.png', bbox_inches='tight', dpi=500)
+plt.savefig('evaluation/results/mivia_nodes_scatter.png', bbox_inches='tight', dpi=500)
 plt.show()
 
 # ── 4.1.3 Runtime Fidelity ────────────────────────────────────────────────────
@@ -310,7 +318,7 @@ speedup.columns = ['Median ratio', 'Mean ratio']
 print('Runtime ratio (unified / reference). >1.0 means unified is slower:')
 print(speedup)
 
-fig, axes = plt.subplots(2, 2, figsize=(14, 7))
+fig, axes = plt.subplots(2, 3, figsize=(14, 7))
 axes = axes.flatten()
 for i, algo in enumerate(ALGOS):
     ax = axes[i]
@@ -323,13 +331,13 @@ for i, algo in enumerate(ALGOS):
     lim = max(sub['ref_time'].max(), sub['unified_time'].max()) * 1.1
     ax.plot([1e-3, lim], [1e-3, lim], 'k--', linewidth=0.8, alpha=0.5)
     ax.set_xscale('log'); ax.set_yscale('log')
-    ax.set_title(LABELS[algo], fontsize=9)
-    ax.set_xlabel('Reference time (s)', fontsize=7)
-    ax.set_ylabel('Unified time (s)', fontsize=7)
-    ax.tick_params(labelsize=7)
+    ax.set_title(LABELS[algo])
+    ax.set_xlabel('Reference time (s)')
+    ax.set_ylabel('Unified time (s)')
+    
 # axes[-1].set_visible(False)
-fig.suptitle('4.1.3 Runtime Fidelity: Wall-Clock Time (unified vs reference)\n'
-             'Points above diagonal = unified slower', fontsize=10)
+# fig.suptitle('4.1.3 Runtime Fidelity: Wall-Clock Time (unified vs reference)\n'
+#              'Points above diagonal = unified slower', fontsize=10)
 plt.tight_layout()
-plt.savefig('evaluation/results/bi_time_scatter_with_flag.png', bbox_inches='tight', dpi=500)
+plt.savefig('evaluation/results/mivia_time_scatter.png', bbox_inches='tight', dpi=500)
 plt.show()

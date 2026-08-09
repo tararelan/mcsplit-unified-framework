@@ -9,9 +9,11 @@
 #SBATCH --error=hpc/logs/{ALGO}_%A_%a.err
 
 ALGO={ALGO}
-INSTANCE_LIST=hpc/instances_{ALGO}.txt
+DATASET={DATASET}
+WITH_REF={WITH_REF}
+INSTANCE_LIST={LIST}
 INSTANCE=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" $INSTANCE_LIST)
 A=$(echo $INSTANCE | awk '{print $1}')
 B=$(echo $INSTANCE | awk '{print $2}')
 
-bash hpc/run_instance.sh $ALGO $A $B
+bash hpc/run_instance.sh $ALGO $A $B $DATASET $WITH_REF

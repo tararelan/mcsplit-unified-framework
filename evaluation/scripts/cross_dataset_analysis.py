@@ -14,11 +14,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+plt.rcParams.update({
+    'font.size': 14,
+    'axes.titlesize': 18,
+    'axes.labelsize': 16,
+    'xtick.labelsize': 13,
+    'ytick.labelsize': 13,
+})
+
 pd.set_option('display.width', 200)
 pd.set_option('display.float_format', '{:.3f}'.format)
 
-ALGOS = ['mcsplit', 'rl', 'll', 'dal', 'dsb', 'rrsplit', 'symsplit']
-DATA_DIR = Path('hpc/cross-dataset-evaluation/results')
+ALGOS = ['mcsplit', 'rl', 'll', 'dsb', 'rrsplit', 'symsplit']
 
 LABELS = {
     'mcsplit': 'McSplit', 'rl': 'McSplit+RL', 'll': 'McSplit+LL',
@@ -44,10 +51,15 @@ EASY_THRESHOLD = 10.0
 inst_key = ['instance_a', 'instance_b']
 
 # ── 2. Load helper ────────────────────────────────────────────────────────────
-def load_dataset(tag):
+def load_dataset(tag, algos):
     dfs = []
-    for algo in ALGOS:
-        path = DATA_DIR / f'{algo}_bi_all.csv'
+    for algo in algos:
+        if tag == 'mivia':
+            DATA_DIR = Path('hpc/validation/results')
+            path = DATA_DIR / f'{algo}_all.csv'
+        else:
+            DATA_DIR = Path('hpc/cross-dataset-evaluation/results')
+            path = DATA_DIR / f'{algo}_{tag}_all.csv'
         if not path.exists():
             print(f'WARNING: {path} not found, skipping {algo}')
             continue
@@ -111,8 +123,8 @@ def solved_table(medium_data, medium_instances):
                      'Solved %': round(100 * solved / total, 1)})
     return pd.DataFrame(rows).set_index('Algorithm')
 
-def cactus_time(medium_data, title, fname):
-    fig, ax = plt.subplots(figsize=(9, 5))
+def cactus_time(medium_data, fname):
+    fig, ax = plt.subplots(figsize=(12, 5.5))
     for algo in ALGOS:
         sub = medium_data[
             (medium_data['algo'] == algo) &
@@ -122,11 +134,11 @@ def cactus_time(medium_data, title, fname):
             continue
         ax.plot(sub, np.arange(1, len(sub) + 1),
                 label=LABELS[algo], color=COLORS[algo], linewidth=1.8)
-    ax.set_xlabel('Wall-clock time (s)', fontsize=11)
-    ax.set_ylabel('Instances solved', fontsize=11)
-    # ax.set_xscale('log')
-    ax.set_title(title, fontsize=11)
-    ax.legend(fontsize=9, loc='upper left')
+    ax.set_xlabel('Wall-clock time (s)')
+    ax.set_ylabel('Instances solved')
+    ax.set_xscale('log')
+    # ax.set_title(title)
+    ax.legend(loc='upper left')
     ax.set_ylim(bottom=0)
     ax.grid(True, alpha=0.3)
     ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
@@ -136,8 +148,8 @@ def cactus_time(medium_data, title, fname):
     print(f'Saved {fname}')
 
 
-def cactus_nodes(medium_data, title, fname):
-    fig, ax = plt.subplots(figsize=(9, 5))
+def cactus_nodes(medium_data, fname):
+    fig, ax = plt.subplots(figsize=(12, 5.5))
     for algo in ALGOS:
         sub = medium_data[
             (medium_data['algo'] == algo) &
@@ -147,11 +159,11 @@ def cactus_nodes(medium_data, title, fname):
             continue
         ax.plot(sub, np.arange(1, len(sub) + 1),
                 label=LABELS[algo], color=COLORS[algo], linewidth=1.8)
-    ax.set_xlabel('Nodes', fontsize=11)
-    ax.set_ylabel('Instances Solved', fontsize=11)
-    # ax.set_xscale('log')
-    ax.set_title(title, fontsize=11)
-    ax.legend(fontsize=9, loc='upper left')
+    ax.set_xlabel('Nodes')
+    ax.set_ylabel('Instances Solved')
+    ax.set_xscale('log')
+    # ax.set_title(title)
+    ax.legend(loc='upper left')
     ax.set_ylim(bottom=0)
     ax.grid(True, alpha=0.3)
     ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
@@ -240,13 +252,44 @@ def sym_pruned_summary(medium_data, dataset_name):
     return result
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ── 5. MIVIA Dataset ─────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+print('=' * 60)
+print('4.4.1 Results on MIVIA')
+print('=' * 60)
+
+mivia_data = load_dataset('mivia', ['mcsplit', 'rl', 'll', 'dsb', 'rrsplit', 'symsplit'])
+
+if not mivia_data.empty:
+    bi_difficulty = classify_difficulty(mivia_data)
+    print(f'\nMIVIA difficulty distribution:')
+    print(bi_difficulty.value_counts())
+
+    mivia_medium = set(bi_difficulty[bi_difficulty == 'medium'].index)
+    mivia_med_mask = mivia_data.set_index(inst_key).index.isin(mivia_medium)
+    mivia_medium_data = mivia_data[mivia_med_mask].copy()
+
+    print(f'\nMIVIA solved counts (medium instances, n={len(mivia_medium)}):')
+    print(solved_table(mivia_medium_data, mivia_medium))
+
+    cactus_time(mivia_medium_data,
+                'evaluation/results/mivia_cactus_time.png')
+    
+    cactus_nodes(mivia_medium_data,
+                'evaluation/results/mivia_cactus_nodes.png')
+    bi_incumbent = hard_instance_analysis(mivia_data, bi_difficulty, 'MIVIA')
+    bi_sym = sym_pruned_summary(mivia_medium_data, 'MIVIA')
+else:
+    print('No BI data loaded - check file paths.')
+
+# ─────────────────────────────────────────────────────────────────────────────
 # ── 5. BI Dataset ─────────────────────────────────────────────────────────────
 # ─────────────────────────────────────────────────────────────────────────────
 print('=' * 60)
 print('4.4.1 Results on BI (Biochemical Reactions)')
 print('=' * 60)
 
-bi_data = load_dataset('bi')
+bi_data = load_dataset('bi', ['mcsplit', 'rl', 'll', 'dsb'])
 
 if not bi_data.empty:
     bi_difficulty = classify_difficulty(bi_data)
@@ -261,11 +304,9 @@ if not bi_data.empty:
     print(solved_table(bi_medium_data, bi_medium))
 
     cactus_time(bi_medium_data,
-                'BI Dataset (Biochemical Reactions) Time versus Instances',
                 'evaluation/results/bi_cactus_time.png')
     
     cactus_nodes(bi_medium_data,
-                'BI Dataset (Biochemical Reactions) Nodes versus Instances',
                 'evaluation/results/bi_cactus_nodes.png')
     bi_incumbent = hard_instance_analysis(bi_data, bi_difficulty, 'BI')
     bi_sym = sym_pruned_summary(bi_medium_data, 'BI')
@@ -279,7 +320,7 @@ print('\n' + '=' * 60)
 print('4.4.2 Results on LV (Biological Networks)')
 print('=' * 60)
 
-lv_data = load_dataset('lv')
+lv_data = load_dataset('lv', ['mcsplit', 'rl', 'll', 'dsb', 'rrsplit', 'symsplit'])
 
 if not lv_data.empty:
     lv_difficulty = classify_difficulty(lv_data)
@@ -294,11 +335,9 @@ if not lv_data.empty:
     print(solved_table(lv_medium_data, lv_medium))
 
     cactus_time(lv_medium_data,
-                'LV Dataset Time versus Instances',
                 'evaluation/results/lv_cactus_time.png')
     
     cactus_nodes(lv_medium_data,
-                'LV Dataset Nodes versus Instances',
                 'evaluation/results/lv_cactus_nodes.png')
 
     lv_incumbent = hard_instance_analysis(lv_data, lv_difficulty, 'LV')
@@ -370,13 +409,13 @@ if mivia_dfs:
                    color=COLORS[algo], alpha=0.85)
 
     ax.set_xticks(x + width / 2)
-    ax.set_xticklabels(datasets, fontsize=10)
-    ax.set_ylabel('Mean symmetry-pruned branches', fontsize=10)
-    ax.set_title('Symmetry Mechanism Activity Across Datasets', fontsize=10)
-    ax.legend(fontsize=9)
+    ax.set_xticklabels(datasets)
+    ax.set_ylabel('Mean symmetry-pruned branches')
+    ax.set_title('Symmetry Mechanism Activity Across Datasets')
+    ax.legend()
     ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
     plt.tight_layout()
-    plt.savefig('evaluation/results/sym_pruned_comparison.png', bbox_inches='tight')
+    # plt.savefig('evaluation/results/sym_pruned_comparison.png', bbox_inches='tight')
     plt.show()
     print('Saved sym_pruned_comparison.png')
 
@@ -385,7 +424,7 @@ if mivia_dfs:
 # on instances where both completed (medium) or both timed out (hard)
 
 for dataset_name, data, instances in [
-    ('BI', bi_data, bi_medium),
+    # ('BI', bi_data, bi_medium),
     ('LV', lv_data, lv_medium),
 ]:
     sub = data[data['algo'].isin(['rrsplit', 'symsplit'])].copy()

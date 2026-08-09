@@ -15,9 +15,8 @@ if [ -z "$ALGO" ]; then
     exit 1
 fi
 
-mkdir -p hpc/logs hpc/scripts hpc/results
+mkdir -p hpc/logs hpc/results
 
-# Generate LV pairs (exclude macOS metadata files)
 LIST="hpc/instances_${ALGO}_lv.txt"
 FILES=($(ls instances/SIP/LV/g* | grep -v '/\._' | sort -t'g' -k2 -n))
 > "$LIST"
@@ -31,22 +30,23 @@ echo "LV pairs: $(wc -l < $LIST)"
 NJOBS=$(($(wc -l < "$LIST") - 1))
 
 if [ "$WITH_REF" = "1" ]; then
-    SCRIPT="hpc/scripts/job_${ALGO}_lv_ref.slurm"
-    sed "s/{ALGO}/$ALGO/g; s/{NJOBS}/$NJOBS/g; s/{DATASET}/lv/g" \
-        hpc/scripts/job_array_ref.slurm > "$SCRIPT"
-    sed -i 's/\r$//' "$SCRIPT"
-    echo "Submitting $ALGO LV (with reference comparison): $((NJOBS+1)) jobs"
+    SCRIPT="hpc/job_${ALGO}_lv_ref.slurm"
 else
-    SCRIPT="hpc/scripts/job_${ALGO}_lv.slurm"
-    sed "s/{ALGO}/$ALGO/g; s/{NJOBS}/$NJOBS/g; s/{DATASET}/lv/g" \
-        hpc/scripts/job_array.slurm > "$SCRIPT"
-    sed -i 's/\r$//' "$SCRIPT"
-    echo "Submitting $ALGO LV: $((NJOBS+1)) jobs"
+    SCRIPT="hpc/job_${ALGO}_lv.slurm"
 fi
 
-if grep -q "{DATASET}" "$SCRIPT"; then
-    echo "ERROR: {DATASET} was not replaced in $SCRIPT"
+sed "s/{ALGO}/$ALGO/g; s/{NJOBS}/$NJOBS/g; s/{DATASET}/lv/g; s/{WITH_REF}/$WITH_REF/g; s#{LIST}#$LIST#g" \
+    hpc/job_array.slurm > "$SCRIPT"
+sed -i 's/\r$//' "$SCRIPT"
+
+if grep -qE "\{ALGO\}|\{NJOBS\}|\{DATASET\}|\{LIST\}|\{WITH_REF\}" "$SCRIPT"; then
+    echo "ERROR: placeholder not replaced in $SCRIPT"
     exit 1
 fi
 
+if [ "$WITH_REF" = "1" ]; then
+    echo "Submitting $ALGO LV (with reference comparison): $((NJOBS+1)) jobs"
+else
+    echo "Submitting $ALGO LV: $((NJOBS+1)) jobs"
+fi
 sbatch "$SCRIPT"

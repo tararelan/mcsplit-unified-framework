@@ -51,6 +51,7 @@ This manual describes how to build and run the unified MCS solver framework. The
 ### Requirements
 
 - g++ 11.4.0 or later with C++17 support
+- instances.zip unzipped
 - GNU Make
 - POSIX-compatible shell (bash)
 - Boost library (for HPC submission scripts only)
@@ -202,6 +203,23 @@ bash hpc/submit_bi.sh dsb --with-ref
 bash hpc/submit_lv.sh symsplit --with-ref
 ```
 
+rm -rf hpc/results/symsplit_lv_reference/
+
+bash -n hpc/job_array.slurm 2>&1 | head  # won't fully validate since placeholders aren't substituted, but catches gross syntax issues
+bash hpc/submit_bi.sh dsb              # plain mode
+bash hpc/submit_bi.sh dsb --with-ref   # ref mode
+
+To see progress
+squeue -u tr77
+ls hpc/results/mcsplit_mivia/ | wc -l
+head -5 -q hpc/results/mcsplit_mivia/*.csv
+ls hpc/results/dsb_bi_with_ref/ | wc -l
+head -5 -q hpc/results/dsb_bi_with_ref/*.csv
+ls hpc/results/symsplit_lv_reference/ | wc -l
+head -5 -q hpc/results/symsplit_lv_reference/*.csv
+head -5 -q hpc/results/dsb_bi/*.csv
+ls hpc/results/mcsplit_mivia/ | wc -l
+
 The output would be one line, space-separated:
 ```
 <unified_size> <unified_edges> <unified_nodes> <unified_time> <unified_aborted> <unified_nodes_to_best> <unified_time_to_best> <unified_cut_branches> <unified_bound_pruned> <unified_sym_pruned> <ref_size> <ref_nodes> <ref_time> <match>
@@ -221,13 +239,24 @@ for ALGO in mcsplit rl ll ll_lsm ll_lum dal dal_rl dal_dal \
             rrsplit rrsplit_noveq rrsplit_nomax rrsplit_nobound \
             symsplit symsplit_valonly symsplit_varonly; do
     # MIVIA
-    cat ablation/results/${ALGO}_mivia/*.csv > ablation/results/${ALGO}_mivia_all.csv
+    cat hpc/results/${ALGO}_mivia/*.csv > hpc/results/${ALGO}_mivia_all.csv
     # BI
-    cat ablation/results/${ALGO}_bi/*.csv > ablation/results/${ALGO}_bi_all.csv
+    cat hpc/results/${ALGO}_bi/*.csv > hpc/results/${ALGO}_bi_all.csv
     # LV
-    cat ablation/results/${ALGO}_lv/*.csv > ablation/results/${ALGO}_lv_all.csv
+    cat hpc/results/${ALGO}_lv/*.csv > hpc/results/${ALGO}_lv_all.csv
 done
 ```
+
+bash hpc/merge_results.sh dsb bi              # plain mode → dsb_bi_all.csv
+bash hpc/merge_results.sh symsplit lv --with-ref   # ref mode   → dsb_bi_with_ref_all.csv
+
+cat hpc/results/mcsplit_mivia/*.csv > hpc/results/mcsplit_mivia_all.csv
+
+Note that merging the CSVs do not have any headings - you will have to add them yourself.
+
+instance_a,instance_b,algo,unified_size,unified_edges,unified_nodes,unified_time,unified_aborted,unified_nodes_to_best,unified_time_to_best,unified_cut_branches,unified_bound_pruned,unified_sym_pruned
+
+instance_a,instance_b,algo,unified_size,unified_edges,unified_nodes,unified_time,unified_aborted,nified_nodes_to_best,unified_time_to_best,unified_cut_branches,unified_bound_pruned,unified_sym_pruned,ref_size,ref_nodes,ref_time,match
 
 #### 5. Copy results back to local machine
 

@@ -10,16 +10,15 @@ if [ "$2" = "--with-ref" ]; then
 fi
 
 if [ -z "$ALGO" ]; then
-    echo "Usage: bash hpc/submit_mivia.sh <algo>"
-    echo "Algorithms: mcsplit rl ll, ll_lsm, ll_lum, dal, dal_dal, dal_rl, dsb, dsb_always, dsb_never, rrsplit, rrsplit_noveq, rrsplit_nomax, rrsplit_nobound, symsplit, symsplit_valonly, symsplit_varonly"
+    echo "Usage: bash hpc/submit_mivia.sh <algo> [--with-ref]"
+    echo "Algorithms: mcsplit rl ll ll_lsm ll_lum dal dal_dal dal_rl dsb dsb_always dsb_never rrsplit rrsplit_noveq rrsplit_nomax rrsplit_nobound symsplit symsplit_valonly symsplit_varonly"
     exit 1
 fi
 
-mkdir -p hpc/logs hpc/scripts hpc/results
+mkdir -p hpc/logs hpc/results
 
 LIST="hpc/instances_${ALGO}.txt"
 
-# Generate instance list if it doesn't exist
 if [ ! -f "$LIST" ]; then
     echo "Generating instance list for $ALGO..."
     > "$LIST"
@@ -35,25 +34,23 @@ echo "MIVIA instances: $(wc -l < $LIST)"
 NJOBS=$(($(wc -l < "$LIST") - 1))
 
 if [ "$WITH_REF" = "1" ]; then
-    # Validation mode: use reference comparison script
-    SCRIPT="hpc/scripts/job_${ALGO}_ref.slurm"
-    sed "s/{ALGO}/$ALGO/g; s/{NJOBS}/$NJOBS/g" \
-        hpc/scripts/job_array_ref.slurm > "$SCRIPT"
-    sed -i 's/\r$//' "$SCRIPT"
-    echo "Submitting $ALGO MIVIA (with reference comparison): $((NJOBS+1)) jobs"
+    SCRIPT="hpc/job_${ALGO}_mivia_ref.slurm"
 else
-    # Experiment mode: unified solver only
-    SCRIPT="hpc/scripts/job_${ALGO}.slurm"
-    sed "s/{ALGO}/$ALGO/g; s/{NJOBS}/$NJOBS/g" \
-        hpc/scripts/job_array.slurm > "$SCRIPT"
-    sed -i 's/\r$//' "$SCRIPT"
-    echo "Submitting $ALGO MIVIA: $((NJOBS+1)) jobs"
+    SCRIPT="hpc/job_${ALGO}_mivia.slurm"
 fi
 
-if grep -q "{ALGO}" "$SCRIPT"; then
-    echo "ERROR: {ALGO} was not replaced in $SCRIPT"
+sed "s/{ALGO}/$ALGO/g; s/{NJOBS}/$NJOBS/g; s/{DATASET}/mivia/g; s/{WITH_REF}/$WITH_REF/g; s#{LIST}#$LIST#g" \
+    hpc/job_array.slurm > "$SCRIPT"
+sed -i 's/\r$//' "$SCRIPT"
+
+if grep -qE "\{ALGO\}|\{NJOBS\}|\{DATASET\}|\{LIST\}|\{WITH_REF\}" "$SCRIPT"; then
+    echo "ERROR: placeholder not replaced in $SCRIPT"
     exit 1
 fi
 
-echo "Submitting $ALGO MIVIA: $((NJOBS+1)) jobs"
+if [ "$WITH_REF" = "1" ]; then
+    echo "Submitting $ALGO MIVIA (with reference comparison): $((NJOBS+1)) jobs"
+else
+    echo "Submitting $ALGO MIVIA: $((NJOBS+1)) jobs"
+fi
 sbatch "$SCRIPT"
