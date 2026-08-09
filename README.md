@@ -1,4 +1,4 @@
-# The University of St Andrews
+<!-- # The University of St Andrews
 
 ## Understanding and Evaluating Variants of the McSplit Algorithm for the Maximum Common Subgraph Problem
 
@@ -307,4 +307,4 @@ scp [account]@hypatia.st-andrews.ac.uk:work/[target-directory]/hpc/results/*_all
 ```bash
 make -C solvers
 bash hpc/submit_mivia.sh my_algo --with-ref
-```
+``` -->
