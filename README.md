@@ -27,8 +27,8 @@
     - [5. Collect and merge results](#5-collect-and-merge-results)
     - [6. Copy results back to local machine](#6-copy-results-back-to-local-machine)
   - [Adding a New Algorithm](#adding-a-new-algorithm)
-<!-- 
-## Abstract
+
+<!-- ## Abstract
 
 The Maximum Common Subgraph problem is a fundamental, NP-hard graph-matching problem with applications in cheminformatics, malware detection, and pattern recognition. McSplit and its many variants --- incorporating reinforcement-learning-guided branching, tighter bounding, and structural symmetry reduction --- represent the current state of the art, but each has been evaluated independently, under different hardware, timeouts, and benchmark suites, making it unclear how much of any claimed improvement is attributable to algorithm design rather than experimental setup.
 
