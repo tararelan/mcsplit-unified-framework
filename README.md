@@ -220,13 +220,19 @@ rsync -avu --progress \
   [account]@hypatia.st-andrews.ac.uk:work/[target-directory]/
 ```
 
-#### 2. Build on Hypatia
+#### 2. Connect to Hypatia
+
+```bash
+ssh [account]@hypatia.st-andrews.ac.uk
+```
+
+#### 3. Build on Hypatia
 
 ```bash
 cd ~/work/[target-directory]/solvers && rm -f bin/mcsp && make
 ```
 
-#### 3. Submit scripts
+#### 4. Submit scripts
 
 Submit one algorithm at a time so as not to hit the QOS limits. Each script accepts an optional `--with-ref` flag to also run the corresponding reference binary and record a PASS/FAIL/MISSING_DATA comparison alongside the unified solver's results.
 
@@ -246,7 +252,7 @@ bash hpc/submit_lv.sh symsplit --with-ref
 
 Wait for each array to finish (`squeue -u [account]`) before submitting the next, to stay within QOS limits.
 
-#### 4. Monitoring progress
+#### 5. Monitoring progress
 
 ```bash
 squeue -u [account]                                    # job status
@@ -257,7 +263,7 @@ head -5 -q hpc/results/<algo>_<dataset>/*.csv          # spot-check output
 
 e.g. `ls hpc/results/mcsplit_mivia/ | wc -l` or `ls hpc/results/dsb_bi_with_ref/ | wc -l`.
 
-#### 5. Collect and merge results
+#### 6. Collect and merge results
 
 Per-instance CSVs (one file per instance pair, no header) are merged into a single file with the correct header using `hpc/merge_results.sh`:
 
@@ -281,7 +287,7 @@ Ref-mode header (17 columns):
 instance_a,instance_b,algo,unified_size,unified_edges,unified_nodes,unified_time,unified_aborted,unified_nodes_to_best,unified_time_to_best,unified_cut_branches,unified_bound_pruned,unified_sym_pruned,ref_size,ref_nodes,ref_time,match
 ```
 
-#### 6. Copy results back to local machine
+#### 7. Copy results back to local machine
 
 ```bash
 scp [account]@hypatia.st-andrews.ac.uk:work/[target-directory]/hpc/results/*_all.csv \
