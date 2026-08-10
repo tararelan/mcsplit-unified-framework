@@ -1,4 +1,4 @@
-<!-- # The University of St Andrews
+# The University of St Andrews
 
 ## Understanding and Evaluating Variants of the McSplit Algorithm for the Maximum Common Subgraph Problem
 
@@ -34,7 +34,7 @@ The Maximum Common Subgraph problem is a fundamental, NP-hard graph-matching pro
 
 This dissertation presents open-source C++ re-implementations of seven McSplit-family algorithms within a shared search skeleton, isolating each algorithm's distinguishing components --- branching heuristic, bound computation, and symmetry or redundancy reduction --- for direct, controlled comparison. Each re-implementation is validated against its original reference for solution correctness, search-tree fidelity, and runtime fidelity across synthetic, directed biochemical, and large heterogeneous benchmark datasets.
 
-This validation uncovered two previously undocumented defects in published reference implementations --- a solution-inflating reward bug in McSplit+DAL, and a direction-awareness omission rendering RRSplit and SymSplit unsound on directed graphs --- both traced to specific source-level causes and corroborated across independent implementations. This shows that prior evaluations of these algorithms, including their own published comparisons, may not be fully reliable, and demonstrates the necessity of unified, comparable re-implementation. Beyond validation, cross-dataset evaluation shows no single algorithm dominates: structural pruning outperforms learned branching on synthetic and heterogeneous graphs, while reinforcement-learning-guided branching becomes competitive on directed biochemical networks, where repeated reaction motifs provide an exploitable reward signal. An accompanying ablation study isolates each component's individual contribution, offering practical, structure-aware guidance for solver selection. -->
+This validation uncovered two previously undocumented defects in published reference implementations --- a solution-inflating reward bug in McSplit+DAL, and a direction-awareness omission rendering RRSplit and SymSplit unsound on directed graphs --- both traced to specific source-level causes and corroborated across independent implementations. This shows that prior evaluations of these algorithms, including their own published comparisons, may not be fully reliable, and demonstrates the necessity of unified, comparable re-implementation. Beyond validation, cross-dataset evaluation shows no single algorithm dominates: structural pruning outperforms learned branching on synthetic and heterogeneous graphs, while reinforcement-learning-guided branching becomes competitive on directed biochemical networks, where repeated reaction motifs provide an exploitable reward signal. An accompanying ablation study isolates each component's individual contribution, offering practical, structure-aware guidance for solver selection.  -->
 
 ## Acknowledgements
 
@@ -307,4 +307,4 @@ scp [account]@hypatia.st-andrews.ac.uk:work/[target-directory]/hpc/results/*_all
 ```bash
 make -C solvers
 bash hpc/submit_mivia.sh my_algo --with-ref
-``` -->
+```
