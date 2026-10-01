@@ -113,6 +113,21 @@ public:
 							 const std::vector<int> &right, size_t bd_idx,
 							 const std::vector<int> &twins, const std::vector<int> &high);
 
+	/**
+	 * Justifies the maximality reduction: matching v->w (sorted indices)
+	 * splits no bidomain, so under the current trail v->w can be assumed.
+	 * Must be called before v->w is pushed or explored.
+	 */
+	void maximal_match(int v, int w);
+
+	/**
+	 * Justifies SymSplit's value symmetry at the node branching on v: for
+	 * each (b, w), b and w are twins in H, both free, with b < w, so v->w
+	 * can be ruled out in favour of v->b. Must be called before any branch
+	 * at this node is explored. Sorted indices.
+	 */
+	void break_value_symmetry(int v, const std::vector<std::pair<int, int>> &twins);
+
 	/// Pushes the decision v->bottom (sorted index) onto the proof trail.
 	void push_exclude(int v);
 
@@ -188,7 +203,8 @@ private:
 	std::vector<bool> trail_is_match;				 // whether each decision is v->w
 	std::vector<int> trail_vertex;					 // the G vertex of each decision (model index)
 	std::vector<std::vector<int>> trail_lum;		 // G leaves paired by LUM under each decision
-	std::vector<std::vector<long long>> trail_lum_ids; // their forcing clauses, deleted on pop
+	std::vector<std::vector<long long>> trail_attached_ids; // clauses justified under each decision, deleted on pop
+	std::vector<long long> root_attached_ids;		 // likewise, for the empty trail (never deleted)
 	std::vector<std::vector<long long>> child_nogoods; // per depth: backtrack clauses awaiting deletion
 
 	long long alo_id(int v) const { return v + 1; }
@@ -197,6 +213,9 @@ private:
 	void write_backtrack_clause();
 	void record_backtrack_clause(long long id);
 	void write_trail_clause();
+
+	long long derive_forced_match(int v, int w);
+	std::vector<long long> &attached_ids();
 
 	BidomainPlan plan_bidomain(const std::vector<int> &L, const std::vector<int> &R) const;
 	long long derive_pair_bound(const std::vector<int> &L, const std::vector<int> &R);

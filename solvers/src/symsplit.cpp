@@ -2,6 +2,7 @@
 
 #include "graph.h"
 #include "common.h"
+#include "proof.h"
 #include <algorithm>
 #include <numeric>
 #include <vector>
@@ -31,8 +32,8 @@ int partition_sparse_sym(std::vector<int> &all_vv, int start, int len, int degre
 std::vector<Bidomain> filter_domains_sym(const std::vector<Bidomain> &d, std::vector<int> &left, std::vector<int> &right, const Graph &g, const Graph &h, int v, int w, bool &best_match, std::vector<int> &index_right);
 int find_vertices_with_common_neighbors(const Graph &g, std::vector<int> &eqn_classes);
 bool break_h_sym(const std::vector<int> &arr, int start_idx, int len, int w, const std::vector<int> &h_eqn_classes);
-void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent, std::vector<VtxPair> &current, std::vector<Bidomain> &domains, std::vector<int> &left, std::vector<int> &right, unsigned int goal, Stats &stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool> &abort_due_to_timeout, const std::vector<int> &g_eqn_classes, const std::vector<int> &h_eqn_classes, std::vector<int> &index_right, int sym_mode);
-std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h, Stats &stats, std::atomic<bool> &abort_due_to_timeout, int sym_mode = 3);
+void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent, std::vector<VtxPair> &current, std::vector<Bidomain> &domains, std::vector<int> &left, std::vector<int> &right, unsigned int goal, Stats &stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool> &abort_due_to_timeout, const std::vector<int> &g_eqn_classes, const std::vector<int> &h_eqn_classes, std::vector<int> &index_right, int sym_mode, ProofLogger *proof);
+std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h, Stats &stats, std::atomic<bool> &abort_due_to_timeout, int sym_mode = 3, ProofLogger *proof = nullptr);
 
 /**
  * Computes the McSplit upper bound on the number of additional vertex
@@ -542,6 +543,8 @@ bool break_h_sym(const std::vector<int> &arr, int start_idx, int len, int w,
  * @param h_eqn_classes        Symmetry class labels for H vertices (-1 if none)
  * @param index_right          H-side position index kept in sync with right
  * @param sym_mode             Bitmask controlling active symmetry rules
+ * @param proof                Proof logger, or nullptr if disabled (requires
+ *                             variable symmetry to be off)
  */
 void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
                std::vector<VtxPair> &current, std::vector<Bidomain> &domains,
@@ -549,10 +552,12 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
                Stats &stats, std::chrono::time_point<std::chrono::steady_clock> start_time,
                std::atomic<bool> &abort_due_to_timeout,
                const std::vector<int> &g_eqn_classes, const std::vector<int> &h_eqn_classes,
-               std::vector<int> &index_right, int sym_mode)
+               std::vector<int> &index_right, int sym_mode, ProofLogger *proof)
 {
 	if (abort_due_to_timeout)
 	{
+		if (proof)
+			proof->abort();
 		return;
 	}
 
@@ -564,6 +569,8 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
 		stats.time_to_best = std::chrono::duration<double>(
 								 std::chrono::steady_clock::now() - start_time)
 								 .count();
+		if (proof)
+			proof->new_incumbent(current);
 	}
 
 	stats.nodes++;
@@ -573,12 +580,16 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
 	{
 		stats.cut_branches++;
 		stats.bound_pruned++;
+		if (proof)
+			proof->prune_by_bound(domains, left, right);
 		return;
 	}
 
 	int bd_idx = select_bidomain_sym(domains, left, current.size());
 	if (bd_idx == -1)
 	{
+		if (proof)
+			proof->backtrack();
 		return;
 	}
 
@@ -610,6 +621,26 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
 	bd.right_len--;
 	int w = w_lower;
 
+	// value symmetry skips every w with a smaller twin still in the
+	// bidomain; the proof rules these out before any branch is explored
+	if (proof && (sym_mode & 2))
+	{
+		std::vector<std::pair<int, int>> twins;
+		for (int i = 0; i <= bd.right_len; i++)
+		{
+			int u = right[bd.r + i];
+			if (h_eqn_classes[u] == -1)
+				continue;
+			int smallest = u;
+			for (int j = 0; j <= bd.right_len; j++)
+				if (h_eqn_classes[right[bd.r + j]] == h_eqn_classes[u] && right[bd.r + j] < smallest)
+					smallest = right[bd.r + j];
+			if (smallest != u)
+				twins.push_back({smallest, u});
+		}
+		proof->break_value_symmetry(v, twins);
+	}
+
 	bool best_match = false;
 	bool skip_exclude = false; // set when the include-branch search already proved maximality/bound-exhaustion
 
@@ -634,16 +665,33 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
 
 		auto new_domains = filter_domains_sym(domains, left, right, g, h, v, w,
 											  best_match, index_right);
+		// if v->w splits no bidomain, the other branches here are skipped
+		// below; the proof assumes v->w before exploring it
+		if (proof && best_match)
+			proof->maximal_match(v, w);
 		current.push_back(VtxPair(v, w));
+		if (proof)
+			proof->push_match(v, w);
 		solve_sym(g, h, incumbent, current, new_domains, left, right, goal,
 				  stats, start_time, abort_due_to_timeout,
-				  g_eqn_classes, h_eqn_classes, index_right, sym_mode);
+				  g_eqn_classes, h_eqn_classes, index_right, sym_mode, proof);
+		if (proof)
+			proof->pop();
 		current.pop_back();
 
 		if (best_match || bound <= (int)incumbent.size())
 		{
 			stats.sym_pruned++;
 			skip_exclude = true; // exclude branch would be redundant/futile
+			// without best_match, the incumbent has caught up with this
+			// node's bound, which refutes the node outright
+			if (proof && !best_match)
+			{
+				std::vector<Bidomain> node_domains = domains;
+				node_domains[bd_idx].left_len++;
+				node_domains[bd_idx].right_len++;
+				proof->prune_by_bound(node_domains, left, right);
+			}
 			break;
 		}
 	}
@@ -676,10 +724,18 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
 
 	if (!skip_exclude)
 	{
+		if (proof)
+			proof->push_exclude(v);
 		solve_sym(g, h, incumbent, current, domains, left, right, goal,
 				  stats, start_time, abort_due_to_timeout,
-				  g_eqn_classes, h_eqn_classes, index_right, sym_mode);
+				  g_eqn_classes, h_eqn_classes, index_right, sym_mode, proof);
+		if (proof)
+			proof->pop();
 	}
+
+	// Every way of extending the current trail has now been refuted
+	if (proof)
+		proof->backtrack();
 }
 
 /**
@@ -712,11 +768,14 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
  * @param stats                Search statistics (updated in place)
  * @param abort_due_to_timeout Atomic flag set by timeout thread
  * @param sym_mode             Bitmask: bit 0 = variable symmetry, bit 1 = value symmetry
+ * @param proof                Proof logger, or nullptr if disabled (requires
+ *                             variable symmetry to be off)
  * @return                     Maximum common induced subgraph as matched vertex pairs,
  *                             indexed into the original unsorted graphs
  */
 std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h,
-                              Stats &stats, std::atomic<bool> &abort_due_to_timeout, int sym_mode)
+                              Stats &stats, std::atomic<bool> &abort_due_to_timeout, int sym_mode,
+                              ProofLogger *proof)
 {
 
 	auto calc_degrees = [](const Graph& g) {
@@ -778,6 +837,9 @@ std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h,
 	set_adjlist(g_sorted);
 	set_adjlist(h_sorted);
 
+	if (proof)
+		proof->set_vertex_orders(vv0, vv1);
+
 	std::vector<int> index_right(h_sorted.n);
 	for (int i = 0; i < h_sorted.n; i++)
 	{
@@ -800,7 +862,7 @@ std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h,
 	auto start_time = std::chrono::steady_clock::now();
 	solve_sym(g_sorted, h_sorted, incumbent, current, domains, left, right, 1,
 			  stats, start_time, abort_due_to_timeout,
-			  g_eqn_sorted, h_eqn_sorted, index_right, sym_mode);
+			  g_eqn_sorted, h_eqn_sorted, index_right, sym_mode, proof);
 
 	for (auto &p : incumbent)
 	{
