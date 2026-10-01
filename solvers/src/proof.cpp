@@ -541,8 +541,12 @@ void ProofLogger::maximal_match_with_twins(int v, int w)
 	for (int z = 0; z < h_n; z++)
 		if (h_rank[z] > h_rank[w] && compatible[v][z] && !h_used[z] && same_pattern(v, z))
 			zs.push_back(z);
+	// v's own twins can't hold w when v takes a later value: its earlier
+	// twins are decided, and the twin ordering puts its later twins after
+	// v's value (which unit propagation sees), so leave them out
 	for (int a = 0; a < g_n; a++)
-		if (a != v && compatible[a][w] && g_image[a] == -1 && !g_excluded[a] && same_pattern(a, w))
+		if (a != v && compatible[a][w] && g_image[a] == -1 && !g_excluded[a] && same_pattern(a, w) &&
+			(g_twin_class[a] == -1 || g_twin_class[a] != g_twin_class[v]))
 			as.push_back(a);
 
 	auto write_guard = [&](int coeff) {
@@ -588,7 +592,10 @@ void ProofLogger::maximal_match_with_twins(int v, int w)
 				for (int c : between)
 					if (compatible[last][c])
 						range.push_back(c);
-				if (range.empty())
+				// s1 < ... < s_r all strictly between w and z needs r values
+				// there, and otherwise unit propagation along the twin
+				// ordering already rules this case out
+				if (range.size() < r)
 					continue;
 				const int d = range.size();
 				pbp << "red";
