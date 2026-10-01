@@ -10,7 +10,7 @@ static std::string match_var(int v, int w)
 
 static std::string bottom_var(int v)
 {
-	return "x" + std::to_string(v) + "_b";
+	return "x" + std::to_string(v) + "_null";
 }
 
 static std::string unused_var(int w)
@@ -84,18 +84,16 @@ void ProofLogger::write_model(const Graph &g, const Graph &h)
 	for (int w = 0; w < h_n; w++)
 		if (users[w] > 0)
 			n_constraints++;
+	for (int w = 0; w < h_n; w++)
+		n_constraints += (long long)users[w] * (g_n - 1);
 
-	// two assignments conflict iff their adjacency differs; adjmat values
-	// encode presence, direction and edge label, so compare them exactly
-	auto conflicts = [&](int v1, int w1, int v2, int w2) {
-		return w1 != w2 && compatible[v1][w1] && compatible[v2][w2] && g.adjmat[v1][v2] != h.adjmat[w1][w2];
+	// The encoding is CakePB's (cake_pb_mcis), so that on undirected
+	// unlabelled graphs, proofs can also be checked by its verified encoder.
+	// adjmat values encode presence, direction and edge label, so u->w' is
+	// consistent with v->w iff the values match exactly.
+	auto consistent = [&](int v, int w, int u, int w2) {
+		return compatible[u][w2] && g.adjmat[v][u] == h.adjmat[w][w2];
 	};
-	for (int v1 = 0; v1 < g_n; v1++)
-		for (int v2 = v1 + 1; v2 < g_n; v2++)
-			for (int w1 = 0; w1 < h_n; w1++)
-				for (int w2 = 0; w2 < h_n; w2++)
-					if (conflicts(v1, w1, v2, w2))
-						n_constraints++;
 
 	opb << "* #variable= " << n_vars << " #constraint= " << n_constraints << "\n";
 	opb << "min:";
@@ -133,23 +131,38 @@ void ProofLogger::write_model(const Graph &g, const Graph &h)
 		for (int v = 0; v < g_n; v++)
 			if (compatible[v][w])
 			{
-				opb << (first ? "" : " ") << "1 " << match_var(v, w);
+				opb << (first ? "" : " ") << "1 ~" << match_var(v, w);
 				first = false;
 			}
-		opb << " <= 1 ;\n";
+		opb << " >= " << users[w] - 1 << " ;\n";
 		inj_id[w] = next_id++;
 	}
 
-	// adjacency must be preserved in both directions (induced subgraph)
-	for (int v1 = 0; v1 < g_n; v1++)
-		for (int v2 = v1 + 1; v2 < g_n; v2++)
-			for (int w1 = 0; w1 < h_n; w1++)
+	// adjacency must be preserved in both directions (induced subgraph): if
+	// v->w, then each other u is unmapped or takes a consistent value. As in
+	// CakePB, the clauses for v list v's neighbours first, then the rest.
+	std::vector<std::vector<std::vector<long long>>> support_id(
+		g_n, std::vector<std::vector<long long>>(h_n, std::vector<long long>(g_n, -1)));
+	for (int w = 0; w < h_n; w++)
+		for (int v = 0; v < g_n; v++)
+		{
+			if (!compatible[v][w])
+				continue;
+			std::vector<int> others;
+			for (int pass = 0; pass < 2; pass++)
+				for (int u = 0; u < g_n; u++)
+					if (u != v && (g.adjmat[v][u] != 0) == (pass == 0))
+						others.push_back(u);
+			for (int u : others)
+			{
+				opb << "1 ~" << match_var(v, w) << " 1 " << bottom_var(u);
 				for (int w2 = 0; w2 < h_n; w2++)
-					if (conflicts(v1, w1, v2, w2))
-					{
-						opb << "1 ~" << match_var(v1, w1) << " 1 ~" << match_var(v2, w2) << " >= 1 ;\n";
-						next_id++;
-					}
+					if (consistent(v, w, u, w2))
+						opb << " 1 " << match_var(u, w2);
+				opb << " >= 1 ;\n";
+				support_id[v][w][u] = next_id++;
+			}
+		}
 	opb.close();
 
 	pbp << "pseudo-Boolean proof version 3.0\n";
@@ -161,6 +174,33 @@ void ProofLogger::write_model(const Graph &g, const Graph &h)
 		pbp << " " << bottom_var(v);
 	pbp << " ;\n";
 	obj_id = next_id++;
+
+	// The support clauses only propagate once all but one value of u is
+	// ruled out, so derive a clause for each pair of inconsistent
+	// assignments, which the rest of the proof relies on propagating. These
+	// then replace the support clauses in the core: redundance and dominance
+	// goals for a clause usually map it onto another clause that exists, so
+	// they're far cheaper to check than the support clauses' goals.
+	const long long first_pair_id = next_id;
+	for (int v1 = 0; v1 < g_n; v1++)
+		for (int v2 = v1 + 1; v2 < g_n; v2++)
+			for (int w1 = 0; w1 < h_n; w1++)
+				for (int w2 = 0; w2 < h_n; w2++)
+					if (w1 != w2 && compatible[v1][w1] && compatible[v2][w2] && !consistent(v1, w1, v2, w2))
+					{
+						pbp << "rup 1 ~" << match_var(v1, w1) << " 1 ~" << match_var(v2, w2) << " >= 1 : "
+							<< support_id[v1][w1][v2] << " " << amo_id(v2) << " ;\n";
+						next_id++;
+					}
+	if (next_id > first_pair_id)
+		pbp << "core range " << first_pair_id << " " << next_id << " ;\n";
+	// each support clause follows from v's at-least-one constraint and the
+	// pair clauses, which is what checked deletion verifies
+	for (int w = 0; w < h_n; w++)
+		for (int v = 0; v < g_n; v++)
+			for (int u = 0; u < g_n; u++)
+				if (support_id[v][w][u] != -1)
+					pbp << "delc " << support_id[v][w][u] << " ;\n";
 }
 
 void ProofLogger::set_vertex_orders(const std::vector<int> &g_order, const std::vector<int> &h_order)
@@ -293,10 +333,11 @@ void ProofLogger::break_g_twins(const std::vector<std::vector<int>> &classes)
 	// pos(a) is the sorted index of a's image plus one, or h_n + 1 if a is
 	// unmapped. For twins a < b, swapping them is an automorphism of the
 	// model, so any solution with pos(a) > pos(b) can be swapped into one
-	// with pos(a) < pos(b): red O(a,b): pos(b) - pos(a) >= 0. Deriving
-	// O(a,b) for later b creates goals for the earlier O(a,c), which become
-	// pos(c) - pos(b) >= 0; they follow from O(a,c) and the negation of
-	// O(a,b) by adding them up.
+	// with pos(a) < pos(b), which is lex smaller: dom O(a,b): pos(b) -
+	// pos(a) >= 0. Consecutive twins are enough, since dominance goals come
+	// only from the core.
+	if (!lex_order)
+		throw std::logic_error("proof logging: the twin ordering needs the lex order");
 	auto write_pos = [&](int a, int sign) {
 		for (int w = 0; w < h_n; w++)
 			if (compatible[a][w])
@@ -329,60 +370,28 @@ void ProofLogger::break_g_twins(const std::vector<std::vector<int>> &classes)
 				if (compatible[cls[i]] != compatible[cls[k]])
 					throw std::logic_error("proof logging: twins with different vertex labels");
 
-		std::vector<std::vector<long long>> order_id(cls.size(), std::vector<long long>(cls.size(), -1));
+		std::vector<long long> order_id(cls.size(), -1);
 		for (size_t i = 0; i + 1 < cls.size(); i++)
-			for (size_t k = i + 1; k < cls.size(); k++)
-			{
-				const int a = cls[i], b = cls[k];
-				if (lex_order)
-				{
-					// with the lex order loaded, by dominance instead: the swap
-					// changes f by (W_a - W_b) (pos(b) - pos(a)), which the
-					// negation of O(a,b) makes negative. The goals are the
-					// weak and strict order conditions, each with the negated
-					// goal as -1; the negation of O(a,b) is -2 for the first,
-					// and -4 for the second (after the first's two IDs).
-					const std::string diff = dec_sub(lex_weight[a], lex_weight[b]);
-					pbp << "dom";
-					write_pos(b, 1);
-					write_pos(a, -1);
-					pbp << " >= 0 :";
-					write_swap(a, b);
-					pbp << " : subproof\n"
-						<< "proofgoal #1\npol -1 -2 " << diff << " * + ;\nqed : -1 ;\n"
-						<< "proofgoal #2\npol -1 -4 " << diff << " * + ;\nqed : -1 ;\n"
-						<< "qed ;\n";
-					next_id += 6;
-					order_id[i][k] = next_id - 1;
-					continue;
-				}
-				pbp << "red";
-				write_pos(b, 1);
-				write_pos(a, -1);
-				pbp << " >= 0 :";
-				write_swap(a, b);
-				if (k == i + 1)
-				{
-					pbp << " ;\n";
-					next_id++;
-				}
-				else
-				{
-					pbp << " : subproof\n";
-					long long neg = next_id++;
-					for (size_t m = i + 1; m < k; m++)
-					{
-						pbp << "proofgoal " << order_id[i][m] << "\n";
-						long long goal = next_id++;
-						pbp << "pol " << neg << " " << goal << " + " << order_id[i][m] << " + ;\n";
-						next_id++;
-						pbp << "qed : -1 ;\n";
-					}
-					pbp << "qed ;\n";
-					next_id++;
-				}
-				order_id[i][k] = next_id - 1;
-			}
+		{
+			const int a = cls[i], b = cls[i + 1];
+			// The swap changes f by (W_a - W_b) (pos(b) - pos(a)), which the
+			// negation of O(a,b) makes negative. The goals are the weak and
+			// strict order conditions, each with the negated goal as -1; the
+			// negation of O(a,b) is -2 for the first, and -4 for the second
+			// (after the first's two IDs).
+			const std::string diff = dec_sub(lex_weight[a], lex_weight[b]);
+			pbp << "dom";
+			write_pos(b, 1);
+			write_pos(a, -1);
+			pbp << " >= 0 :";
+			write_swap(a, b);
+			pbp << " : subproof\n"
+				<< "proofgoal #1\npol -1 -2 " << diff << " * + ;\nqed : -1 ;\n"
+				<< "proofgoal #2\npol -1 -4 " << diff << " * + ;\nqed : -1 ;\n"
+				<< "qed ;\n";
+			next_id += 6;
+			order_id[i] = next_id - 1;
+		}
 
 		// For propagation, between consecutive twins a < b: if b takes w,
 		// then a takes something earlier than w. With unit propagation, this
@@ -398,16 +407,18 @@ void ProofLogger::break_g_twins(const std::vector<std::vector<int>> &classes)
 				for (int u = 0; u < h_n; u++)
 					if (compatible[a][u] && h_rank[u] < h_rank[w])
 						pbp << " 1 " << match_var(a, u);
-				pbp << " >= 1 : " << order_id[i][i + 1] << " " << amo_id(b) << " " << alo_id(a) << " " << inj_id[w] << " ;\n";
+				pbp << " >= 1 : " << order_id[i] << " " << amo_id(b) << " " << alo_id(a) << " " << inj_id[w] << " ;\n";
 				next_id++;
 			}
 		}
 
-		pbp << "del id";
-		for (size_t i = 0; i + 1 < cls.size(); i++)
-			for (size_t k = i + 1; k < cls.size(); k++)
-				pbp << " " << order_id[i][k];
-		pbp << " ;\n";
+		if (cls.size() > 1)
+		{
+			pbp << "del id";
+			for (size_t i = 0; i + 1 < cls.size(); i++)
+				pbp << " " << order_id[i];
+			pbp << " ;\n";
+		}
 	}
 }
 
@@ -517,56 +528,64 @@ void ProofLogger::pop()
 	trail_attached_ids.pop_back();
 }
 
-long long ProofLogger::derive_forced_match(int v, int w)
+std::vector<int> ProofLogger::holders(int v, int w) const
 {
-	// Every vertex not on the trail is free. Under the trail, v can still
-	// take any free z with its adjacency pattern (or bottom), and w can
-	// still be taken by any free a with w's pattern.
-	std::vector<int> zs{-1}, as;
-	for (int z = 0; z < h_n; z++)
-		if (z != w && compatible[v][z] && !h_used[z] && same_pattern(v, z))
-			zs.push_back(z);
+	// every vertex not on the trail is free, and under the trail, w can
+	// still be taken by any free a with w's pattern
+	std::vector<int> as;
 	for (int a = 0; a < g_n; a++)
 		if (a != v && compatible[a][w] && g_image[a] == -1 && !g_excluded[a] && same_pattern(a, w))
 			as.push_back(a);
+	return as;
+}
 
-	// Rule out each z in turn, one holder a of w at a time: the witness
-	// moves v onto w and a onto z (or just v, if w is unused). The caller
-	// is responsible for this preserving adjacency.
+long long ProofLogger::rule_out_value(int v, int w, int z, const char *rule)
+{
+	// One holder a of w at a time, the witness moves v onto w and a onto z
+	// (or just v, if w is unused). The caller is responsible for this
+	// preserving adjacency, and for dom, for it being lex smaller.
 	auto value = [&](int u, int z) { return z == -1 ? bottom_var(u) : match_var(u, z); };
-	std::vector<long long> ruled_out;
-	for (int z : zs)
+	const std::vector<int> as = holders(v, w);
+	std::vector<long long> cases;
+	for (int a : as)
 	{
-		std::vector<long long> cases;
-		for (int a : as)
-		{
-			pbp << "red";
-			for (const std::string &lit : trail)
-				pbp << " 1 ~" << lit;
-			pbp << " 1 ~" << value(v, z) << " 1 ~" << match_var(a, w) << " >= 1 : "
-				<< value(v, z) << " -> 0 " << match_var(v, w) << " -> 1 "
-				<< match_var(a, w) << " -> 0 " << value(a, z) << " -> 1 ;\n";
-			cases.push_back(next_id++);
-		}
-		pbp << "red";
+		pbp << rule;
 		for (const std::string &lit : trail)
 			pbp << " 1 ~" << lit;
-		pbp << " 1 ~" << value(v, z);
-		for (int a : as)
-			pbp << " 1 " << match_var(a, w);
-		pbp << " >= 1 : " << value(v, z) << " -> 0 " << match_var(v, w) << " -> 1 ;\n";
+		pbp << " 1 ~" << value(v, z) << " 1 ~" << match_var(a, w) << " >= 1 : "
+			<< value(v, z) << " -> 0 " << match_var(v, w) << " -> 1 "
+			<< match_var(a, w) << " -> 0 " << value(a, z) << " -> 1 ;\n";
 		cases.push_back(next_id++);
-
-		pbp << "rup";
-		for (const std::string &lit : trail)
-			pbp << " 1 ~" << lit;
-		pbp << " 1 ~" << value(v, z) << " >= 1 ;\n";
-		ruled_out.push_back(next_id++);
-		pbp << "del id";
-		for (long long id : cases)
-			pbp << " " << id;
-		pbp << " ;\n";
 	}
+	pbp << rule;
+	for (const std::string &lit : trail)
+		pbp << " 1 ~" << lit;
+	pbp << " 1 ~" << value(v, z);
+	for (int a : as)
+		pbp << " 1 " << match_var(a, w);
+	pbp << " >= 1 : " << value(v, z) << " -> 0 " << match_var(v, w) << " -> 1 ;\n";
+	cases.push_back(next_id++);
+
+	pbp << "rup";
+	for (const std::string &lit : trail)
+		pbp << " 1 ~" << lit;
+	pbp << " 1 ~" << value(v, z) << " >= 1 ;\n";
+	long long id = next_id++;
+	pbp << "del id";
+	for (long long c : cases)
+		pbp << " " << c;
+	pbp << " ;\n";
+	return id;
+}
+
+long long ProofLogger::derive_forced_match(int v, int w)
+{
+	// Under the trail, v can still take any free z with its adjacency
+	// pattern, or bottom. Rule each of them out, then v->w is forced.
+	std::vector<long long> ruled_out{rule_out_value(v, w, -1, "red")};
+	for (int z = 0; z < h_n; z++)
+		if (z != w && compatible[v][z] && !h_used[z] && same_pattern(v, z))
+			ruled_out.push_back(rule_out_value(v, w, z, "red"));
 
 	pbp << "rup";
 	for (const std::string &lit : trail)
@@ -634,120 +653,24 @@ void ProofLogger::maximal_match_with_twins(int v, int w, bool and_bottom)
 	w = h_order[w];
 	if (g_image[v] != -1 || g_excluded[v] || h_used[w])
 		throw std::logic_error("proof logging: maximal match is not between free vertices");
+	if (!lex_order)
+		throw std::logic_error("proof logging: maximality with the twin ordering needs the lex order");
 	if (aborted)
 		return;
 
 	// v->w splits no bidomain, so in a solution under the trail where v
-	// takes some z after w and a takes w, v->w and a->z preserves every
-	// adjacency (as for maximal_match). Bottom comes after every value in
-	// the twin ordering.
+	// takes some z after w (or bottom, which comes after every value) and a
+	// takes w, v->w and a->z preserves every adjacency (as for
+	// maximal_match). The rewrite can break the twin ordering, so it's by
+	// dominance: v is the smallest vertex in its bidomain and a is in the
+	// same bidomain, so v is the most significant vertex that changes, and
+	// its image gets smaller. The earlier values were refuted by the
+	// earlier branches, or by the twin ordering.
 	for (int z = 0; z < h_n; z++)
 		if (h_rank[z] > h_rank[w] && compatible[v][z] && !h_used[z] && same_pattern(v, z))
-			rule_out_by_twin_rewrite(v, w, z);
+			attached_ids().push_back(rule_out_value(v, w, z, "dom"));
 	if (and_bottom)
-		rule_out_by_twin_rewrite(v, w, -1);
-}
-
-void ProofLogger::rule_out_by_twin_rewrite(int v, int w, int z)
-{
-	auto value = [&](int u, int z) { return z == -1 ? bottom_var(u) : match_var(u, z); };
-	// v's own twins can't hold w when v takes a later value: its earlier
-	// twins are decided, and the twin ordering puts its later twins after
-	// v's value (which unit propagation sees), so leave them out
-	std::vector<int> as;
-	for (int a = 0; a < g_n; a++)
-		if (a != v && compatible[a][w] && g_image[a] == -1 && !g_excluded[a] && same_pattern(a, w) &&
-			(g_twin_class[a] == -1 || g_twin_class[a] != g_twin_class[v]))
-			as.push_back(a);
-
-	auto write_guard = [&](int coeff) {
-		for (const std::string &lit : trail)
-			pbp << " " << coeff << " ~" << lit;
-	};
-
-	// The rewrite is v->w and a->z, for whichever a held w. v's twin order
-	// survives: its earlier twins are below w, its later twins above z. But
-	// a's twins a < s1 < s2 < ... whose images lie between w and z would now
-	// come before a, so the rewrite also shifts that chain along (a takes
-	// s1's image, s1 takes s2's, and the last one takes z), which is the
-	// same solution up to a permutation of twins. The cases are by the
-	// length r of the chain, longest first: case r rules out "s_r is between
-	// w and z", so that unit propagation provides "s_{r+1} isn't" for case
-	// r. When z is bottom, everything after w is between w and z, and v's
-	// later twins are all unmapped.
-	std::vector<int> between; // values strictly between w and z
-	for (int c = 0; c < h_n; c++)
-		if (h_rank[c] > h_rank[w] && (z == -1 || h_rank[c] < h_rank[z]))
-			between.push_back(c);
-
-	std::vector<long long> cases;
-	for (int a : as)
-	{
-		// a's later twins (classes are in increasing index order, and
-		// twins are branched in that order, so these are all free)
-		std::vector<int> chain{a};
-		if (g_twin_class[a] != -1)
-		{
-			const std::vector<int> &cls = g_twin_classes[g_twin_class[a]];
-			for (size_t i = std::find(cls.begin(), cls.end(), a) - cls.begin() + 1; i < cls.size(); i++)
-				if (g_image[cls[i]] == -1 && !g_excluded[cls[i]])
-					chain.push_back(cls[i]);
-		}
-		for (size_t r = chain.size() - 1; r >= 1; r--)
-		{
-			const int last = chain[r];
-			std::vector<int> range;
-			for (int c : between)
-				if (compatible[last][c])
-					range.push_back(c);
-			// s1 < ... < s_r all strictly between w and z needs r values
-			// there, and otherwise unit propagation along the twin
-			// ordering already rules this case out
-			if (range.size() < r)
-				continue;
-			const int d = range.size();
-			pbp << "red";
-			write_guard(d);
-			pbp << " " << d << " ~" << value(v, z) << " " << d << " ~" << match_var(a, w);
-			for (int c : range)
-				pbp << " 1 ~" << match_var(last, c);
-			pbp << " >= " << d << " : " << value(v, z) << " -> 0 " << match_var(v, w) << " -> 1";
-			for (size_t i = 0; i < r; i++)
-			{
-				for (int c = 0; c < h_n; c++)
-					if (compatible[chain[i]][c])
-						pbp << " " << match_var(chain[i], c) << " -> " << match_var(chain[i + 1], c);
-				pbp << " " << bottom_var(chain[i]) << " -> " << bottom_var(chain[i + 1]);
-			}
-			for (int c = 0; c < h_n; c++)
-				if (compatible[last][c])
-					pbp << " " << match_var(last, c) << " -> " << (c == z ? 1 : 0);
-			pbp << " " << bottom_var(last) << " -> " << (z == -1 ? 1 : 0) << " ;\n";
-			cases.push_back(next_id++);
-		}
-		pbp << "red";
-		write_guard(1);
-		pbp << " 1 ~" << value(v, z) << " 1 ~" << match_var(a, w) << " >= 1 : "
-			<< value(v, z) << " -> 0 " << match_var(v, w) << " -> 1 "
-			<< match_var(a, w) << " -> 0 " << value(a, z) << " -> 1 ;\n";
-		cases.push_back(next_id++);
-	}
-	pbp << "red";
-	write_guard(1);
-	pbp << " 1 ~" << value(v, z);
-	for (int a : as)
-		pbp << " 1 " << match_var(a, w);
-	pbp << " >= 1 : " << value(v, z) << " -> 0 " << match_var(v, w) << " -> 1 ;\n";
-	cases.push_back(next_id++);
-
-	pbp << "rup";
-	write_guard(1);
-	pbp << " 1 ~" << value(v, z) << " >= 1 ;\n";
-	attached_ids().push_back(next_id++);
-	pbp << "del id";
-	for (long long id : cases)
-		pbp << " " << id;
-	pbp << " ;\n";
+		attached_ids().push_back(rule_out_value(v, w, -1, "dom"));
 }
 
 void ProofLogger::break_value_symmetry(int v, const std::vector<std::pair<int, int>> &twins)

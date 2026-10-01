@@ -590,6 +590,9 @@ std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
     if (proof) {
         proof->set_vertex_orders(vv0, vv1);
         if (red_mode & 1) {
+            // the twin ordering, and maximality alongside it, are by
+            // dominance under a lex order on the images
+            proof->enable_lex_order();
             // twin classes in increasing index order, which is the order
             // VEQ assumes they are branched in
             std::vector<std::vector<int>> classes;

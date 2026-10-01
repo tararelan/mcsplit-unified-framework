@@ -1,19 +1,23 @@
 #pragma once
 
-// VeriPB 3 proof logging for the McSplit-family solvers (McSplit, RL, LL
-// without LUM, DAL with the RL policy). The logger writes an OPB model of
-// the maximum common induced subgraph instance and a proof log that
-// certifies the optimal solution size found by the search.
+// VeriPB 3 proof logging for every solver in the framework. The logger
+// writes an OPB model of the maximum common induced subgraph instance and a
+// proof log that certifies the optimal solution size found by the search.
 //
 // Model (written from the graphs as main() sees them, after the swap that
-// makes g the smaller graph, using their original vertex indices):
-//   x<v>_<w>  vertex v of G is mapped to vertex w of H (only label-compatible pairs)
-//   x<v>_b    vertex v of G is left unmapped ("bottom")
-//   minimise  sum_v x<v>_b
+// makes g the smaller graph, using their original vertex indices). On
+// undirected unlabelled graphs this is exactly the encoding of CakePB's
+// verified MCIS checker (cake_pb_mcis), constraint order included:
+//   x<v>_<w>   vertex v of G is mapped to vertex w of H (only label-compatible pairs)
+//   x<v>_null  vertex v of G is left unmapped ("bottom")
+//   minimise   sum_v x<v>_null
 //   each v takes exactly one value (written as >= 1 and <= 1 constraints)
 //   each w is used at most once
-//   for every pair of assignments v1->w1, v2->w2 whose adjacency (including
-//   direction and edge label) disagrees: ~x<v1>_<w1> + ~x<v2>_<w2> >= 1
+//   for each v->w and each other u: u is unmapped, or takes a w' whose
+//   adjacency to w (including direction and edge label) matches u's to v
+// The proof starts by deriving a clause ~x<v1>_<w1> + ~x<v2>_<w2> >= 1 for
+// each pair of inconsistent assignments, which propagates better, and then
+// replaces the support clauses with these in the core.
 //
 // Proof: the search trail is a sequence of decisions, either v->w (a match)
 // or v->bottom (the "exclude v" branch). Every node that is exhausted or
@@ -39,22 +43,24 @@
 // unit propagation forces the pair. These clauses are guarded by the trail
 // and deleted when the decision v->w is popped.
 //
-// RRSplit's vertex-equivalence reduction breaks the symmetry between twins
-// in G (vertices with the same neighbourhood). Twins are always branched in
-// increasing (sorted) index order, so the reduction amounts to: the images
-// of a twin class increase with index, and once one twin is unmapped, so
-// are all later ones. break_g_twins derives this once, before search, by
-// redundance with the transposition of each pair of twins as the witness.
+// RRSplit's vertex-equivalence reduction, and SymSplit's variable symmetry,
+// break the symmetry between twins in G (vertices with the same
+// neighbourhood). Twins are always branched in increasing (sorted) index
+// order, so the reduction amounts to: the images of a twin class increase
+// with index, and once one twin is unmapped, so are all later ones.
 //
-// SymSplit with both symmetries can skip v->w because a smaller twin b of w
-// in H is free, even when b lies below the image of v's previous twin. Then
-// the solution with v->b that respects the twin ordering is in an earlier
-// branch, which redundance under the trail can't appeal to. Instead, the
-// proof loads a lex order on the images, in branching order, and uses
-// dominance for the twin ordering and for value symmetry: SymSplit always
-// branches on the smallest vertex of a bidomain, so each of its rewrites
-// makes the branching vertex's image smaller, and touches only later
-// vertices otherwise.
+// Reasoning alongside this ordering often rewrites a solution into one that
+// breaks it, and the solution that respects it can be in an earlier branch
+// (for example, SymSplit's value symmetry can skip v->w in favour of a twin
+// below the image of v's previous twin), which redundance under the trail
+// can't appeal to. So for these algorithms, the proof first loads a lex
+// order on the images, in branching order (enable_lex_order), and uses
+// dominance: for the twin ordering itself (break_g_twins), for maximality
+// (maximal_match_with_twins) and for value symmetry. Both solvers always
+// branch on the smallest vertex of a bidomain, and every rewrite only
+// otherwise touches vertices in the same bidomain, so the branching
+// vertex is the most significant one that changes, and its image gets
+// smaller.
 
 #include "graph.h"
 #include "common.h"
@@ -109,7 +115,7 @@ public:
 	/**
 	 * Derives the twin ordering for each class of twins in G (sorted
 	 * indices; each class is listed in increasing index order). Must be
-	 * called before search, after set_vertex_orders.
+	 * called before search, after enable_lex_order.
 	 */
 	void break_g_twins(const std::vector<std::vector<int>> &classes);
 
@@ -117,8 +123,8 @@ public:
 	 * Loads a lex order on the images of G's vertices, in sorted index
 	 * order (with bottom after every vertex of H), so that later reasoning
 	 * can use dominance. Must be called before search and before
-	 * break_g_twins, after set_vertex_orders. Every later rewrite of a
-	 * solution must then not increase it.
+	 * break_g_twins, after set_vertex_orders. Every later redundance step
+	 * must then not increase it, which rules out LUM and maximal_match.
 	 */
 	void enable_lex_order();
 
@@ -141,9 +147,10 @@ public:
 
 	/**
 	 * Justifies the maximality reduction alongside the twin ordering from
-	 * break_g_twins: matching v->w (sorted indices) splits no bidomain, so
-	 * under the current trail, v takes no value after w (nor bottom, if
-	 * and_bottom is set). Must be called before v->w is pushed or explored.
+	 * break_g_twins, by dominance: matching v->w (sorted indices) splits no
+	 * bidomain, so under the current trail, v takes no value after w (nor
+	 * bottom, if and_bottom is set). Must be called before v->w is pushed or
+	 * explored.
 	 */
 	void maximal_match_with_twins(int v, int w, bool and_bottom = false);
 
@@ -256,12 +263,14 @@ private:
 	// whether a has b's adjacency to everything matched on the trail (model indices)
 	bool same_pattern(int a, int b) const;
 
+	// the free vertices other than v that could take w under the trail
+	std::vector<int> holders(int v, int w) const;
+
 	// Under the trail, rules out v->z (bottom if z is -1) in favour of v->w,
-	// where the solver's reasoning guarantees that v->w and a->z preserve
-	// adjacency for any free holder a of w, and h_rank[w] < h_rank[z]. Keeps
-	// the twin ordering by shifting a's later twins along. Attaches the
-	// resulting clause to the trail. Model indices.
-	void rule_out_by_twin_rewrite(int v, int w, int z);
+	// one holder of w at a time, using rule (red or dom); the caller makes
+	// sure that rewrite is valid. Returns the ID of the resulting clause.
+	// Model indices.
+	long long rule_out_value(int v, int w, int z, const char *rule);
 	std::vector<long long> &attached_ids();
 
 	BidomainPlan plan_bidomain(const std::vector<int> &L, const std::vector<int> &R) const;

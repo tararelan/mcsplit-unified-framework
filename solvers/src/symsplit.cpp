@@ -846,11 +846,12 @@ std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h,
 	if (proof)
 	{
 		proof->set_vertex_orders(vv0, vv1);
-		// with both symmetries, value symmetry can skip v->w in favour of a
-		// twin below the image of v's previous twin, which is only justified
-		// by an earlier branch; a lex order on the images (in branching
-		// order) lets the proof use dominance instead
-		if (sym_mode == 3)
+		// the twin ordering, and maximality and value symmetry alongside it,
+		// are by dominance under a lex order on the images (with both
+		// symmetries, value symmetry can skip v->w in favour of a twin below
+		// the image of v's previous twin, which is only justified by an
+		// earlier branch)
+		if (sym_mode & 1)
 			proof->enable_lex_order();
 		if (sym_mode & 1)
 		{
