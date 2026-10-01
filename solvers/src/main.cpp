@@ -179,7 +179,7 @@ int main(int argc, char **argv)
 
 	// proof logging covers McSplit's and DSB's bidomain bounds, LUM,
 	// RRSplit's reductions, SymSplit's variable and value symmetry, and the
-	// maximality reduction (full SymSplit prunes slightly less when logging)
+	// maximality reduction
 	std::unique_ptr<ProofLogger> proof;
 	if (!arguments.proof_prefix.empty())
 	{
