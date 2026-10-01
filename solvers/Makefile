@@ -21,5 +21,16 @@ bin/mcsp: $(SRC) $(BOOST_INC)/boost/functional/hash.hpp
 	mkdir -p bin
 	$(CXX) $(CXXFLAGS) -I $(BOOST_INC) -o bin/mcsp $(SRC)
 
+# Checks the proofs of every algorithm with VeriPB (and with CakePB, if
+# CAKE_PB_MCIS is set to the path of cake_pb_mcis)
+check-proofs: bin/mcsp
+	python3 test/check_proofs.py --solver bin/mcsp $(if $(CAKE_PB_MCIS),--cake $(CAKE_PB_MCIS))
+
+# Checks that mutated solvers and proof loggers are all caught
+check-mutants: $(BOOST_INC)/boost/functional/hash.hpp
+	CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS) -I $(BOOST_INC)" python3 test/mutants.py
+
 clean:
 	rm -f bin/mcsp src/*.o
+
+.PHONY: all check-proofs check-mutants clean
