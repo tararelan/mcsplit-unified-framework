@@ -2,6 +2,7 @@
 
 #include "graph.h"
 #include "common.h"
+#include "proof.h"
 #include <algorithm>
 #include <numeric>
 #include <vector>
@@ -21,8 +22,8 @@ int partition(std::vector<int>& all_vv, int start, int len, const std::vector<un
 void remove_vtx_from_left_domain(std::vector<int>& left, Bidomain& bd, int v);
 static void remove_bidomain(std::vector<Bidomain>& domains, int idx);
 std::vector<Bidomain> filter_domains(const std::vector<Bidomain>& d, std::vector<int>& left, std::vector<int>& right, const Graph& g, const Graph& h, int v, int w, bool multiway);
-void solve(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout);
-std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout);
+void solve(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof);
+std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof);
 
 /**
  * McSplit's upper bound.
@@ -249,15 +250,19 @@ std::vector<Bidomain> filter_domains(const std::vector<Bidomain>& d, std::vector
  * @param stats Search statistics, updated in-place.
  * @param start_time Time the search began, used for timing incumbent updates.
  * @param abort_due_to_timeout Flag checked to abort the search early.
+ * @param proof Proof logger, or nullptr if proof logging is disabled.
  */
 void solve(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         std::vector<VtxPair>& current, std::vector<Bidomain>& domains,
         std::vector<int>& left, std::vector<int>& right, unsigned int goal,
         bool multiway, Stats& stats,
         std::chrono::time_point<std::chrono::steady_clock> start_time,
-        std::atomic<bool>& abort_due_to_timeout) {
+        std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof) {
 
-    if (abort_due_to_timeout) return;
+    if (abort_due_to_timeout) {
+        if (proof) proof->abort();
+        return;
+    }
 
     stats.nodes++;
 
@@ -268,6 +273,7 @@ void solve(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         stats.nodes_to_best = stats.nodes;
         stats.time_to_best = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - start_time).count();
+        if (proof) proof->new_incumbent(current);
     }
 
     // Compute upper bound: current size + max possible additional matches
@@ -276,12 +282,16 @@ void solve(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
     if (bound <= (int)incumbent.size() || bound < (int)goal) {
         stats.cut_branches++;
         stats.bound_pruned++;
+        if (proof) proof->prune_by_bound(domains, left, right);
         return;
     }
 
     // Select bidomain to branch on: smallest max(left_len, right_len)
     int bd_idx = select_bidomain(domains, left, current.size());
-    if (bd_idx == -1) return; // No bidomains left - search complete at this node
+    if (bd_idx == -1) { // No bidomains left - search complete at this node
+        if (proof) proof->backtrack();
+        return;
+    }
 
     Bidomain& bd = domains[bd_idx];
 
@@ -312,8 +322,10 @@ void solve(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         // Compute new bidomains after committing to match (v, w)
         auto new_domains = filter_domains(domains, left, right, g, h, v, w, multiway);
         current.push_back(VtxPair(v, w));
+        if (proof) proof->push_match(v, w);
         solve(g, h, incumbent, current, new_domains, left, right, goal,
-                multiway, stats, start_time, abort_due_to_timeout);
+                multiway, stats, start_time, abort_due_to_timeout, proof);
+        if (proof) proof->pop();
         current.pop_back(); // Backtrack
     }
 
@@ -323,8 +335,13 @@ void solve(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         remove_bidomain(domains, bd_idx);
 
     // Branch 2: try not matching v at all - recurse without v in any solution
+    if (proof) proof->push_exclude(v);
     solve(g, h, incumbent, current, domains, left, right, goal,
-            multiway, stats, start_time, abort_due_to_timeout);
+            multiway, stats, start_time, abort_due_to_timeout, proof);
+    if (proof) proof->pop();
+
+    // Every way of extending the current trail has now been refuted
+    if (proof) proof->backtrack();
 }
 
 /**
@@ -337,10 +354,11 @@ void solve(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
  * @param multiway Whether to use label/direction-aware domain splitting.
  * @param stats Search statistics, updated in-place.
  * @param abort_due_to_timeout Flag checked to abort the search early.
+ * @param proof Proof logger, or nullptr if proof logging is disabled.
  * @return The largest common subgraph solution found, as vertex pairs in the original graphs' indices.
  */
 std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway,
-        Stats& stats, std::atomic<bool>& abort_due_to_timeout) {
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof) {
 
     // Calculate degree of each vertex for sorting.
     // Only counts outgoing edges (adjmat[v][w] & 1) - consistent with
@@ -384,6 +402,7 @@ std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway,
     // solution is converted back to original indices at the end
     Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
     Graph h_sorted = induced_subgraph(const_cast<Graph&>(h), vv1);
+    if (proof) proof->set_vertex_orders(vv0, vv1);
 
     // Build initial bidomains - one per label value shared by both graphs.
     // Each bidomain pairs all G-vertices with a given label against all
@@ -418,7 +437,7 @@ std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway,
     std::vector<VtxPair> incumbent, current;
     auto start_time = std::chrono::steady_clock::now();
     solve(g_sorted, h_sorted, incumbent, current, domains, left, right, 1,
-            multiway, stats, start_time, abort_due_to_timeout);
+            multiway, stats, start_time, abort_due_to_timeout, proof);
 
     // Convert solution indices from sorted graph back to original graph indices
     for (auto& p : incumbent) {

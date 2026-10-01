@@ -2,6 +2,7 @@
 
 #include "graph.h"
 #include "common.h"
+#include "proof.h"
 #include <iostream>
 #include <string>
 #include <chrono>
@@ -9,19 +10,22 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <memory>
+#include <set>
 #include <argp.h>
 
 std::vector<VtxPair> mcs(const Graph &g, const Graph &h, bool multiway,
-						 Stats &stats, std::atomic<bool> &abort_due_to_timeout);
+						 Stats &stats, std::atomic<bool> &abort_due_to_timeout, ProofLogger *proof = nullptr);
 std::vector<VtxPair> mcs_rl(const Graph &g, const Graph &h, bool multiway,
-							Stats &stats, std::atomic<bool> &abort_due_to_timeout);
+							Stats &stats, std::atomic<bool> &abort_due_to_timeout, ProofLogger *proof = nullptr);
 // use_lum: enable leaf union matching; use_lsm: enable long-short memory scoring
 std::vector<VtxPair> mcs_ll(const Graph &g, const Graph &h, bool multiway, Stats &stats,
-							std::atomic<bool> &abort_due_to_timeout, bool use_lum = true, bool use_lsm = true);
+							std::atomic<bool> &abort_due_to_timeout, bool use_lum = true, bool use_lsm = true,
+							ProofLogger *proof = nullptr);
 // policy_mode: 0 = hybrid (alternating), 1 = RL only, 2 = DAL only
 std::vector<VtxPair> mcs_dal(const Graph &g, const Graph &h, bool multiway,
 							 Stats &stats, std::atomic<bool> &abort_due_to_timeout,
-							 int policy_mode = 0);
+							 int policy_mode = 0, ProofLogger *proof = nullptr);
 // bound_mode: 0 = gated (adaptive), 1 = always on, 2 = never on (plain McSplit bound)
 std::vector<VtxPair> mcs_dsb(const Graph &g, const Graph &h, bool multiway,
 							 Stats &stats, std::atomic<bool> &abort_due_to_timeout, int bound_mode = 0);
@@ -50,6 +54,7 @@ static struct argp_option options[] = {
 	{"vertex-labelled", 'x', 0, 0, "Use vertex labels only (no edge labels)"},
 	{"timeout", 't', "timeout", 0, "Abort search after this many seconds (0 = no limit)"},
 	{"algorithm", 'A', "algo", 0, "Algorithm to run: mcsplit, rl, ll, dal, dsb, rrsplit, symsplit"},
+	{"proof", 'p', "prefix", 0, "Write a VeriPB model and proof to PREFIX.opb and PREFIX.pbp"},
 	{0}};
 
 // Parsed argument state, populated by the argp parser and read by main().
@@ -63,6 +68,7 @@ static struct
 	bool vertex_labelled = false;	   // read and match vertex labels
 	int timeout = 0;				   // search timeout in seconds (0 = unlimited)
 	std::string algorithm = "mcsplit"; // algorithm identifier
+	std::string proof_prefix;		   // proof logging file prefix (empty = disabled)
 	char *filename1 = nullptr;		   // path to first input graph
 	char *filename2 = nullptr;		   // path to second input graph
 	int arg_num = 0;				   // counter for positional arguments
@@ -111,6 +117,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		break;
 	case 'A':
 		arguments.algorithm = arg;
+		break;
+	case 'p':
+		arguments.proof_prefix = arg;
 		break;
 	case ARGP_KEY_ARG:
 		if (arguments.arg_num == 0)
@@ -165,6 +174,23 @@ int main(int argc, char **argv)
 	if (g.n > h.n)
 		std::swap(g, h);
 
+	// proof logging covers the algorithms whose only pruning is McSplit's
+	// bidomain bound; the others need justifications that aren't written yet
+	// (LUM in ll, ll_lum, dal and dal_dal; the degree-sequence bound in dsb;
+	// the symmetry and maximality reductions in rrsplit and symsplit)
+	std::unique_ptr<ProofLogger> proof;
+	if (!arguments.proof_prefix.empty())
+	{
+		static const std::set<std::string> proof_algorithms = {"mcsplit", "rl", "ll_lsm", "dal_rl"};
+		if (!proof_algorithms.count(arguments.algorithm))
+		{
+			std::cerr << "Proof logging is not supported for algorithm " << arguments.algorithm << std::endl;
+			return 1;
+		}
+		proof = std::make_unique<ProofLogger>(arguments.proof_prefix);
+		proof->write_model(g, h);
+	}
+
 	if (!arguments.quiet)
 	{
 		std::cout << g.n << " vertices" << std::endl;
@@ -205,18 +231,18 @@ int main(int argc, char **argv)
 	// mode/bitmask (see the declarations and options[] table above for
 	// what each mode value means)
 	if (arguments.algorithm == "rl")
-		solution = mcs_rl(g, h, multiway, stats, abort_due_to_timeout);
+		solution = mcs_rl(g, h, multiway, stats, abort_due_to_timeout, proof.get());
 
 	else if (arguments.algorithm == "ll")
 		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, true, true);
 	else if (arguments.algorithm == "ll_lsm")
-		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, false, true);
+		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, false, true, proof.get());
 	else if (arguments.algorithm == "ll_lum")
 		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, true, false);
 	else if (arguments.algorithm == "dal")
 		solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout, 0);
 	else if (arguments.algorithm == "dal_rl")
-		solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout, 1);
+		solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout, 1, proof.get());
 	else if (arguments.algorithm == "dal_dal")
 		solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout, 2);
 
@@ -244,11 +270,14 @@ int main(int argc, char **argv)
 		solution = mcs_sym(g, h, stats, abort_due_to_timeout, 1); // variable only
 
 	else
-		solution = mcs(g, h, multiway, stats, abort_due_to_timeout);
+		solution = mcs(g, h, multiway, stats, abort_due_to_timeout, proof.get());
 
 	auto stop = std::chrono::steady_clock::now();
 	stats.time_elapsed = std::chrono::duration<double>(stop - start).count();
 	stats.aborted = aborted;
+
+	if (proof)
+		proof->finish(solution.size());
 
 	// Count edges in solution (boolean adjacency check only - does not
 	// distinguish direction on directed graphs, see Section 4.1.2.2)

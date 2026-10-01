@@ -19,6 +19,7 @@
     - [Available Algorithms](#available-algorithms)
     - [Examples](#examples)
     - [Output Format](#output-format)
+    - [Proof Logging](#proof-logging)
   - [Running Experiments on HPC](#running-experiments-on-hpc-hypatia)
     - [1. Sync files to Hypatia](#1-sync-files-to-hypatia)
     - [2. Build on Hypatia](#2-build-on-hypatia)
@@ -139,6 +140,7 @@ make -C solvers
 | `-x` | `--vertex-labelled` | Use vertex labels only (no edge labels) |
 | `-t <seconds>` | `--timeout` | Abort search after this many seconds (0 = no limit) |
 | `-A <algo>` | `--algorithm` | Algorithm to run (see algorithm table below) |
+| `-p <prefix>` | `--proof` | Write a VeriPB model and proof to `<prefix>.opb` and `<prefix>.pbp` (see [Proof Logging](#proof-logging)) |
 
 #### Available Algorithms
 
@@ -207,6 +209,19 @@ One line, space-separated:
 | `unified_sym_pruned` | Branches pruned by symmetry or redundancy reduction |
 
 When run with `--with-ref` on HPC (see below), four extra fields are appended: `ref_size`, `ref_nodes`, `ref_time`, `match` (`PASS`/`FAIL`/`MISSING_DATA`).
+
+#### Proof Logging
+
+With `-p <prefix>`, the solver writes a pseudo-Boolean model of the instance to `<prefix>.opb` and a [VeriPB](https://gitlab.com/MIAOresearch/software/VeriPB) 3 proof to `<prefix>.pbp`. The proof certifies the reported solution size independently of the solver:
+
+```bash
+./solvers/bin/mcsp -A mcsplit -d -q -p proof g1.dimacs g2.dimacs
+veripb proof.opb proof.pbp
+```
+
+The model has a variable `x<v>_<w>` for each label-compatible pair (vertex `v` of the smaller graph mapped to `w`) and `x<v>_b` for `v` left unmapped, and minimises the number of unmapped vertices. A complete run ends with `s VERIFIED BOUNDS k <= obj <= k`, so the maximum common induced subgraph has `|V(G)| - k` vertices. A run stopped by `-t` only certifies its best solution (`0 <= obj <= k`).
+
+Proof logging is supported for `mcsplit`, `rl`, `ll_lsm` and `dal_rl`, whose only pruning is the McSplit bidomain bound. The other algorithms are rejected. LUM (`ll`, `ll_lum`, `dal`, `dal_dal`), the degree-sequence bound (`dsb*`) and the RRSplit/SymSplit reductions still need their own justifications. The model has one clause per incompatible pair of assignments, so it grows as O(|V(G)|² |V(H)|²) and is practical for graphs up to a few dozen vertices.
 
 ---
 

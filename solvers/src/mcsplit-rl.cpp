@@ -2,6 +2,7 @@
 
 #include "graph.h"
 #include "common.h"
+#include "proof.h"
 #include <algorithm>
 #include <numeric>
 #include <vector>
@@ -22,8 +23,8 @@ static int partition_rl(std::vector<int>& all_vv, int start, int len, const std:
 static int remove_matched_vertex_rl(std::vector<int>& arr, int start, int len, const std::vector<int>& matched);
 static void remove_vtx_from_array_rl(std::vector<int>& arr, int start_idx, int& len, int remove_idx);
 static std::vector<Bidomain> rewardfeed_rl(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<int>& left, std::vector<int>& right, std::vector<gtype_rl>& lgrade, std::vector<gtype_rl>& rgrade, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
-static void solve_rl(const Graph& g, const Graph& h, std::vector<gtype_rl>& lgrade, std::vector<gtype_rl>& rgrade, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout);
-std::vector<VtxPair> mcs_rl(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout);
+static void solve_rl(const Graph& g, const Graph& h, std::vector<gtype_rl>& lgrade, std::vector<gtype_rl>& rgrade, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof);
+std::vector<VtxPair> mcs_rl(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof);
 
 /**
  * McSplit's upper bound: sum of min(left_len, right_len) over all bidomains
@@ -320,6 +321,7 @@ static std::vector<Bidomain> rewardfeed_rl(const std::vector<Bidomain>& d,
  * @param stats Search statistics, updated in-place.
  * @param start_time Time the search began, used for timing incumbent updates.
  * @param abort_due_to_timeout Flag checked to abort the search early.
+ * @param proof Proof logger, or nullptr if proof logging is disabled.
  */
 static void solve_rl(const Graph& g, const Graph& h,
         std::vector<gtype_rl>& lgrade, std::vector<gtype_rl>& rgrade,
@@ -328,9 +330,12 @@ static void solve_rl(const Graph& g, const Graph& h,
         std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right,
         unsigned int goal, bool multiway, Stats& stats,
         std::chrono::time_point<std::chrono::steady_clock> start_time,
-        std::atomic<bool>& abort_due_to_timeout) {
+        std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof) {
 
-    if (abort_due_to_timeout) { return; }
+    if (abort_due_to_timeout) {
+        if (proof) { proof->abort(); }
+        return;
+    }
 
     stats.nodes++;
 
@@ -340,18 +345,23 @@ static void solve_rl(const Graph& g, const Graph& h,
         stats.nodes_to_best = stats.nodes;
         stats.time_to_best = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - start_time).count();
+        if (proof) { proof->new_incumbent(current); }
     }
 
     int bound = current.size() + calc_bound_rl(domains);
     if (bound <= (int)incumbent.size() || bound < (int)goal) {
         stats.cut_branches++;
         stats.bound_pruned++;
+        if (proof) { proof->prune_by_bound(domains, left, right); }
         return;
     }
 
     // Select bidomain and v using lgrade scores
     int bd_idx = select_bidomain_rl(domains, left, lgrade, current.size());
-    if (bd_idx == -1) { return; }
+    if (bd_idx == -1) {
+        if (proof) { proof->backtrack(); }
+        return;
+    }
 
     Bidomain& bd = domains[bd_idx];
 
@@ -376,9 +386,11 @@ static void solve_rl(const Graph& g, const Graph& h,
         new_domains = rewardfeed_rl(domains, current, g_matched, h_matched,
                 left, right, lgrade, rgrade, g, h, v, w, multiway, stats);
 
+        if (proof) { proof->push_match(v, w); }
         solve_rl(g, h, lgrade, rgrade, incumbent, current,
                 g_matched, h_matched, new_domains, left, right,
-                goal, multiway, stats, start_time, abort_due_to_timeout);
+                goal, multiway, stats, start_time, abort_due_to_timeout, proof);
+        if (proof) { proof->pop(); }
 
         while (current.size() > cur_len) {
             VtxPair pr = current.back();
@@ -391,9 +403,14 @@ static void solve_rl(const Graph& g, const Graph& h,
     bd.right_len++;
     if (bd.left_len == 0) { remove_bidomain_rl(domains, bd_idx); }
 
+    if (proof) { proof->push_exclude(v); }
     solve_rl(g, h, lgrade, rgrade, incumbent, current,
             g_matched, h_matched, domains, left, right,
-            goal, multiway, stats, start_time, abort_due_to_timeout);
+            goal, multiway, stats, start_time, abort_due_to_timeout, proof);
+    if (proof) { proof->pop(); }
+
+    // Every way of extending the current trail has now been refuted
+    if (proof) { proof->backtrack(); }
 }
 
 /**
@@ -404,11 +421,12 @@ static void solve_rl(const Graph& g, const Graph& h,
  * @param multiway Whether to use label/direction-aware domain splitting.
  * @param stats Search statistics, updated in-place.
  * @param abort_due_to_timeout Flag checked to abort the search early.
+ * @param proof Proof logger, or nullptr if proof logging is disabled.
  * @return The largest common subgraph solution found, as vertex pairs in the original graphs' indices.
  */
 static std::vector<VtxPair> mcs_rl_common(const Graph& g, const Graph& h,
         bool multiway, Stats& stats,
-        std::atomic<bool>& abort_due_to_timeout) {
+        std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof) {
 
     // total degree (out + in), matching the reference's calculate_degrees
     auto calc_degrees = [](const Graph& g) {
@@ -443,6 +461,7 @@ static std::vector<VtxPair> mcs_rl_common(const Graph& g, const Graph& h,
 
     Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
     Graph h_sorted = induced_subgraph(const_cast<Graph&>(h), vv1);
+    if (proof) { proof->set_vertex_orders(vv0, vv1); }
 
     // Per-label bidomains - same as McSplit, DAL, LL
     std::vector<int> left, right;
@@ -482,7 +501,7 @@ static std::vector<VtxPair> mcs_rl_common(const Graph& g, const Graph& h,
     // correctly uses g_sorted/h_sorted, matching domains/left/right
     solve_rl(g_sorted, h_sorted, lgrade, rgrade, incumbent, current,
             g_matched, h_matched, domains, left, right, 1,
-            multiway, stats, start_time, abort_due_to_timeout);
+            multiway, stats, start_time, abort_due_to_timeout, proof);
 
     for (auto& p : incumbent) {
         p.v = vv0[p.v];
@@ -493,6 +512,6 @@ static std::vector<VtxPair> mcs_rl_common(const Graph& g, const Graph& h,
 }
 
 std::vector<VtxPair> mcs_rl(const Graph& g, const Graph& h, bool multiway,
-        Stats& stats, std::atomic<bool>& abort_due_to_timeout) {
-    return mcs_rl_common(g, h, multiway, stats, abort_due_to_timeout);
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof) {
+    return mcs_rl_common(g, h, multiway, stats, abort_due_to_timeout, proof);
 }

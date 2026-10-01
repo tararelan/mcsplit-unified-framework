@@ -2,6 +2,7 @@
 
 #include "graph.h"
 #include "common.h"
+#include "proof.h"
 #include <algorithm>
 #include <numeric>
 #include <vector>
@@ -54,11 +55,11 @@ void solve_ll(const Graph& g, const Graph& h,
         bool use_lum, bool use_lsm,
         Stats& stats,
         std::chrono::time_point<std::chrono::steady_clock> start_time,
-        std::atomic<bool>& abort_due_to_timeout);
+        std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof);
 
 std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
-        bool use_lum = true, bool use_lsm = true);
+        bool use_lum = true, bool use_lsm = true, ProofLogger* proof = nullptr);
 
 
 /**
@@ -408,6 +409,7 @@ std::vector<Bidomain> rewardfeed_ll(
  * @param stats Search statistics, updated in-place.
  * @param start_time Time the search began, used for timing incumbent updates.
  * @param abort_due_to_timeout Flag checked to abort the search early.
+ * @param proof Proof logger, or nullptr if proof logging is disabled (requires use_lum=false).
  */
 
 void solve_ll(const Graph& g, const Graph& h,
@@ -421,9 +423,12 @@ void solve_ll(const Graph& g, const Graph& h,
         bool use_lum, bool use_lsm,
         Stats& stats,
         std::chrono::time_point<std::chrono::steady_clock> start_time,
-        std::atomic<bool>& abort_due_to_timeout) {
+        std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof) {
 
-    if (abort_due_to_timeout) return;
+    if (abort_due_to_timeout) {
+        if (proof) proof->abort();
+        return;
+    }
     stats.nodes++;
 
     if (current.size() > incumbent.size()) {
@@ -432,18 +437,23 @@ void solve_ll(const Graph& g, const Graph& h,
         stats.nodes_to_best  = stats.nodes;
         stats.time_to_best   = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - start_time).count();
+        if (proof) proof->new_incumbent(current);
     }
 
     int bound = current.size() + calc_bound_ll(domains);
     if (bound <= (int)incumbent.size() || bound < (int)goal) {
         stats.cut_branches++;
         stats.bound_pruned++;
+        if (proof) proof->prune_by_bound(domains, left, right);
         return;
     }
 
     // v selection always uses lgrade (S0 / per-vertex short-term score)
     int bd_idx = select_bidomain_ll(domains, left, lgrade, current.size());
-    if (bd_idx == -1) return;
+    if (bd_idx == -1) {
+        if (proof) proof->backtrack();
+        return;
+    }
 
     Bidomain& bd = domains[bd_idx];
     int tmp_idx = selectV_index_ll(left, lgrade, bd.l, bd.left_len);
@@ -471,10 +481,12 @@ void solve_ll(const Graph& g, const Graph& h,
                 left, right, lgrade, Q[v], rgrade, g, h, v, w,
                 multiway, use_lum, use_lsm, stats);
 
+        if (proof) proof->push_match(v, w);
         solve_ll(g, h, lgrade, Q, rgrade, incumbent, current,
                 g_matched, h_matched, new_domains, left, right,
                 goal, multiway, use_lum, use_lsm,
-                stats, start_time, abort_due_to_timeout);
+                stats, start_time, abort_due_to_timeout, proof);
+        if (proof) proof->pop();
 
         while (current.size() > cur_len) {
             VtxPair pr = current.back();
@@ -488,10 +500,15 @@ void solve_ll(const Graph& g, const Graph& h,
     if (bd.left_len == 0) remove_bidomain_ll(domains, bd_idx);
 
     // branch where v is not matched at all
+    if (proof) proof->push_exclude(v);
     solve_ll(g, h, lgrade, Q, rgrade, incumbent, current,
             g_matched, h_matched, domains, left, right,
             goal, multiway, use_lum, use_lsm,
-            stats, start_time, abort_due_to_timeout);
+            stats, start_time, abort_due_to_timeout, proof);
+    if (proof) proof->pop();
+
+    // Every way of extending the current trail has now been refuted
+    if (proof) proof->backtrack();
 }
 
 /**
@@ -508,12 +525,14 @@ void solve_ll(const Graph& g, const Graph& h,
  * @param abort_due_to_timeout Flag checked to abort the search early.
  * @param use_lum Whether to bulk-match compatible leaf pairs after each match.
  * @param use_lsm Whether to score w using per-pair Q (true) or per-vertex rgrade (false).
+ * @param proof Proof logger, or nullptr if proof logging is disabled. LUM's
+ *              leaf matching is not justified in the proof, so use_lum must be false.
  * @return The largest common subgraph solution found, as vertex pairs in the original graphs' indices.
  */
 
 std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
-        bool use_lum, bool use_lsm) {
+        bool use_lum, bool use_lsm, ProofLogger* proof) {
 
     // total degree (out + in), matching the reference's calculate_degrees
     auto calc_degrees = [](const Graph& g) {
@@ -548,6 +567,7 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
 
     Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
     Graph h_sorted = induced_subgraph(const_cast<Graph&>(h), vv1);
+    if (proof) proof->set_vertex_orders(vv0, vv1);
 
     // leaf lists only needed when LUM is enabled - skipped otherwise to
     // avoid unnecessary O(n^2) work in the LSM-only ablation variant
@@ -596,7 +616,7 @@ std::vector<VtxPair> mcs_ll(const Graph& g, const Graph& h, bool multiway,
     solve_ll(g_sorted, h_sorted, lgrade, Q, rgrade, incumbent, current,
             g_matched, h_matched, domains, left, right, 1,
             multiway, use_lum, use_lsm,
-            stats, start_time, abort_due_to_timeout);
+            stats, start_time, abort_due_to_timeout, proof);
 
     for (auto& p : incumbent) {
         p.v = vv0[p.v];
