@@ -175,14 +175,14 @@ int main(int argc, char **argv)
 	if (g.n > h.n)
 		std::swap(g, h);
 
-	// proof logging covers the algorithms whose pruning is McSplit's or
-	// DSB's bidomain bound; the others need justifications that aren't
-	// written yet (LUM in ll, ll_lum, dal and dal_dal; the symmetry and
-	// maximality reductions in rrsplit and symsplit)
+	// proof logging covers the algorithms whose reasoning is McSplit's or
+	// DSB's bidomain bound and LUM; the symmetry and maximality reductions
+	// in rrsplit and symsplit need justifications that aren't written yet
 	std::unique_ptr<ProofLogger> proof;
 	if (!arguments.proof_prefix.empty())
 	{
-		static const std::set<std::string> proof_algorithms = {"mcsplit", "rl", "ll_lsm", "dal_rl",
+		static const std::set<std::string> proof_algorithms = {"mcsplit", "rl", "ll", "ll_lsm", "ll_lum",
+																	"dal", "dal_rl", "dal_dal",
 																	"dsb", "dsb_always", "dsb_never"};
 		if (!proof_algorithms.count(arguments.algorithm))
 		{
@@ -236,17 +236,17 @@ int main(int argc, char **argv)
 		solution = mcs_rl(g, h, multiway, stats, abort_due_to_timeout, proof.get());
 
 	else if (arguments.algorithm == "ll")
-		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, true, true);
+		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, true, true, proof.get());
 	else if (arguments.algorithm == "ll_lsm")
 		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, false, true, proof.get());
 	else if (arguments.algorithm == "ll_lum")
-		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, true, false);
+		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, true, false, proof.get());
 	else if (arguments.algorithm == "dal")
-		solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout, 0);
+		solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout, 0, proof.get());
 	else if (arguments.algorithm == "dal_rl")
 		solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout, 1, proof.get());
 	else if (arguments.algorithm == "dal_dal")
-		solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout, 2);
+		solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout, 2, proof.get());
 
 	else if (arguments.algorithm == "dsb")
 		solution = mcs_dsb(g, h, multiway, stats, abort_due_to_timeout, 0, proof.get());

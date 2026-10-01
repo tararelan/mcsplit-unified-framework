@@ -167,6 +167,9 @@ void ProofLogger::set_vertex_orders(const std::vector<int> &g_order, const std::
 {
 	this->g_order = g_order;
 	this->h_order = h_order;
+	g_image.assign(g_n, -1);
+	h_used.assign(h_n, false);
+	g_excluded.assign(g_n, false);
 }
 
 void ProofLogger::enable_unused_vertex_vars()
@@ -220,23 +223,143 @@ void ProofLogger::new_incumbent(const std::vector<VtxPair> &current)
 
 void ProofLogger::push_match(int v, int w)
 {
-	trail.push_back(match_var(g_order[v], h_order[w]));
+	v = g_order[v];
+	w = h_order[w];
+	trail.push_back(match_var(v, w));
 	trail_is_match.push_back(true);
+	trail_vertex.push_back(v);
+	trail_lum.emplace_back();
+	trail_lum_ids.emplace_back();
+	g_image[v] = w;
+	h_used[w] = true;
 	n_matched++;
 }
 
 void ProofLogger::push_exclude(int v)
 {
-	trail.push_back(bottom_var(g_order[v]));
+	v = g_order[v];
+	trail.push_back(bottom_var(v));
 	trail_is_match.push_back(false);
+	trail_vertex.push_back(v);
+	trail_lum.emplace_back();
+	trail_lum_ids.emplace_back();
+	g_excluded[v] = true;
 }
 
 void ProofLogger::pop()
 {
-	if (trail_is_match.back())
+	for (int vl : trail_lum.back())
+	{
+		h_used[g_image[vl]] = false;
+		g_image[vl] = -1;
 		n_matched--;
+	}
+	if (!trail_lum_ids.back().empty())
+	{
+		pbp << "del id";
+		for (long long id : trail_lum_ids.back())
+			pbp << " " << id;
+		pbp << " ;\n";
+	}
+
+	int v = trail_vertex.back();
+	if (trail_is_match.back())
+	{
+		h_used[g_image[v]] = false;
+		g_image[v] = -1;
+		n_matched--;
+	}
+	else
+		g_excluded[v] = false;
+
 	trail.pop_back();
 	trail_is_match.pop_back();
+	trail_vertex.pop_back();
+	trail_lum.pop_back();
+	trail_lum_ids.pop_back();
+}
+
+void ProofLogger::lum_match(int vl, int wl)
+{
+	vl = g_order[vl];
+	wl = h_order[wl];
+	if (g_image[vl] != -1 || g_excluded[vl] || h_used[wl] || !trail_is_match.back())
+		throw std::logic_error("proof logging: LUM pair is not between free leaves under a match");
+
+	if (!aborted)
+	{
+		// Every vertex not on the trail is free. Under the trail, vl can
+		// still take any free z with its adjacency pattern (or bottom), and
+		// wl can still be taken by any free a with wl's pattern.
+		auto same_pattern = [&](int a, int b) {
+			for (int u = 0; u < g_n; u++)
+				if (g_image[u] != -1 && g_adj[a][u] != h_adj[b][g_image[u]])
+					return false;
+			return true;
+		};
+		std::vector<int> zs{-1}, as;
+		for (int z = 0; z < h_n; z++)
+			if (z != wl && compatible[vl][z] && !h_used[z] && same_pattern(vl, z))
+				zs.push_back(z);
+		for (int a = 0; a < g_n; a++)
+			if (a != vl && compatible[a][wl] && g_image[a] == -1 && !g_excluded[a] && same_pattern(a, wl))
+				as.push_back(a);
+
+		// vl is adjacent only to v, and wl only to w, so in any solution
+		// under the trail where vl takes z, moving vl to wl (and whoever had
+		// wl to z) gives a solution of the same size, or a larger one if z
+		// is bottom and wl was unused. Rule out each z this way, one holder
+		// of wl at a time.
+		auto value = [&](int u, int z) { return z == -1 ? bottom_var(u) : match_var(u, z); };
+		std::vector<long long> ruled_out;
+		for (int z : zs)
+		{
+			std::vector<long long> cases;
+			for (int a : as)
+			{
+				pbp << "red";
+				for (const std::string &lit : trail)
+					pbp << " 1 ~" << lit;
+				pbp << " 1 ~" << value(vl, z) << " 1 ~" << match_var(a, wl) << " >= 1 : "
+					<< value(vl, z) << " -> 0 " << match_var(vl, wl) << " -> 1 "
+					<< match_var(a, wl) << " -> 0 " << value(a, z) << " -> 1 ;\n";
+				cases.push_back(next_id++);
+			}
+			pbp << "red";
+			for (const std::string &lit : trail)
+				pbp << " 1 ~" << lit;
+			pbp << " 1 ~" << value(vl, z);
+			for (int a : as)
+				pbp << " 1 " << match_var(a, wl);
+			pbp << " >= 1 : " << value(vl, z) << " -> 0 " << match_var(vl, wl) << " -> 1 ;\n";
+			cases.push_back(next_id++);
+
+			pbp << "rup";
+			for (const std::string &lit : trail)
+				pbp << " 1 ~" << lit;
+			pbp << " 1 ~" << value(vl, z) << " >= 1 ;\n";
+			ruled_out.push_back(next_id++);
+			pbp << "del id";
+			for (long long id : cases)
+				pbp << " " << id;
+			pbp << " ;\n";
+		}
+
+		pbp << "rup";
+		for (const std::string &lit : trail)
+			pbp << " 1 ~" << lit;
+		pbp << " 1 " << match_var(vl, wl) << " >= 1 ;\n";
+		trail_lum_ids.back().push_back(next_id++);
+		pbp << "del id";
+		for (long long id : ruled_out)
+			pbp << " " << id;
+		pbp << " ;\n";
+	}
+
+	g_image[vl] = wl;
+	h_used[wl] = true;
+	n_matched++;
+	trail_lum.back().push_back(vl);
 }
 
 void ProofLogger::write_trail_clause()

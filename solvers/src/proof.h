@@ -31,6 +31,13 @@
 // derive_degree_bound). When the H side is the smaller one, this needs the
 // proof-only variables y<w> <=> "w is not the image of any vertex", which
 // enable_unused_vertex_vars() introduces.
+//
+// LUM (McSplit+LL, McSplit+DAL) pairs leaves of v with leaves of w after
+// matching v->w. Each pair is justified by redundance under the trail
+// (see lum_match): the alternatives for the G leaf are ruled out one at a
+// time, each by a red whose witness moves the leaf onto the H leaf, until
+// unit propagation forces the pair. These clauses are guarded by the trail
+// and deleted when the decision v->w is popped.
 
 #include "graph.h"
 #include "common.h"
@@ -75,10 +82,17 @@ public:
 	/// Pushes the decision v->w (sorted indices) onto the proof trail.
 	void push_match(int v, int w);
 
+	/**
+	 * Justifies a LUM pair: under the current trail, whose last decision
+	 * is v->w, the leaf vl of v is matched to the leaf wl of w (sorted
+	 * indices). Both must be free, with the same edge and vertex labels.
+	 */
+	void lum_match(int vl, int wl);
+
 	/// Pushes the decision v->bottom (sorted index) onto the proof trail.
 	void push_exclude(int v);
 
-	/// Pops the most recent decision from the proof trail.
+	/// Pops the most recent decision, and any LUM pairs justified under it, from the proof trail.
 	void pop();
 
 	/**
@@ -133,7 +147,12 @@ private:
 	std::vector<long long> unused_amo_id;	   // ID of y<w> + sum_v x<v>_<w> <= 1, -1 if absent
 	std::vector<int> g_order, h_order;
 	int incumbent_size = 0;
-	int n_matched = 0; // match decisions on the trail
+	int n_matched = 0; // vertices matched by the trail and LUM
+
+	// the current mapping, in model indices
+	std::vector<int> g_image;		 // g_image[v]: w if v->w, -1 otherwise
+	std::vector<bool> h_used;		 // h_used[w]: some v->w
+	std::vector<bool> g_excluded;	 // g_excluded[v]: v->bottom is on the trail
 
 	long long next_id = 1;	   // ID the next constraint-producing rule will receive
 	long long obj_id = -1;	   // ID of the most recent objective-improving constraint
@@ -142,6 +161,9 @@ private:
 
 	std::vector<std::string> trail;					 // decision literals, outermost first
 	std::vector<bool> trail_is_match;				 // whether each decision is v->w
+	std::vector<int> trail_vertex;					 // the G vertex of each decision (model index)
+	std::vector<std::vector<int>> trail_lum;		 // G leaves paired by LUM under each decision
+	std::vector<std::vector<long long>> trail_lum_ids; // their forcing clauses, deleted on pop
 	std::vector<std::vector<long long>> child_nogoods; // per depth: backtrack clauses awaiting deletion
 
 	long long alo_id(int v) const { return v + 1; }

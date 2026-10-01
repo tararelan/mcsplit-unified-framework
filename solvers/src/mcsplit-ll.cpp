@@ -42,7 +42,7 @@ std::vector<Bidomain> rewardfeed_ll(const std::vector<Bidomain>& d,
         const Graph& g, const Graph& h,
         int v, int w, bool multiway,
         bool use_lum, bool use_lsm,
-        Stats& stats);
+        Stats& stats, ProofLogger* proof);
 
 void solve_ll(const Graph& g, const Graph& h,
         std::vector<gtype>& lgrade,
@@ -259,6 +259,7 @@ void remove_vtx_from_array_ll(std::vector<int>& arr, int start_idx, int& len, in
  * @param use_lum Whether to bulk-match compatible leaf pairs after matching (v,w).
  * @param use_lsm Whether to score w using per-pair Qv (true) or per-vertex rgrade (false).
  * @param stats Search statistics, updated in-place.
+ * @param proof Proof logger (justifies each LUM pair), or nullptr if disabled.
  * @return The new list of bidomains after the split.
  */
 std::vector<Bidomain> rewardfeed_ll(
@@ -272,7 +273,7 @@ std::vector<Bidomain> rewardfeed_ll(
         const Graph& g, const Graph& h,
         int v, int w, bool multiway,
         bool use_lum, bool use_lsm,
-        Stats& stats) {
+        Stats& stats, ProofLogger* proof) {
 
     current.push_back(VtxPair(v, w));
     g_matched[v] = 1;
@@ -295,6 +296,7 @@ std::vector<Bidomain> rewardfeed_ll(
                     else {
                         int v_leaf = leaf_g[p], w_leaf = leaf_h[q];
                         p++; q++;
+                        if (proof) proof->lum_match(v_leaf, w_leaf);
                         current.push_back(VtxPair(v_leaf, w_leaf));
                         g_matched[v_leaf] = 1; // matched immediately - correct, unlike reference
                         h_matched[w_leaf] = 1;
@@ -409,7 +411,7 @@ std::vector<Bidomain> rewardfeed_ll(
  * @param stats Search statistics, updated in-place.
  * @param start_time Time the search began, used for timing incumbent updates.
  * @param abort_due_to_timeout Flag checked to abort the search early.
- * @param proof Proof logger, or nullptr if proof logging is disabled (requires use_lum=false).
+ * @param proof Proof logger, or nullptr if proof logging is disabled.
  */
 
 void solve_ll(const Graph& g, const Graph& h,
@@ -477,11 +479,11 @@ void solve_ll(const Graph& g, const Graph& h,
 
         unsigned int cur_len = current.size();
 
+        if (proof) proof->push_match(v, w);
         auto new_domains = rewardfeed_ll(domains, current, g_matched, h_matched,
                 left, right, lgrade, Q[v], rgrade, g, h, v, w,
-                multiway, use_lum, use_lsm, stats);
+                multiway, use_lum, use_lsm, stats, proof);
 
-        if (proof) proof->push_match(v, w);
         solve_ll(g, h, lgrade, Q, rgrade, incumbent, current,
                 g_matched, h_matched, new_domains, left, right,
                 goal, multiway, use_lum, use_lsm,
@@ -529,8 +531,7 @@ void solve_ll(const Graph& g, const Graph& h,
  * @param abort_due_to_timeout Flag checked to abort the search early.
  * @param use_lum Whether to bulk-match compatible leaf pairs after each match.
  * @param use_lsm Whether to score w using per-pair Q (true) or per-vertex rgrade (false).
- * @param proof Proof logger, or nullptr if proof logging is disabled. LUM's
- *              leaf matching is not justified in the proof, so use_lum must be false.
+ * @param proof Proof logger, or nullptr if proof logging is disabled.
  * @return The largest common subgraph solution found, as vertex pairs in the original graphs' indices.
  */
 

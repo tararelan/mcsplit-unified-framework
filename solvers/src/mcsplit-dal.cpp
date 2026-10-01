@@ -29,7 +29,7 @@ int remove_matched_vertex(std::vector<int>& arr, int start, int len, const std::
 void remove_vtx_from_array(std::vector<int>& arr, int start_idx, int& len, int remove_idx);
 static void remove_bidomain(std::vector<Bidomain>& domains, int idx);
 std::vector<Bidomain> rewardfeed_RL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, std::vector<int>& g_matched, std::vector<int>& h_matched, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
-std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& V, std::vector<gtype>& Qv, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
+std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& V, std::vector<gtype>& Qv, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats, ProofLogger* proof);
 void solve_dal(const Graph& g, const Graph& h, std::vector<gtype>& V, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, std::vector<std::vector<gtype>>& Q, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, int& M, int& num, int Maxnum, int policy_mode, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof);
 std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout, int policy_mode = 0, ProofLogger* proof = nullptr); // 0=hybrid, 1=RL_only, 2=DAL_only
 
@@ -342,13 +342,14 @@ std::vector<Bidomain> rewardfeed_RL(const std::vector<Bidomain>& d, std::vector<
  * @param w         Matched vertex in H
  * @param multiway  If true, further split adjacent bidomains by exact edge label (direction-aware)
  * @param stats     Search statistics (unused here, reserved for future use)
+ * @param proof     Proof logger (justifies each LUM pair), or nullptr if disabled
  * @return          New bidomain list after splitting
  */
 std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current,
         std::vector<int>& g_matched, std::vector<int>& h_matched,
         std::vector<int>& left, std::vector<int>& right,
         std::vector<gtype>& V, std::vector<gtype>& Qv,
-        const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats) {
+        const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats, ProofLogger* proof) {
     current.push_back(VtxPair(v, w));
     g_matched[v] = 1;
     h_matched[w] = 1;
@@ -369,6 +370,7 @@ std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector
                 else if (h_matched[leaf_h[q]]) { q++; }
                 else {
                     int v_leaf = leaf_g[p], w_leaf = leaf_h[q];
+                    if (proof) { proof->lum_match(v_leaf, w_leaf); }
                     p++; q++;
                     current.push_back(VtxPair(v_leaf, w_leaf));
                     g_matched[v_leaf] = 1; // matched immediately - correct, unlike reference
@@ -491,7 +493,7 @@ std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector
  * @param stats                Search statistics (updated in place)
  * @param start_time           Search start time for elapsed time computation
  * @param abort_due_to_timeout Atomic flag set by timeout thread; checked at entry
- * @param proof                Proof logger, or nullptr if disabled (requires policy_mode 1: the DAL policy's LUM is not justified)
+ * @param proof                Proof logger, or nullptr if proof logging is disabled
  */
 void solve_dal(const Graph& g, const Graph& h,
         std::vector<gtype>& V, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade,
@@ -593,13 +595,13 @@ void solve_dal(const Graph& g, const Graph& h,
         // Apply reward function for current policy
         // rewardfeed_RL: adds (v,w) to current, splits domains, updates RL scores
         // rewardfeed_DAL: adds (v,w) + leaf matches to current, splits domains, updates DAL scores
+        if (proof) { proof->push_match(v, w); }
         if (M == 1) {
             new_domains = rewardfeed_RL(domains, current, left, right, lgrade, rgrade, g_matched, h_matched, g, h, v, w, multiway, stats);
         } else {
-            new_domains = rewardfeed_DAL(domains, current, g_matched, h_matched, left, right, V, Q[v], g, h, v, w, multiway, stats);
+            new_domains = rewardfeed_DAL(domains, current, g_matched, h_matched, left, right, V, Q[v], g, h, v, w, multiway, stats, proof);
         }
 
-        if (proof) { proof->push_match(v, w); }
         solve_dal(g, h, V, lgrade, rgrade, Q, incumbent, current,
 			g_matched, h_matched, new_domains, left, right, goal,
 			multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout, proof);
@@ -645,7 +647,7 @@ void solve_dal(const Graph& g, const Graph& h,
  * @param stats                Search statistics (updated in place)
  * @param abort_due_to_timeout Atomic flag set by timeout thread
  * @param policy_mode          0 = hybrid alternation, 1 = force RL only, 2 = force DAL only
- * @param proof                Proof logger, or nullptr if disabled (requires policy_mode 1)
+ * @param proof                Proof logger, or nullptr if proof logging is disabled
  * @return                     Maximum common induced subgraph as matched vertex pairs,
  *                             indexed into the original unsorted graphs
  */
