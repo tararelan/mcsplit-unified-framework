@@ -617,12 +617,16 @@ void solve_dal(const Graph& g, const Graph& h,
     bd.right_len++;
     if (bd.left_len == 0) { remove_bidomain(domains, bd_idx); }
 
-    // Branch where v is not matched at all
+    // Branch where v is not matched at all. v is marked in g_matched for
+    // the duration, so that LUM can't pair it as a leaf further down
+    // (doing so would explore solutions outside this branch)
+    g_matched[v] = 1;
     if (proof) { proof->push_exclude(v); }
     solve_dal(g, h, V, lgrade, rgrade, Q, incumbent, current,
         g_matched, h_matched, domains, left, right, goal,
         multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout, proof);
     if (proof) { proof->pop(); }
+    g_matched[v] = 0;
 
     // Every way of extending the current trail has now been refuted
     if (proof) { proof->backtrack(); }

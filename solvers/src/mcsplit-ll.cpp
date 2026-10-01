@@ -499,13 +499,17 @@ void solve_ll(const Graph& g, const Graph& h,
     bd.right_len++;
     if (bd.left_len == 0) remove_bidomain_ll(domains, bd_idx);
 
-    // branch where v is not matched at all
+    // branch where v is not matched at all. v is marked in g_matched for
+    // the duration, so that LUM can't pair it as a leaf further down
+    // (doing so would explore solutions outside this branch)
+    g_matched[v] = 1;
     if (proof) proof->push_exclude(v);
     solve_ll(g, h, lgrade, Q, rgrade, incumbent, current,
             g_matched, h_matched, domains, left, right,
             goal, multiway, use_lum, use_lsm,
             stats, start_time, abort_due_to_timeout, proof);
     if (proof) proof->pop();
+    g_matched[v] = 0;
 
     // Every way of extending the current trail has now been refuted
     if (proof) proof->backtrack();
