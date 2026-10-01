@@ -432,7 +432,7 @@ void ProofLogger::prune_by_twin_bound(const std::vector<Bidomain> &domains, cons
 	// The twins can only take values from high (unit propagation over the
 	// twin ordering rules out the rest), so summing their at-least-one
 	// constraints with high's injectivity constraints gives
-	// sum_{twins} x<v>_b >= |twins| - |high|. The other bidomains are
+	// sum_{twins} x<v>_null >= |twins| - |high|. The other bidomains are
 	// handled as in prune_by_bound.
 	pbp << "pol " << obj_id;
 	for (int v : twins)
@@ -999,7 +999,7 @@ void ProofLogger::prune_by_bound(const std::vector<Bidomain> &domains,
 
 	// operands summing "v takes some value" over L and "w is used at most
 	// once" over R: once the trail falsifies every assignment leaving the
-	// bidomain, this gives sum_{v in L} x<v>_b >= |L| - |R|
+	// bidomain, this gives sum_{v in L} x<v>_null >= |L| - |R|
 	auto mcsplit_operands = [&](size_t i) {
 		for (int v : Ls[i])
 			pbp << " " << alo_id(v) << " +";
@@ -1111,7 +1111,7 @@ void ProofLogger::finish(int best_size)
 	if (aborted || contra_id == -1)
 	{
 		// search incomplete: only the best logged solution is certified, with
-		// the trivial lower bound sum_v x<v>_b >= 0
+		// the trivial lower bound sum_v x<v>_null >= 0
 		pbp << "rup";
 		for (int v = 0; v < g_n; v++)
 			pbp << " 1 " << bottom_var(v);
