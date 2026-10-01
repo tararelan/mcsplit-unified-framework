@@ -335,8 +335,7 @@ static void prune_by_twin_bound_rr(ProofLogger* proof, const std::vector<Bidomai
  * @param EqClass Structural equivalence class of each G-side vertex.
  * @param index_right Reverse lookup (vertex -> current position in `right`), updated in-place.
  * @param red_mode Bitmask controlling which RRSplit reductions are enabled.
- * @param proof Proof logger, or nullptr if proof logging is disabled (the
- *              maximality reduction can't yet be combined with vertex equivalence).
+ * @param proof Proof logger, or nullptr if proof logging is disabled.
  */
 void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         std::vector<VtxPair>& current, std::vector<Bidomain>& domains,
@@ -465,8 +464,13 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         auto new_domains = filter_domains_rr(domains, left, right, g, h, v, w,
                 best_match, index_right);
         // if v->w splits no bidomain, the remaining values for v are
-        // skipped below; the proof assumes v->w before exploring it
-        if (proof && (red_mode & 2) && best_match) { proof->maximal_match(v, w); }
+        // skipped below; the proof rules them out before exploring v->w
+        // (with VEQ, only the later values, since the twin ordering
+        // constrains which rewrites are allowed)
+        if (proof && (red_mode & 2) && best_match) {
+            if (red_mode & 1) { proof->maximal_match_with_twins(v, w); }
+            else { proof->maximal_match(v, w); }
+        }
         current.push_back(VtxPair(v, w));
         if (proof) { proof->push_match(v, w); }
         solve_rr(g, h, incumbent, current, new_domains, left, right, goal,
@@ -531,8 +535,7 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
  * @param stats Search statistics, updated in-place.
  * @param abort_due_to_timeout Flag checked to abort the search early.
  * @param red_mode Bitmask controlling which RRSplit reductions are enabled.
- * @param proof Proof logger, or nullptr if proof logging is disabled (the
- *              maximality reduction can't yet be combined with vertex equivalence).
+ * @param proof Proof logger, or nullptr if proof logging is disabled.
  * @return The largest common subgraph solution found, as vertex pairs in the original graphs' indices.
  */
 std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,

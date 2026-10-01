@@ -178,17 +178,17 @@ int main(int argc, char **argv)
 		std::swap(g, h);
 
 	// proof logging covers McSplit's and DSB's bidomain bounds, LUM,
-	// RRSplit's vertex equivalence and tighter bound, SymSplit's value
-	// symmetry, and the maximality reduction; combining maximality or value
-	// symmetry with the G-side twin symmetry (rrsplit, rrsplit_nobound,
-	// symsplit, symsplit_varonly) needs justifications that aren't written yet
+	// RRSplit's reductions, SymSplit's value symmetry, and the maximality
+	// reduction; SymSplit's variable symmetry (symsplit, symsplit_varonly)
+	// needs justifications that aren't written yet
 	std::unique_ptr<ProofLogger> proof;
 	if (!arguments.proof_prefix.empty())
 	{
 		static const std::set<std::string> proof_algorithms = {"mcsplit", "rl", "ll", "ll_lsm", "ll_lum",
 																	"dal", "dal_rl", "dal_dal",
 																	"dsb", "dsb_always", "dsb_never",
-																	"rrsplit_nomax", "rrsplit_noveq", "symsplit_valonly"};
+																	"rrsplit", "rrsplit_nomax", "rrsplit_noveq", "rrsplit_nobound",
+																	"symsplit_valonly"};
 		if (!proof_algorithms.count(arguments.algorithm))
 		{
 			std::cerr << "Proof logging is not supported for algorithm " << arguments.algorithm << std::endl;
@@ -269,13 +269,13 @@ int main(int argc, char **argv)
 		solution = mcs_dsb(g, h, multiway, stats, abort_due_to_timeout, 2, proof.get());
 
 	else if (arguments.algorithm == "rrsplit")
-		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 7); // all on
+		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 7, proof.get()); // all on
 	else if (arguments.algorithm == "rrsplit_noveq")
 		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 6, proof.get()); // max+bound
 	else if (arguments.algorithm == "rrsplit_nomax")
 		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 5, proof.get()); // veq+bound
 	else if (arguments.algorithm == "rrsplit_nobound")
-		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 3); // veq+max
+		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 3, proof.get()); // veq+max
 
 	else if (arguments.algorithm == "symsplit")
 		solution = mcs_sym(g, h, stats, abort_due_to_timeout, 3); // full

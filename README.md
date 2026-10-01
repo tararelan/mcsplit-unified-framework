@@ -221,13 +221,13 @@ veripb proof.opb proof.pbp
 
 The model has a variable `x<v>_<w>` for each label-compatible pair (vertex `v` of the smaller graph mapped to `w`) and `x<v>_b` for `v` left unmapped, and minimises the number of unmapped vertices. A complete run ends with `s VERIFIED BOUNDS k <= obj <= k`, so the maximum common induced subgraph has `|V(G)| - k` vertices. A run stopped by `-t` only certifies its best solution (`0 <= obj <= k`).
 
-Proof logging is supported for every algorithm except those that combine G-side twin symmetry with maximality or value symmetry (`rrsplit`, `rrsplit_nobound`, `symsplit`, `symsplit_varonly`), which still need their own justifications. The supported RRSplit and SymSplit variants (`rrsplit_nomax`, `rrsplit_noveq`, `symsplit_valonly`) work on undirected unlabelled graphs only, since those algorithms ignore labels and direction:
+Proof logging is supported for every algorithm except SymSplit with variable symmetry (`symsplit`, `symsplit_varonly`), which still needs its own justification. The RRSplit and SymSplit variants work on undirected unlabelled graphs only, since those algorithms ignore labels and direction:
 - McSplit's bidomain bound (all supported algorithms) is justified by summing at-least-one and at-most-one constraints.
 - DSB's bound (`dsb*`): the logger recomputes the edge and non-edge counting bounds itself, and justifies them by degree reasoning inside each bidomain.
 - LUM's leaf matching (`ll`, `ll_lum`, `dal`, `dal_dal`): each leaf pair is justified by redundance under the current branch. The leaf's alternatives are ruled out one at a time, each by moving the leaf onto its partner.
 - RRSplit's vertex-equivalence reduction and its tighter bound (`rrsplit_nomax`): before search, redundance derives an ordering on each class of twins (vertices with the same neighbourhood), with the swap of two twins as the witness. The tighter bound is then a counting argument over that ordering.
 - SymSplit's value symmetry (`symsplit_valonly`): at each node, before any branch is explored, redundance rules out each value that has a smaller twin still available, with the swap of the two twins in H as the witness.
-- The maximality reduction (`rrsplit_noveq`, `symsplit_valonly`): when matching v to w splits no bidomain, v->w is forced under the current branch. As for LUM, v's alternatives are ruled out one at a time, each by moving v onto w. The model has one clause per incompatible pair of assignments, so it grows as O(|V(G)|² |V(H)|²) and is practical for graphs up to a few dozen vertices.
+- The maximality reduction (`rrsplit*`, `symsplit_valonly`): when matching v to w splits no bidomain, v->w is forced under the current branch. As for LUM, v's alternatives are ruled out one at a time, each by moving v onto w. With RRSplit's twin ordering, only v's later values are ruled out, and each rewrite also shifts the twins of w's holder along so that they stay in order. The model has one clause per incompatible pair of assignments, so it grows as O(|V(G)|² |V(H)|²) and is practical for graphs up to a few dozen vertices.
 
 ---
 

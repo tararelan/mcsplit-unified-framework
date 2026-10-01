@@ -121,6 +121,14 @@ public:
 	void maximal_match(int v, int w);
 
 	/**
+	 * Justifies the maximality reduction alongside the twin ordering from
+	 * break_g_twins: matching v->w (sorted indices) splits no bidomain, so
+	 * under the current trail, v takes no value after w. Must be called
+	 * before v->w is pushed or explored.
+	 */
+	void maximal_match_with_twins(int v, int w);
+
+	/**
 	 * Justifies SymSplit's value symmetry at the node branching on v: for
 	 * each (b, w), b and w are twins in H, both free, with b < w, so v->w
 	 * can be ruled out in favour of v->b. Must be called before any branch
@@ -186,6 +194,11 @@ private:
 	std::vector<long long> unused_amo_id;	   // ID of y<w> + sum_v x<v>_<w> <= 1, -1 if absent
 	std::vector<int> g_order, h_order;
 	std::vector<int> h_rank; // h_rank[w]: sorted index of model vertex w
+
+	// twin classes from break_g_twins, in model indices and increasing
+	// sorted index order
+	std::vector<std::vector<int>> g_twin_classes;
+	std::vector<int> g_twin_class; // g_twin_class[v]: index into g_twin_classes, -1 if none
 	int incumbent_size = 0;
 	int n_matched = 0; // vertices matched by the trail and LUM
 
