@@ -38,6 +38,13 @@
 // time, each by a red whose witness moves the leaf onto the H leaf, until
 // unit propagation forces the pair. These clauses are guarded by the trail
 // and deleted when the decision v->w is popped.
+//
+// RRSplit's vertex-equivalence reduction breaks the symmetry between twins
+// in G (vertices with the same neighbourhood). Twins are always branched in
+// increasing (sorted) index order, so the reduction amounts to: the images
+// of a twin class increase with index, and once one twin is unmapped, so
+// are all later ones. break_g_twins derives this once, before search, by
+// redundance with the transposition of each pair of twins as the witness.
 
 #include "graph.h"
 #include "common.h"
@@ -88,6 +95,23 @@ public:
 	 * indices). Both must be free, with the same edge and vertex labels.
 	 */
 	void lum_match(int vl, int wl);
+
+	/**
+	 * Derives the twin ordering for each class of twins in G (sorted
+	 * indices; each class is listed in increasing index order). Must be
+	 * called before search, after set_vertex_orders.
+	 */
+	void break_g_twins(const std::vector<std::vector<int>> &classes);
+
+	/**
+	 * Justifies RRSplit's tighter bound and logs the backtrack clause. In
+	 * bidomain bd_idx, the twins listed (sorted indices, all on the left)
+	 * can only take the right-hand vertices listed as high, so at least
+	 * |twins| - |high| of them are unmatched.
+	 */
+	void prune_by_twin_bound(const std::vector<Bidomain> &domains, const std::vector<int> &left,
+							 const std::vector<int> &right, size_t bd_idx,
+							 const std::vector<int> &twins, const std::vector<int> &high);
 
 	/// Pushes the decision v->bottom (sorted index) onto the proof trail.
 	void push_exclude(int v);
@@ -146,6 +170,7 @@ private:
 	std::vector<long long> unused_alo_id;	   // ID of y<w> + sum_v x<v>_<w> >= 1, -1 if absent
 	std::vector<long long> unused_amo_id;	   // ID of y<w> + sum_v x<v>_<w> <= 1, -1 if absent
 	std::vector<int> g_order, h_order;
+	std::vector<int> h_rank; // h_rank[w]: sorted index of model vertex w
 	int incumbent_size = 0;
 	int n_matched = 0; // vertices matched by the trail and LUM
 

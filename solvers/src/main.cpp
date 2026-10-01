@@ -32,7 +32,8 @@ std::vector<VtxPair> mcs_dsb(const Graph &g, const Graph &h, bool multiway,
 							 ProofLogger *proof = nullptr);
 // red_mode: bitmask - bit 0 = vertex-equivalence, bit 1 = maximality, bit 2 = tighter bound
 std::vector<VtxPair> mcs_rr(const Graph &g, const Graph &h, Stats &stats,
-							std::atomic<bool> &abort_due_to_timeout, int red_mode = 7);
+							std::atomic<bool> &abort_due_to_timeout, int red_mode = 7,
+							ProofLogger *proof = nullptr);
 // sym_mode: bitmask - bit 0 = variable symmetry, bit 1 = value symmetry
 std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h,
 							 Stats &stats, std::atomic<bool> &abort_due_to_timeout, int sym_mode = 3);
@@ -176,17 +177,28 @@ int main(int argc, char **argv)
 		std::swap(g, h);
 
 	// proof logging covers the algorithms whose reasoning is McSplit's or
-	// DSB's bidomain bound and LUM; the symmetry and maximality reductions
-	// in rrsplit and symsplit need justifications that aren't written yet
+	// DSB's bidomain bound, LUM, and RRSplit's vertex equivalence and
+	// tighter bound; the maximality reduction (rrsplit, rrsplit_noveq,
+	// rrsplit_nobound) and symsplit's reductions need justifications that
+	// aren't written yet
 	std::unique_ptr<ProofLogger> proof;
 	if (!arguments.proof_prefix.empty())
 	{
 		static const std::set<std::string> proof_algorithms = {"mcsplit", "rl", "ll", "ll_lsm", "ll_lum",
 																	"dal", "dal_rl", "dal_dal",
-																	"dsb", "dsb_always", "dsb_never"};
+																	"dsb", "dsb_always", "dsb_never",
+																	"rrsplit_nomax"};
 		if (!proof_algorithms.count(arguments.algorithm))
 		{
 			std::cerr << "Proof logging is not supported for algorithm " << arguments.algorithm << std::endl;
+			return 1;
+		}
+		// RRSplit ignores labels and direction, so it only solves (and can
+		// only be certified on) undirected unlabelled instances
+		if (arguments.algorithm.rfind("rrsplit", 0) == 0 &&
+			(arguments.directed || arguments.vertex_labelled || arguments.edge_labelled))
+		{
+			std::cerr << "Proof logging for " << arguments.algorithm << " needs undirected unlabelled graphs" << std::endl;
 			return 1;
 		}
 		proof = std::make_unique<ProofLogger>(arguments.proof_prefix);
@@ -260,7 +272,7 @@ int main(int argc, char **argv)
 	else if (arguments.algorithm == "rrsplit_noveq")
 		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 6); // max+bound
 	else if (arguments.algorithm == "rrsplit_nomax")
-		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 5); // veq+bound
+		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 5, proof.get()); // veq+bound
 	else if (arguments.algorithm == "rrsplit_nobound")
 		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 3); // veq+max
 

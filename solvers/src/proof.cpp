@@ -167,6 +167,9 @@ void ProofLogger::set_vertex_orders(const std::vector<int> &g_order, const std::
 {
 	this->g_order = g_order;
 	this->h_order = h_order;
+	h_rank.assign(h_n, 0);
+	for (int i = 0; i < h_n; i++)
+		h_rank[h_order[i]] = i;
 	g_image.assign(g_n, -1);
 	h_used.assign(h_n, false);
 	g_excluded.assign(g_n, false);
@@ -204,6 +207,130 @@ void ProofLogger::enable_unused_vertex_vars()
 			unused_amo_id[w] = next_id++;
 		}
 	}
+}
+
+void ProofLogger::break_g_twins(const std::vector<std::vector<int>> &classes)
+{
+	// pos(a) is the sorted index of a's image plus one, or h_n + 1 if a is
+	// unmapped. For twins a < b, swapping them is an automorphism of the
+	// model, so any solution with pos(a) > pos(b) can be swapped into one
+	// with pos(a) < pos(b): red O(a,b): pos(b) - pos(a) >= 0. Deriving
+	// O(a,b) for later b creates goals for the earlier O(a,c), which become
+	// pos(c) - pos(b) >= 0; they follow from O(a,c) and the negation of
+	// O(a,b) by adding them up.
+	auto write_pos = [&](int a, int sign) {
+		for (int w = 0; w < h_n; w++)
+			if (compatible[a][w])
+				pbp << " " << sign * (h_rank[w] + 1) << " " << match_var(a, w);
+		pbp << " " << sign * (h_n + 1) << " " << bottom_var(a);
+	};
+
+	for (const std::vector<int> &sorted_class : classes)
+	{
+		std::vector<int> cls;
+		for (int v : sorted_class)
+			cls.push_back(g_order[v]);
+		for (size_t i = 0; i + 1 < cls.size(); i++)
+			for (size_t k = i + 1; k < cls.size(); k++)
+				if (compatible[cls[i]] != compatible[cls[k]])
+					throw std::logic_error("proof logging: twins with different vertex labels");
+
+		std::vector<std::vector<long long>> order_id(cls.size(), std::vector<long long>(cls.size(), -1));
+		for (size_t i = 0; i + 1 < cls.size(); i++)
+			for (size_t k = i + 1; k < cls.size(); k++)
+			{
+				const int a = cls[i], b = cls[k];
+				pbp << "red";
+				write_pos(b, 1);
+				write_pos(a, -1);
+				pbp << " >= 0 :";
+				for (int w = 0; w < h_n; w++)
+					if (compatible[a][w])
+						pbp << " " << match_var(a, w) << " -> " << match_var(b, w) << " "
+							<< match_var(b, w) << " -> " << match_var(a, w);
+				pbp << " " << bottom_var(a) << " -> " << bottom_var(b) << " "
+					<< bottom_var(b) << " -> " << bottom_var(a);
+				if (k == i + 1)
+				{
+					pbp << " ;\n";
+					next_id++;
+				}
+				else
+				{
+					pbp << " : subproof\n";
+					long long neg = next_id++;
+					for (size_t m = i + 1; m < k; m++)
+					{
+						pbp << "proofgoal " << order_id[i][m] << "\n";
+						long long goal = next_id++;
+						pbp << "pol " << neg << " " << goal << " + " << order_id[i][m] << " + ;\n";
+						next_id++;
+						pbp << "qed : -1 ;\n";
+					}
+					pbp << "qed ;\n";
+					next_id++;
+				}
+				order_id[i][k] = next_id - 1;
+			}
+
+		// For propagation, between consecutive twins a < b: if b takes w,
+		// then a takes something earlier than w. With unit propagation, this
+		// chains along the class, and an unmapped twin unmaps all later ones.
+		for (size_t i = 0; i + 1 < cls.size(); i++)
+		{
+			const int a = cls[i], b = cls[i + 1];
+			for (int w = 0; w < h_n; w++)
+			{
+				if (!compatible[b][w])
+					continue;
+				pbp << "rup 1 ~" << match_var(b, w);
+				for (int u = 0; u < h_n; u++)
+					if (compatible[a][u] && h_rank[u] < h_rank[w])
+						pbp << " 1 " << match_var(a, u);
+				pbp << " >= 1 : " << order_id[i][i + 1] << " " << amo_id(b) << " " << alo_id(a) << " " << inj_id[w] << " ;\n";
+				next_id++;
+			}
+		}
+
+		pbp << "del id";
+		for (size_t i = 0; i + 1 < cls.size(); i++)
+			for (size_t k = i + 1; k < cls.size(); k++)
+				pbp << " " << order_id[i][k];
+		pbp << " ;\n";
+	}
+}
+
+void ProofLogger::prune_by_twin_bound(const std::vector<Bidomain> &domains, const std::vector<int> &left,
+									  const std::vector<int> &right, size_t bd_idx,
+									  const std::vector<int> &twins, const std::vector<int> &high)
+{
+	if (aborted)
+		return;
+
+	// The twins can only take values from high (unit propagation over the
+	// twin ordering rules out the rest), so summing their at-least-one
+	// constraints with high's injectivity constraints gives
+	// sum_{twins} x<v>_b >= |twins| - |high|. The other bidomains are
+	// handled as in prune_by_bound.
+	pbp << "pol " << obj_id;
+	for (int v : twins)
+		pbp << " " << alo_id(g_order[v]) << " +";
+	for (int w : high)
+		pbp << " " << inj_id[h_order[w]] << " +";
+	for (size_t i = 0; i < domains.size(); i++)
+	{
+		const Bidomain &bd = domains[i];
+		if (i == bd_idx || bd.left_len <= bd.right_len)
+			continue;
+		for (int k = 0; k < bd.left_len; k++)
+			pbp << " " << alo_id(g_order[left[bd.l + k]]) << " +";
+		for (int k = 0; k < bd.right_len; k++)
+			pbp << " " << inj_id[h_order[right[bd.r + k]]] << " +";
+	}
+	pbp << " ;\n";
+	long long pol_id = next_id++;
+	write_backtrack_clause();
+	pbp << "del id " << pol_id << " ;\n";
 }
 
 void ProofLogger::new_incumbent(const std::vector<VtxPair> &current)

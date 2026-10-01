@@ -221,10 +221,11 @@ veripb proof.opb proof.pbp
 
 The model has a variable `x<v>_<w>` for each label-compatible pair (vertex `v` of the smaller graph mapped to `w`) and `x<v>_b` for `v` left unmapped, and minimises the number of unmapped vertices. A complete run ends with `s VERIFIED BOUNDS k <= obj <= k`, so the maximum common induced subgraph has `|V(G)| - k` vertices. A run stopped by `-t` only certifies its best solution (`0 <= obj <= k`).
 
-Proof logging is supported for every algorithm except `rrsplit*` and `symsplit*`, whose symmetry and maximality reductions still need their own justifications:
+Proof logging is supported for every algorithm except `symsplit*` and the RRSplit variants with the maximality reduction (`rrsplit`, `rrsplit_noveq`, `rrsplit_nobound`), whose reductions still need their own justifications. `rrsplit_nomax` is supported on undirected unlabelled graphs only, since RRSplit ignores labels and direction:
 - McSplit's bidomain bound (all supported algorithms) is justified by summing at-least-one and at-most-one constraints.
 - DSB's bound (`dsb*`): the logger recomputes the edge and non-edge counting bounds itself, and justifies them by degree reasoning inside each bidomain.
-- LUM's leaf matching (`ll`, `ll_lum`, `dal`, `dal_dal`): each leaf pair is justified by redundance under the current branch. The leaf's alternatives are ruled out one at a time, each by moving the leaf onto its partner. The model has one clause per incompatible pair of assignments, so it grows as O(|V(G)|² |V(H)|²) and is practical for graphs up to a few dozen vertices.
+- LUM's leaf matching (`ll`, `ll_lum`, `dal`, `dal_dal`): each leaf pair is justified by redundance under the current branch. The leaf's alternatives are ruled out one at a time, each by moving the leaf onto its partner.
+- RRSplit's vertex-equivalence reduction and its tighter bound (`rrsplit_nomax`): before search, redundance derives an ordering on each class of twins (vertices with the same neighbourhood), with the swap of two twins as the witness. The tighter bound is then a counting argument over that ordering. The model has one clause per incompatible pair of assignments, so it grows as O(|V(G)|² |V(H)|²) and is practical for graphs up to a few dozen vertices.
 
 ---
 

@@ -2,6 +2,7 @@
 
 #include "graph.h"
 #include "common.h"
+#include "proof.h"
 #include <algorithm>
 #include <numeric>
 #include <vector>
@@ -32,8 +33,8 @@ int partition_rr(std::vector<int>& all_vv, int start, int len, const std::vector
 int partition_right_rr(std::vector<int>& all_vv, int start, int len, const std::vector<unsigned int>& adjrow, std::vector<int>& index_right);
 int partition_sparse_rr(std::vector<int>& all_vv, int start, int len, int degree, const unsigned int* adjlist, std::vector<int>& index_right);
 std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vector<int>& left, std::vector<int>& right, const Graph& g, const Graph& h, int v, int w, bool& best_match, std::vector<int>& index_right);
-void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, const ui* EqClass, std::vector<int>& index_right, int red_mode);
-std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h, Stats& stats, std::atomic<bool>& abort_due_to_timeout, int red_mode = 7);
+void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, const ui* EqClass, std::vector<int>& index_right, int red_mode, ProofLogger* proof);
+std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h, Stats& stats, std::atomic<bool>& abort_due_to_timeout, int red_mode = 7, ProofLogger* proof = nullptr);
 
 /**
  * McSplit's upper bound: sum of min(left_len, right_len) over all bidomains
@@ -282,6 +283,34 @@ std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vec
 }
 
 /**
+ * Logs the justification for a prune by RRSplit's tighter equivalence-class
+ * bound: within bidomain bd_idx, v and its twins can only take right-hand
+ * vertices above w_lower.
+ *
+ * @param proof Proof logger.
+ * @param domains Bidomains at this node, with v back in bidomain bd_idx.
+ * @param left G-side vertex array.
+ * @param right H-side vertex array.
+ * @param bd_idx Index of v's bidomain.
+ * @param EqClass Structural equivalence class of each G-side vertex.
+ * @param v The branching vertex.
+ * @param w_lower The largest image of a twin of v that is already matched.
+ */
+static void prune_by_twin_bound_rr(ProofLogger* proof, const std::vector<Bidomain>& domains,
+        const std::vector<int>& left, const std::vector<int>& right, int bd_idx,
+        const ui* EqClass, int v, int w_lower) {
+    const Bidomain& bd = domains[bd_idx];
+    std::vector<int> twins, high;
+    for (int i = 0; i < bd.left_len; i++) {
+        if (EqClass[left[bd.l + i]] == EqClass[v]) { twins.push_back(left[bd.l + i]); }
+    }
+    for (int i = 0; i < bd.right_len; i++) {
+        if (right[bd.r + i] > w_lower) { high.push_back(right[bd.r + i]); }
+    }
+    proof->prune_by_twin_bound(domains, left, right, bd_idx, twins, high);
+}
+
+/**
  * red_mode: bitmask controlling which RRSplit reductions are enabled
  *   bit 0 (value 1) = vertex-equivalence reduction (w_lower skip + exclude-branch removal)
  *   bit 1 (value 2) = maximality reduction (best_match commit/prune)
@@ -306,15 +335,20 @@ std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vec
  * @param EqClass Structural equivalence class of each G-side vertex.
  * @param index_right Reverse lookup (vertex -> current position in `right`), updated in-place.
  * @param red_mode Bitmask controlling which RRSplit reductions are enabled.
+ * @param proof Proof logger, or nullptr if proof logging is disabled (requires
+ *              the maximality reduction to be off).
  */
 void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         std::vector<VtxPair>& current, std::vector<Bidomain>& domains,
         std::vector<int>& left, std::vector<int>& right, unsigned int goal,
         Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time,
         std::atomic<bool>& abort_due_to_timeout, const ui* EqClass,
-        std::vector<int>& index_right, int red_mode) {
+        std::vector<int>& index_right, int red_mode, ProofLogger* proof) {
 
-    if (abort_due_to_timeout) { return; }
+    if (abort_due_to_timeout) {
+        if (proof) { proof->abort(); }
+        return;
+    }
 
     if (current.size() > incumbent.size()) {
         incumbent = current;
@@ -322,17 +356,22 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         stats.nodes_to_best = stats.nodes;
         stats.time_to_best = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - start_time).count();
+        if (proof) { proof->new_incumbent(current); }
     }
 
     int bound = current.size() + calc_bound(domains);
     if (bound <= (int)incumbent.size() || bound < (int)goal) {
         stats.cut_branches++;
         stats.bound_pruned++;
+        if (proof) { proof->prune_by_bound(domains, left, right); }
         return;
     }
 
     int bd_idx = select_bidomain(domains, left, current.size());
-    if (bd_idx == -1) { return; }
+    if (bd_idx == -1) {
+        if (proof) { proof->backtrack(); }
+        return;
+    }
 
     Bidomain& bd = domains[bd_idx];
 
@@ -379,6 +418,7 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
                 left[bd.l + bd.left_len] = v;
                 bd.left_len++;
                 stats.sym_pruned++;
+                if (proof) { prune_by_twin_bound_rr(proof, domains, left, right, bd_idx, EqClass, v, w_lower); }
                 return;
             }
         }
@@ -388,6 +428,7 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
                 left[bd.l + bd.left_len] = v;
                 bd.left_len++;
                 stats.sym_pruned++;
+                if (proof) { prune_by_twin_bound_rr(proof, domains, left, right, bd_idx, EqClass, v, w_lower); }
                 return;
             }
         }
@@ -424,14 +465,24 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         auto new_domains = filter_domains_rr(domains, left, right, g, h, v, w,
                 best_match, index_right);
         current.push_back(VtxPair(v, w));
+        if (proof) { proof->push_match(v, w); }
         solve_rr(g, h, incumbent, current, new_domains, left, right, goal,
-                stats, start_time, abort_due_to_timeout, EqClass, index_right, red_mode);
+                stats, start_time, abort_due_to_timeout, EqClass, index_right, red_mode, proof);
+        if (proof) { proof->pop(); }
         current.pop_back();
 
         // Maximality reduction: if best_match, current solution is optimal here
         bool maximality_prune = (red_mode & 2) && best_match;   // MAX enabled
         if (maximality_prune || bound <= (int)incumbent.size()) {
             stats.sym_pruned++;
+            // the incumbent has caught up with this node's bound, which
+            // refutes the node outright (v is still unassigned here)
+            if (proof && !maximality_prune) {
+                std::vector<Bidomain> node_domains = domains;
+                node_domains[bd_idx].left_len++;
+                node_domains[bd_idx].right_len++;
+                proof->prune_by_bound(node_domains, left, right);
+            }
             break;
         }
     }
@@ -453,9 +504,15 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
 
     if (bd.left_len == 0) { remove_bidomain(domains, bd_idx); }
 
-    // branch where v is excluded entirely from the mapping
+    // branch where v is excluded entirely from the mapping (with VEQ, so
+    // are its remaining twins: the twin ordering forces that in the proof)
+    if (proof) { proof->push_exclude(v); }
     solve_rr(g, h, incumbent, current, domains, left, right, goal,
-            stats, start_time, abort_due_to_timeout, EqClass, index_right, red_mode);
+            stats, start_time, abort_due_to_timeout, EqClass, index_right, red_mode, proof);
+    if (proof) { proof->pop(); }
+
+    // Every way of extending the current trail has now been refuted
+    if (proof) { proof->backtrack(); }
 }
 
 /**
@@ -471,11 +528,13 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
  * @param stats Search statistics, updated in-place.
  * @param abort_due_to_timeout Flag checked to abort the search early.
  * @param red_mode Bitmask controlling which RRSplit reductions are enabled.
+ * @param proof Proof logger, or nullptr if proof logging is disabled (requires
+ *              the maximality reduction to be off).
  * @return The largest common subgraph solution found, as vertex pairs in the original graphs' indices.
  */
 std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
-        int red_mode) {
+        int red_mode, ProofLogger* proof) {
 
     // total degree (out + in), matching the reference's calculate_degrees
     auto calc_degrees = [](const Graph& g) {
@@ -522,6 +581,24 @@ std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
     ui* EqClass = nullptr;
     GetEqClass(g_sorted, EqClass);
 
+    if (proof) {
+        proof->set_vertex_orders(vv0, vv1);
+        if (red_mode & 1) {
+            // twin classes in increasing index order, which is the order
+            // VEQ assumes they are branched in
+            std::vector<std::vector<int>> classes;
+            std::vector<int> class_of(g_sorted.n + 1, -1);
+            for (int v = 0; v < g_sorted.n; v++) {
+                if (class_of[EqClass[v]] == -1) {
+                    class_of[EqClass[v]] = classes.size();
+                    classes.emplace_back();
+                }
+                classes[class_of[EqClass[v]]].push_back(v);
+            }
+            proof->break_g_twins(classes);
+        }
+    }
+
     std::vector<int> index_right(h_sorted.n);
     for (int i = 0; i < h_sorted.n; i++) { index_right[i] = i; }
 
@@ -536,7 +613,7 @@ std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
     auto start_time = std::chrono::steady_clock::now();
     // correctly uses g_sorted/h_sorted, matching domains/left/right/EqClass
     solve_rr(g_sorted, h_sorted, incumbent, current, domains, left, right, 1,
-        stats, start_time, abort_due_to_timeout, EqClass, index_right, red_mode);
+        stats, start_time, abort_due_to_timeout, EqClass, index_right, red_mode, proof);
 
     delete[] EqClass;
 
