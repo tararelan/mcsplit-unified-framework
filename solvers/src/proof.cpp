@@ -209,6 +209,85 @@ void ProofLogger::enable_unused_vertex_vars()
 	}
 }
 
+
+// Decimal arithmetic for the lex order's weights, which overflow 64 bits.
+static std::string dec_mul(const std::string &a, long long m)
+{
+	std::string r;
+	long long carry = 0;
+	for (int i = a.size() - 1; i >= 0; i--)
+	{
+		long long x = (a[i] - '0') * m + carry;
+		r.push_back('0' + x % 10);
+		carry = x / 10;
+	}
+	for (; carry; carry /= 10)
+		r.push_back('0' + carry % 10);
+	while (r.size() > 1 && r.back() == '0')
+		r.pop_back();
+	return std::string(r.rbegin(), r.rend());
+}
+
+// a - b, for a >= b
+static std::string dec_sub(const std::string &a, const std::string &b)
+{
+	std::string r;
+	int borrow = 0;
+	for (int i = a.size() - 1, j = b.size() - 1; i >= 0; i--, j--)
+	{
+		int x = (a[i] - '0') - borrow - (j >= 0 ? b[j] - '0' : 0);
+		borrow = x < 0;
+		r.push_back('0' + (x + 10) % 10);
+	}
+	while (r.size() > 1 && r.back() == '0')
+		r.pop_back();
+	return std::string(r.rbegin(), r.rend());
+}
+
+void ProofLogger::enable_lex_order()
+{
+	// f(x) = sum_i W_i pos(g_order[i]), with W_i = B^(g_n - 1 - i), so that a
+	// smaller f means lexicographically smaller images in branching order.
+	// B is large enough that the most significant changed vertex outweighs
+	// the later ones even when unit propagation bounds each of their
+	// literals independently, which lets the checker prove the order goals.
+	const long long B = (long long)(h_n + 2) * (h_n + 2);
+	lex_weight.assign(g_n, "1");
+	for (int i = g_n - 2; i >= 0; i--)
+		lex_weight[g_order[i]] = dec_mul(lex_weight[g_order[i + 1]], B);
+
+	std::vector<std::string> vars, coeffs;
+	for (int a : g_order)
+	{
+		for (int w = 0; w < h_n; w++)
+			if (compatible[a][w])
+			{
+				vars.push_back(match_var(a, w));
+				coeffs.push_back(dec_mul(lex_weight[a], h_rank[w] + 1));
+			}
+		vars.push_back(bottom_var(a));
+		coeffs.push_back(dec_mul(lex_weight[a], h_n + 1));
+	}
+	pbp << "def_order lexpos\n  vars\n    left";
+	for (size_t k = 0; k < vars.size(); k++)
+		pbp << " u" << k;
+	pbp << " ;\n    right";
+	for (size_t k = 0; k < vars.size(); k++)
+		pbp << " v" << k;
+	pbp << " ;\n  end ;\n  def\n   ";
+	for (size_t k = 0; k < vars.size(); k++)
+		pbp << " " << coeffs[k] << " v" << k << " -" << coeffs[k] << " u" << k;
+	pbp << " >= 0 ;\n  end ;\n  transitivity\n    vars\n      fresh_right";
+	for (size_t k = 0; k < vars.size(); k++)
+		pbp << " w" << k;
+	pbp << " ;\n    end ;\n    proof\n      proofgoal #1\n        pol 1 2 + 3 + ;\n      qed : -1 ;\n    qed ;\n  end ;\nend ;\n";
+	pbp << "load_order lexpos";
+	for (const std::string &var : vars)
+		pbp << " " << var;
+	pbp << " ;\n";
+	lex_order = true;
+}
+
 void ProofLogger::break_g_twins(const std::vector<std::vector<int>> &classes)
 {
 	// pos(a) is the sorted index of a's image plus one, or h_n + 1 if a is
@@ -223,6 +302,14 @@ void ProofLogger::break_g_twins(const std::vector<std::vector<int>> &classes)
 			if (compatible[a][w])
 				pbp << " " << sign * (h_rank[w] + 1) << " " << match_var(a, w);
 		pbp << " " << sign * (h_n + 1) << " " << bottom_var(a);
+	};
+	auto write_swap = [&](int a, int b) {
+		for (int w = 0; w < h_n; w++)
+			if (compatible[a][w])
+				pbp << " " << match_var(a, w) << " -> " << match_var(b, w) << " "
+					<< match_var(b, w) << " -> " << match_var(a, w);
+		pbp << " " << bottom_var(a) << " -> " << bottom_var(b) << " "
+			<< bottom_var(b) << " -> " << bottom_var(a);
 	};
 
 	g_twin_class.assign(g_n, -1);
@@ -247,16 +334,33 @@ void ProofLogger::break_g_twins(const std::vector<std::vector<int>> &classes)
 			for (size_t k = i + 1; k < cls.size(); k++)
 			{
 				const int a = cls[i], b = cls[k];
+				if (lex_order)
+				{
+					// with the lex order loaded, by dominance instead: the swap
+					// changes f by (W_a - W_b) (pos(b) - pos(a)), which the
+					// negation of O(a,b) makes negative. The goals are the
+					// weak and strict order conditions, each with the negated
+					// goal as -1; the negation of O(a,b) is -2 for the first,
+					// and -4 for the second (after the first's two IDs).
+					const std::string diff = dec_sub(lex_weight[a], lex_weight[b]);
+					pbp << "dom";
+					write_pos(b, 1);
+					write_pos(a, -1);
+					pbp << " >= 0 :";
+					write_swap(a, b);
+					pbp << " : subproof\n"
+						<< "proofgoal #1\npol -1 -2 " << diff << " * + ;\nqed : -1 ;\n"
+						<< "proofgoal #2\npol -1 -4 " << diff << " * + ;\nqed : -1 ;\n"
+						<< "qed ;\n";
+					next_id += 6;
+					order_id[i][k] = next_id - 1;
+					continue;
+				}
 				pbp << "red";
 				write_pos(b, 1);
 				write_pos(a, -1);
 				pbp << " >= 0 :";
-				for (int w = 0; w < h_n; w++)
-					if (compatible[a][w])
-						pbp << " " << match_var(a, w) << " -> " << match_var(b, w) << " "
-							<< match_var(b, w) << " -> " << match_var(a, w);
-				pbp << " " << bottom_var(a) << " -> " << bottom_var(b) << " "
-					<< bottom_var(b) << " -> " << bottom_var(a);
+				write_swap(a, b);
 				if (k == i + 1)
 				{
 					pbp << " ;\n";
@@ -655,24 +759,18 @@ void ProofLogger::break_value_symmetry(int v, const std::vector<std::pair<int, i
 	{
 		b = h_order[b];
 		w = h_order[w];
-		if (!g_twin_classes.empty())
-		{
-			// with the twin ordering, v->b must not put v before an earlier
-			// twin, and the holder of b may have twins that would end up
-			// out of order; rule out v->w by the same rewrite as for
-			// maximality, which is valid because swapping b and w preserves
-			// adjacency to everything else
-			if (g_twin_class[v] != -1)
-				for (int a : g_twin_classes[g_twin_class[v]])
-					if (g_image[a] != -1 && h_rank[g_image[a]] > h_rank[b])
-						throw std::logic_error("proof logging: value symmetry below an earlier twin's image");
-			rule_out_by_twin_rewrite(v, b, w);
-			continue;
-		}
 		// b and w are twins in H, so swapping them is an automorphism of
 		// the model, and maps a solution with v->w to one with v->b; b and
-		// w are both free, so the trail is unaffected
-		pbp << "red";
+		// w are both free, so the trail is unaffected. Without the twin
+		// ordering in G, that's redundance under the trail. With it, v->b
+		// can put v before an earlier twin, and the solution that respects
+		// the ordering is then in an earlier branch, so this needs dominance
+		// under the lex order: v is the smallest vertex in its bidomain, and
+		// whoever had b is in the same bidomain, so v is the most
+		// significant vertex that changes, and its image gets smaller.
+		if (!g_twin_classes.empty() && !lex_order)
+			throw std::logic_error("proof logging: value symmetry with the twin ordering needs the lex order");
+		pbp << (lex_order ? "dom" : "red");
 		for (const std::string &lit : trail)
 			pbp << " 1 ~" << lit;
 		pbp << " 1 ~" << match_var(v, w) << " >= 1 :";

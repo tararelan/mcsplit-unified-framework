@@ -45,6 +45,16 @@
 // of a twin class increase with index, and once one twin is unmapped, so
 // are all later ones. break_g_twins derives this once, before search, by
 // redundance with the transposition of each pair of twins as the witness.
+//
+// SymSplit with both symmetries can skip v->w because a smaller twin b of w
+// in H is free, even when b lies below the image of v's previous twin. Then
+// the solution with v->b that respects the twin ordering is in an earlier
+// branch, which redundance under the trail can't appeal to. Instead, the
+// proof loads a lex order on the images, in branching order, and uses
+// dominance for the twin ordering and for value symmetry: SymSplit always
+// branches on the smallest vertex of a bidomain, so each of its rewrites
+// makes the branching vertex's image smaller, and touches only later
+// vertices otherwise.
 
 #include "graph.h"
 #include "common.h"
@@ -102,6 +112,15 @@ public:
 	 * called before search, after set_vertex_orders.
 	 */
 	void break_g_twins(const std::vector<std::vector<int>> &classes);
+
+	/**
+	 * Loads a lex order on the images of G's vertices, in sorted index
+	 * order (with bottom after every vertex of H), so that later reasoning
+	 * can use dominance. Must be called before search and before
+	 * break_g_twins, after set_vertex_orders. Every later rewrite of a
+	 * solution must then not increase it.
+	 */
+	void enable_lex_order();
 
 	/**
 	 * Justifies RRSplit's tighter bound and logs the backtrack clause. In
@@ -211,6 +230,11 @@ private:
 	long long obj_id = -1;	   // ID of the most recent objective-improving constraint
 	long long contra_id = -1;  // ID of the root contradiction, once derived
 	bool aborted = false;
+
+	// set by enable_lex_order; lex_weight[v] is model vertex v's weight, in
+	// decimal since it overflows
+	bool lex_order = false;
+	std::vector<std::string> lex_weight;
 
 	std::vector<std::string> trail;					 // decision literals, outermost first
 	std::vector<bool> trail_is_match;				 // whether each decision is v->w
