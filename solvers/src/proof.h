@@ -228,6 +228,16 @@ private:
 	void write_trail_clause();
 
 	long long derive_forced_match(int v, int w);
+
+	// whether a has b's adjacency to everything matched on the trail (model indices)
+	bool same_pattern(int a, int b) const;
+
+	// Under the trail, rules out v->z (bottom if z is -1) in favour of v->w,
+	// where the solver's reasoning guarantees that v->w and a->z preserve
+	// adjacency for any free holder a of w, and h_rank[w] < h_rank[z]. Keeps
+	// the twin ordering by shifting a's later twins along. Attaches the
+	// resulting clause to the trail. Model indices.
+	void rule_out_by_twin_rewrite(int v, int w, int z);
 	std::vector<long long> &attached_ids();
 
 	BidomainPlan plan_bidomain(const std::vector<int> &L, const std::vector<int> &R) const;

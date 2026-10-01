@@ -31,7 +31,7 @@ int partition_right_sym(std::vector<int> &all_vv, int start, int len, const std:
 int partition_sparse_sym(std::vector<int> &all_vv, int start, int len, int degree, const unsigned int *adjlist, std::vector<int> &index_right);
 std::vector<Bidomain> filter_domains_sym(const std::vector<Bidomain> &d, std::vector<int> &left, std::vector<int> &right, const Graph &g, const Graph &h, int v, int w, bool &best_match, std::vector<int> &index_right);
 int find_vertices_with_common_neighbors(const Graph &g, std::vector<int> &eqn_classes);
-bool break_h_sym(const std::vector<int> &arr, int start_idx, int len, int w, const std::vector<int> &h_eqn_classes);
+bool break_h_sym(const std::vector<int> &arr, int start_idx, int len, int w, const std::vector<int> &h_eqn_classes, int floor = -1);
 void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent, std::vector<VtxPair> &current, std::vector<Bidomain> &domains, std::vector<int> &left, std::vector<int> &right, unsigned int goal, Stats &stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool> &abort_due_to_timeout, const std::vector<int> &g_eqn_classes, const std::vector<int> &h_eqn_classes, std::vector<int> &index_right, int sym_mode, ProofLogger *proof);
 std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h, Stats &stats, std::atomic<bool> &abort_due_to_timeout, int sym_mode = 3, ProofLogger *proof = nullptr);
 
@@ -480,16 +480,17 @@ int find_vertices_with_common_neighbors(const Graph &g, std::vector<int> &eqn_cl
  * @param w              Candidate H-vertex being considered
  * @param h_eqn_classes  Symmetry class labels for H; h_eqn_classes[v] = -1
  *                       if v has no symmetry partner
+ * @param floor          Only twins above this index count (-1 for all)
  * @return               True if a smaller equivalent H-vertex exists in
  *                       the bidomain, meaning w should be skipped
  */
 bool break_h_sym(const std::vector<int> &arr, int start_idx, int len, int w,
-                 const std::vector<int> &h_eqn_classes)
+                 const std::vector<int> &h_eqn_classes, int floor)
 {
 	int w_class = h_eqn_classes[w];
 	for (int i = 0; i < len; i++)
 	{
-		if (h_eqn_classes[arr[start_idx + i]] == w_class && arr[start_idx + i] < w)
+		if (h_eqn_classes[arr[start_idx + i]] == w_class && arr[start_idx + i] < w && arr[start_idx + i] > floor)
 		{
 			return true;
 		}
@@ -543,8 +544,9 @@ bool break_h_sym(const std::vector<int> &arr, int start_idx, int len, int w,
  * @param h_eqn_classes        Symmetry class labels for H vertices (-1 if none)
  * @param index_right          H-side position index kept in sync with right
  * @param sym_mode             Bitmask controlling active symmetry rules
- * @param proof                Proof logger, or nullptr if disabled (not supported
- *                             with both symmetries on)
+ * @param proof                Proof logger, or nullptr if disabled (with both
+ *                             symmetries on, value symmetry then only uses
+ *                             twins above w_lower)
  */
 void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
                std::vector<VtxPair> &current, std::vector<Bidomain> &domains,
@@ -621,6 +623,12 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
 	bd.right_len--;
 	int w = w_lower;
 
+	// With both symmetries, a twin of w below w_lower would justify skipping
+	// w only by appeal to an earlier branch (where v's twin took that twin),
+	// which the proof can't refer back to. These skips are rare, so with
+	// proof logging, value symmetry only looks above w_lower.
+	const int h_sym_floor = (proof && (sym_mode & 1)) ? w_lower : -1;
+
 	// value symmetry skips every w with a smaller twin still in the
 	// bidomain; the proof rules these out before any branch is explored
 	if (proof && (sym_mode & 2))
@@ -629,11 +637,12 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
 		for (int i = 0; i <= bd.right_len; i++)
 		{
 			int u = right[bd.r + i];
-			if (h_eqn_classes[u] == -1)
+			if (h_eqn_classes[u] == -1 || u <= w_lower)
 				continue;
 			int smallest = u;
 			for (int j = 0; j <= bd.right_len; j++)
-				if (h_eqn_classes[right[bd.r + j]] == h_eqn_classes[u] && right[bd.r + j] < smallest)
+				if (h_eqn_classes[right[bd.r + j]] == h_eqn_classes[u] && right[bd.r + j] < smallest &&
+					right[bd.r + j] > h_sym_floor)
 					smallest = right[bd.r + j];
 			if (smallest != u)
 				twins.push_back({smallest, u});
@@ -653,7 +662,7 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
 		}
 		w = right[bd.r + idx];
 
-		if ((sym_mode & 2) && h_eqn_classes[w] != -1 && break_h_sym(right, bd.r, bd.right_len + 1, w, h_eqn_classes))
+		if ((sym_mode & 2) && h_eqn_classes[w] != -1 && break_h_sym(right, bd.r, bd.right_len + 1, w, h_eqn_classes, h_sym_floor))
 		{
 			stats.sym_pruned++;
 			continue;
@@ -775,8 +784,9 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
  * @param stats                Search statistics (updated in place)
  * @param abort_due_to_timeout Atomic flag set by timeout thread
  * @param sym_mode             Bitmask: bit 0 = variable symmetry, bit 1 = value symmetry
- * @param proof                Proof logger, or nullptr if disabled (not supported
- *                             with both symmetries on)
+ * @param proof                Proof logger, or nullptr if disabled (with both
+ *                             symmetries on, value symmetry then only uses
+ *                             twins above w_lower)
  * @return                     Maximum common induced subgraph as matched vertex pairs,
  *                             indexed into the original unsorted graphs
  */

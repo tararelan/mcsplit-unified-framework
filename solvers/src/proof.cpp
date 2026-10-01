@@ -418,12 +418,6 @@ long long ProofLogger::derive_forced_match(int v, int w)
 	// Every vertex not on the trail is free. Under the trail, v can still
 	// take any free z with its adjacency pattern (or bottom), and w can
 	// still be taken by any free a with w's pattern.
-	auto same_pattern = [&](int a, int b) {
-		for (int u = 0; u < g_n; u++)
-			if (g_image[u] != -1 && g_adj[a][u] != h_adj[b][g_image[u]])
-				return false;
-		return true;
-	};
 	std::vector<int> zs{-1}, as;
 	for (int z = 0; z < h_n; z++)
 		if (z != w && compatible[v][z] && !h_used[z] && same_pattern(v, z))
@@ -522,6 +516,14 @@ void ProofLogger::maximal_match(int v, int w)
 		attached_ids().push_back(derive_forced_match(v, w));
 }
 
+bool ProofLogger::same_pattern(int a, int b) const
+{
+	for (int u = 0; u < g_n; u++)
+		if (g_image[u] != -1 && g_adj[a][u] != h_adj[b][g_image[u]])
+			return false;
+	return true;
+}
+
 void ProofLogger::maximal_match_with_twins(int v, int w, bool and_bottom)
 {
 	v = g_order[v];
@@ -531,23 +533,24 @@ void ProofLogger::maximal_match_with_twins(int v, int w, bool and_bottom)
 	if (aborted)
 		return;
 
-	auto same_pattern = [&](int a, int b) {
-		for (int u = 0; u < g_n; u++)
-			if (g_image[u] != -1 && g_adj[a][u] != h_adj[b][g_image[u]])
-				return false;
-		return true;
-	};
-	std::vector<int> zs, as;
+	// v->w splits no bidomain, so in a solution under the trail where v
+	// takes some z after w and a takes w, v->w and a->z preserves every
+	// adjacency (as for maximal_match). Bottom comes after every value in
+	// the twin ordering.
 	for (int z = 0; z < h_n; z++)
 		if (h_rank[z] > h_rank[w] && compatible[v][z] && !h_used[z] && same_pattern(v, z))
-			zs.push_back(z);
-	// bottom comes after every value in the twin ordering
+			rule_out_by_twin_rewrite(v, w, z);
 	if (and_bottom)
-		zs.push_back(-1);
+		rule_out_by_twin_rewrite(v, w, -1);
+}
+
+void ProofLogger::rule_out_by_twin_rewrite(int v, int w, int z)
+{
 	auto value = [&](int u, int z) { return z == -1 ? bottom_var(u) : match_var(u, z); };
 	// v's own twins can't hold w when v takes a later value: its earlier
 	// twins are decided, and the twin ordering puts its later twins after
 	// v's value (which unit propagation sees), so leave them out
+	std::vector<int> as;
 	for (int a = 0; a < g_n; a++)
 		if (a != v && compatible[a][w] && g_image[a] == -1 && !g_excluded[a] && same_pattern(a, w) &&
 			(g_twin_class[a] == -1 || g_twin_class[a] != g_twin_class[v]))
@@ -558,94 +561,89 @@ void ProofLogger::maximal_match_with_twins(int v, int w, bool and_bottom)
 			pbp << " " << coeff << " ~" << lit;
 	};
 
-	// v->w splits no bidomain, so in a solution under the trail where v
-	// takes some z after w and a takes w, v->w and a->z preserves every
-	// adjacency (as for maximal_match). v's twin order survives too: its
-	// earlier twins are below w, its later twins above z. But a's twins
-	// a < s1 < s2 < ... whose images lie between w and z would now come
-	// before a, so the rewrite also shifts that chain along (a takes s1's
-	// image, s1 takes s2's, and the last one takes z), which is the same
-	// solution up to a permutation of twins. The cases are by the length r
-	// of the chain, longest first: case r rules out "s_r is between w and
-	// z", so that unit propagation provides "s_{r+1} isn't" for case r.
-	// When z is bottom, everything after w is between w and z, and v's
+	// The rewrite is v->w and a->z, for whichever a held w. v's twin order
+	// survives: its earlier twins are below w, its later twins above z. But
+	// a's twins a < s1 < s2 < ... whose images lie between w and z would now
+	// come before a, so the rewrite also shifts that chain along (a takes
+	// s1's image, s1 takes s2's, and the last one takes z), which is the
+	// same solution up to a permutation of twins. The cases are by the
+	// length r of the chain, longest first: case r rules out "s_r is between
+	// w and z", so that unit propagation provides "s_{r+1} isn't" for case
+	// r. When z is bottom, everything after w is between w and z, and v's
 	// later twins are all unmapped.
-	for (int z : zs)
-	{
-		std::vector<int> between; // values strictly between w and z
-		for (int c = 0; c < h_n; c++)
-			if (h_rank[c] > h_rank[w] && (z == -1 || h_rank[c] < h_rank[z]))
-				between.push_back(c);
+	std::vector<int> between; // values strictly between w and z
+	for (int c = 0; c < h_n; c++)
+		if (h_rank[c] > h_rank[w] && (z == -1 || h_rank[c] < h_rank[z]))
+			between.push_back(c);
 
-		std::vector<long long> cases;
-		for (int a : as)
+	std::vector<long long> cases;
+	for (int a : as)
+	{
+		// a's later twins (classes are in increasing index order, and
+		// twins are branched in that order, so these are all free)
+		std::vector<int> chain{a};
+		if (g_twin_class[a] != -1)
 		{
-			// a's later twins (classes are in increasing index order, and
-			// twins are branched in that order, so these are all free)
-			std::vector<int> chain{a};
-			if (g_twin_class[a] != -1)
-			{
-				const std::vector<int> &cls = g_twin_classes[g_twin_class[a]];
-				for (size_t i = std::find(cls.begin(), cls.end(), a) - cls.begin() + 1; i < cls.size(); i++)
-					if (g_image[cls[i]] == -1 && !g_excluded[cls[i]])
-						chain.push_back(cls[i]);
-			}
-			for (size_t r = chain.size() - 1; r >= 1; r--)
-			{
-				const int last = chain[r];
-				std::vector<int> range;
-				for (int c : between)
-					if (compatible[last][c])
-						range.push_back(c);
-				// s1 < ... < s_r all strictly between w and z needs r values
-				// there, and otherwise unit propagation along the twin
-				// ordering already rules this case out
-				if (range.size() < r)
-					continue;
-				const int d = range.size();
-				pbp << "red";
-				write_guard(d);
-				pbp << " " << d << " ~" << value(v, z) << " " << d << " ~" << match_var(a, w);
-				for (int c : range)
-					pbp << " 1 ~" << match_var(last, c);
-				pbp << " >= " << d << " : " << value(v, z) << " -> 0 " << match_var(v, w) << " -> 1";
-				for (size_t i = 0; i < r; i++)
-				{
-					for (int c = 0; c < h_n; c++)
-						if (compatible[chain[i]][c])
-							pbp << " " << match_var(chain[i], c) << " -> " << match_var(chain[i + 1], c);
-					pbp << " " << bottom_var(chain[i]) << " -> " << bottom_var(chain[i + 1]);
-				}
-				for (int c = 0; c < h_n; c++)
-					if (compatible[last][c])
-						pbp << " " << match_var(last, c) << " -> " << (c == z ? 1 : 0);
-				pbp << " " << bottom_var(last) << " -> " << (z == -1 ? 1 : 0) << " ;\n";
-				cases.push_back(next_id++);
-			}
+			const std::vector<int> &cls = g_twin_classes[g_twin_class[a]];
+			for (size_t i = std::find(cls.begin(), cls.end(), a) - cls.begin() + 1; i < cls.size(); i++)
+				if (g_image[cls[i]] == -1 && !g_excluded[cls[i]])
+					chain.push_back(cls[i]);
+		}
+		for (size_t r = chain.size() - 1; r >= 1; r--)
+		{
+			const int last = chain[r];
+			std::vector<int> range;
+			for (int c : between)
+				if (compatible[last][c])
+					range.push_back(c);
+			// s1 < ... < s_r all strictly between w and z needs r values
+			// there, and otherwise unit propagation along the twin
+			// ordering already rules this case out
+			if (range.size() < r)
+				continue;
+			const int d = range.size();
 			pbp << "red";
-			write_guard(1);
-			pbp << " 1 ~" << value(v, z) << " 1 ~" << match_var(a, w) << " >= 1 : "
-				<< value(v, z) << " -> 0 " << match_var(v, w) << " -> 1 "
-				<< match_var(a, w) << " -> 0 " << value(a, z) << " -> 1 ;\n";
+			write_guard(d);
+			pbp << " " << d << " ~" << value(v, z) << " " << d << " ~" << match_var(a, w);
+			for (int c : range)
+				pbp << " 1 ~" << match_var(last, c);
+			pbp << " >= " << d << " : " << value(v, z) << " -> 0 " << match_var(v, w) << " -> 1";
+			for (size_t i = 0; i < r; i++)
+			{
+				for (int c = 0; c < h_n; c++)
+					if (compatible[chain[i]][c])
+						pbp << " " << match_var(chain[i], c) << " -> " << match_var(chain[i + 1], c);
+				pbp << " " << bottom_var(chain[i]) << " -> " << bottom_var(chain[i + 1]);
+			}
+			for (int c = 0; c < h_n; c++)
+				if (compatible[last][c])
+					pbp << " " << match_var(last, c) << " -> " << (c == z ? 1 : 0);
+			pbp << " " << bottom_var(last) << " -> " << (z == -1 ? 1 : 0) << " ;\n";
 			cases.push_back(next_id++);
 		}
 		pbp << "red";
 		write_guard(1);
-		pbp << " 1 ~" << value(v, z);
-		for (int a : as)
-			pbp << " 1 " << match_var(a, w);
-		pbp << " >= 1 : " << value(v, z) << " -> 0 " << match_var(v, w) << " -> 1 ;\n";
+		pbp << " 1 ~" << value(v, z) << " 1 ~" << match_var(a, w) << " >= 1 : "
+			<< value(v, z) << " -> 0 " << match_var(v, w) << " -> 1 "
+			<< match_var(a, w) << " -> 0 " << value(a, z) << " -> 1 ;\n";
 		cases.push_back(next_id++);
-
-		pbp << "rup";
-		write_guard(1);
-		pbp << " 1 ~" << value(v, z) << " >= 1 ;\n";
-		attached_ids().push_back(next_id++);
-		pbp << "del id";
-		for (long long id : cases)
-			pbp << " " << id;
-		pbp << " ;\n";
 	}
+	pbp << "red";
+	write_guard(1);
+	pbp << " 1 ~" << value(v, z);
+	for (int a : as)
+		pbp << " 1 " << match_var(a, w);
+	pbp << " >= 1 : " << value(v, z) << " -> 0 " << match_var(v, w) << " -> 1 ;\n";
+	cases.push_back(next_id++);
+
+	pbp << "rup";
+	write_guard(1);
+	pbp << " 1 ~" << value(v, z) << " >= 1 ;\n";
+	attached_ids().push_back(next_id++);
+	pbp << "del id";
+	for (long long id : cases)
+		pbp << " " << id;
+	pbp << " ;\n";
 }
 
 void ProofLogger::break_value_symmetry(int v, const std::vector<std::pair<int, int>> &twins)
@@ -657,6 +655,20 @@ void ProofLogger::break_value_symmetry(int v, const std::vector<std::pair<int, i
 	{
 		b = h_order[b];
 		w = h_order[w];
+		if (!g_twin_classes.empty())
+		{
+			// with the twin ordering, v->b must not put v before an earlier
+			// twin, and the holder of b may have twins that would end up
+			// out of order; rule out v->w by the same rewrite as for
+			// maximality, which is valid because swapping b and w preserves
+			// adjacency to everything else
+			if (g_twin_class[v] != -1)
+				for (int a : g_twin_classes[g_twin_class[v]])
+					if (g_image[a] != -1 && h_rank[g_image[a]] > h_rank[b])
+						throw std::logic_error("proof logging: value symmetry below an earlier twin's image");
+			rule_out_by_twin_rewrite(v, b, w);
+			continue;
+		}
 		// b and w are twins in H, so swapping them is an automorphism of
 		// the model, and maps a solution with v->w to one with v->b; b and
 		// w are both free, so the trail is unaffected

@@ -178,9 +178,8 @@ int main(int argc, char **argv)
 		std::swap(g, h);
 
 	// proof logging covers McSplit's and DSB's bidomain bounds, LUM,
-	// RRSplit's reductions, SymSplit's variable or value symmetry, and the
-	// maximality reduction; SymSplit with both symmetries at once (symsplit)
-	// needs justifications that aren't written yet
+	// RRSplit's reductions, SymSplit's variable and value symmetry, and the
+	// maximality reduction (full SymSplit prunes slightly less when logging)
 	std::unique_ptr<ProofLogger> proof;
 	if (!arguments.proof_prefix.empty())
 	{
@@ -188,7 +187,7 @@ int main(int argc, char **argv)
 																	"dal", "dal_rl", "dal_dal",
 																	"dsb", "dsb_always", "dsb_never",
 																	"rrsplit", "rrsplit_nomax", "rrsplit_noveq", "rrsplit_nobound",
-																	"symsplit_valonly", "symsplit_varonly"};
+																	"symsplit", "symsplit_valonly", "symsplit_varonly"};
 		if (!proof_algorithms.count(arguments.algorithm))
 		{
 			std::cerr << "Proof logging is not supported for algorithm " << arguments.algorithm << std::endl;
@@ -278,7 +277,7 @@ int main(int argc, char **argv)
 		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 3, proof.get()); // veq+max
 
 	else if (arguments.algorithm == "symsplit")
-		solution = mcs_sym(g, h, stats, abort_due_to_timeout, 3); // full
+		solution = mcs_sym(g, h, stats, abort_due_to_timeout, 3, proof.get()); // full
 	else if (arguments.algorithm == "symsplit_valonly")
 		solution = mcs_sym(g, h, stats, abort_due_to_timeout, 2, proof.get()); // value only
 	else if (arguments.algorithm == "symsplit_varonly")
