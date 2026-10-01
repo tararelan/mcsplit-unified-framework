@@ -543,8 +543,8 @@ bool break_h_sym(const std::vector<int> &arr, int start_idx, int len, int w,
  * @param h_eqn_classes        Symmetry class labels for H vertices (-1 if none)
  * @param index_right          H-side position index kept in sync with right
  * @param sym_mode             Bitmask controlling active symmetry rules
- * @param proof                Proof logger, or nullptr if disabled (requires
- *                             variable symmetry to be off)
+ * @param proof                Proof logger, or nullptr if disabled (not supported
+ *                             with both symmetries on)
  */
 void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
                std::vector<VtxPair> &current, std::vector<Bidomain> &domains,
@@ -666,9 +666,16 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
 		auto new_domains = filter_domains_sym(domains, left, right, g, h, v, w,
 											  best_match, index_right);
 		// if v->w splits no bidomain, the other branches here are skipped
-		// below; the proof assumes v->w before exploring it
+		// below; the proof assumes v->w before exploring it (with variable
+		// symmetry, the earlier values are already refuted, and only the
+		// later ones and bottom need ruling out)
 		if (proof && best_match)
-			proof->maximal_match(v, w);
+		{
+			if (sym_mode & 1)
+				proof->maximal_match_with_twins(v, w, true);
+			else
+				proof->maximal_match(v, w);
+		}
 		current.push_back(VtxPair(v, w));
 		if (proof)
 			proof->push_match(v, w);
@@ -768,8 +775,8 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
  * @param stats                Search statistics (updated in place)
  * @param abort_due_to_timeout Atomic flag set by timeout thread
  * @param sym_mode             Bitmask: bit 0 = variable symmetry, bit 1 = value symmetry
- * @param proof                Proof logger, or nullptr if disabled (requires
- *                             variable symmetry to be off)
+ * @param proof                Proof logger, or nullptr if disabled (not supported
+ *                             with both symmetries on)
  * @return                     Maximum common induced subgraph as matched vertex pairs,
  *                             indexed into the original unsorted graphs
  */
@@ -838,7 +845,27 @@ std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h,
 	set_adjlist(h_sorted);
 
 	if (proof)
+	{
 		proof->set_vertex_orders(vv0, vv1);
+		if (sym_mode & 1)
+		{
+			// twin classes in increasing index order, which is the order
+			// they are branched in (twins always share a bidomain, and the
+			// smallest vertex in a bidomain is branched on first)
+			std::vector<std::vector<int>> classes;
+			std::unordered_map<int, int> class_of;
+			for (int v = 0; v < g_sorted.n; v++)
+			{
+				if (g_eqn_sorted[v] == -1)
+					continue;
+				auto [it, fresh] = class_of.emplace(g_eqn_sorted[v], classes.size());
+				if (fresh)
+					classes.emplace_back();
+				classes[it->second].push_back(v);
+			}
+			proof->break_g_twins(classes);
+		}
+	}
 
 	std::vector<int> index_right(h_sorted.n);
 	for (int i = 0; i < h_sorted.n; i++)

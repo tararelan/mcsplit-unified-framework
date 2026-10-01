@@ -522,7 +522,7 @@ void ProofLogger::maximal_match(int v, int w)
 		attached_ids().push_back(derive_forced_match(v, w));
 }
 
-void ProofLogger::maximal_match_with_twins(int v, int w)
+void ProofLogger::maximal_match_with_twins(int v, int w, bool and_bottom)
 {
 	v = g_order[v];
 	w = h_order[w];
@@ -541,6 +541,10 @@ void ProofLogger::maximal_match_with_twins(int v, int w)
 	for (int z = 0; z < h_n; z++)
 		if (h_rank[z] > h_rank[w] && compatible[v][z] && !h_used[z] && same_pattern(v, z))
 			zs.push_back(z);
+	// bottom comes after every value in the twin ordering
+	if (and_bottom)
+		zs.push_back(-1);
+	auto value = [&](int u, int z) { return z == -1 ? bottom_var(u) : match_var(u, z); };
 	// v's own twins can't hold w when v takes a later value: its earlier
 	// twins are decided, and the twin ordering puts its later twins after
 	// v's value (which unit propagation sees), so leave them out
@@ -564,12 +568,13 @@ void ProofLogger::maximal_match_with_twins(int v, int w)
 	// solution up to a permutation of twins. The cases are by the length r
 	// of the chain, longest first: case r rules out "s_r is between w and
 	// z", so that unit propagation provides "s_{r+1} isn't" for case r.
-	std::vector<long long> ruled_out;
+	// When z is bottom, everything after w is between w and z, and v's
+	// later twins are all unmapped.
 	for (int z : zs)
 	{
 		std::vector<int> between; // values strictly between w and z
 		for (int c = 0; c < h_n; c++)
-			if (h_rank[c] > h_rank[w] && h_rank[c] < h_rank[z])
+			if (h_rank[c] > h_rank[w] && (z == -1 || h_rank[c] < h_rank[z]))
 				between.push_back(c);
 
 		std::vector<long long> cases;
@@ -600,10 +605,10 @@ void ProofLogger::maximal_match_with_twins(int v, int w)
 				const int d = range.size();
 				pbp << "red";
 				write_guard(d);
-				pbp << " " << d << " ~" << match_var(v, z) << " " << d << " ~" << match_var(a, w);
+				pbp << " " << d << " ~" << value(v, z) << " " << d << " ~" << match_var(a, w);
 				for (int c : range)
 					pbp << " 1 ~" << match_var(last, c);
-				pbp << " >= " << d << " : " << match_var(v, z) << " -> 0 " << match_var(v, w) << " -> 1";
+				pbp << " >= " << d << " : " << value(v, z) << " -> 0 " << match_var(v, w) << " -> 1";
 				for (size_t i = 0; i < r; i++)
 				{
 					for (int c = 0; c < h_n; c++)
@@ -614,27 +619,27 @@ void ProofLogger::maximal_match_with_twins(int v, int w)
 				for (int c = 0; c < h_n; c++)
 					if (compatible[last][c])
 						pbp << " " << match_var(last, c) << " -> " << (c == z ? 1 : 0);
-				pbp << " " << bottom_var(last) << " -> 0 ;\n";
+				pbp << " " << bottom_var(last) << " -> " << (z == -1 ? 1 : 0) << " ;\n";
 				cases.push_back(next_id++);
 			}
 			pbp << "red";
 			write_guard(1);
-			pbp << " 1 ~" << match_var(v, z) << " 1 ~" << match_var(a, w) << " >= 1 : "
-				<< match_var(v, z) << " -> 0 " << match_var(v, w) << " -> 1 "
-				<< match_var(a, w) << " -> 0 " << match_var(a, z) << " -> 1 ;\n";
+			pbp << " 1 ~" << value(v, z) << " 1 ~" << match_var(a, w) << " >= 1 : "
+				<< value(v, z) << " -> 0 " << match_var(v, w) << " -> 1 "
+				<< match_var(a, w) << " -> 0 " << value(a, z) << " -> 1 ;\n";
 			cases.push_back(next_id++);
 		}
 		pbp << "red";
 		write_guard(1);
-		pbp << " 1 ~" << match_var(v, z);
+		pbp << " 1 ~" << value(v, z);
 		for (int a : as)
 			pbp << " 1 " << match_var(a, w);
-		pbp << " >= 1 : " << match_var(v, z) << " -> 0 " << match_var(v, w) << " -> 1 ;\n";
+		pbp << " >= 1 : " << value(v, z) << " -> 0 " << match_var(v, w) << " -> 1 ;\n";
 		cases.push_back(next_id++);
 
 		pbp << "rup";
 		write_guard(1);
-		pbp << " 1 ~" << match_var(v, z) << " >= 1 ;\n";
+		pbp << " 1 ~" << value(v, z) << " >= 1 ;\n";
 		attached_ids().push_back(next_id++);
 		pbp << "del id";
 		for (long long id : cases)

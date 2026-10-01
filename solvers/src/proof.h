@@ -123,10 +123,10 @@ public:
 	/**
 	 * Justifies the maximality reduction alongside the twin ordering from
 	 * break_g_twins: matching v->w (sorted indices) splits no bidomain, so
-	 * under the current trail, v takes no value after w. Must be called
-	 * before v->w is pushed or explored.
+	 * under the current trail, v takes no value after w (nor bottom, if
+	 * and_bottom is set). Must be called before v->w is pushed or explored.
 	 */
-	void maximal_match_with_twins(int v, int w);
+	void maximal_match_with_twins(int v, int w, bool and_bottom = false);
 
 	/**
 	 * Justifies SymSplit's value symmetry at the node branching on v: for
