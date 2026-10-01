@@ -19,6 +19,7 @@
     - [Available Algorithms](#available-algorithms)
     - [Examples](#examples)
     - [Output Format](#output-format)
+    - [Proof Logging](#proof-logging)
   - [Running Experiments on HPC](#running-experiments-on-hpc-hypatia)
     - [1. Sync files to Hypatia](#1-sync-files-to-hypatia)
     - [2. Build on Hypatia](#2-build-on-hypatia)
@@ -139,6 +140,7 @@ make -C solvers
 | `-x` | `--vertex-labelled` | Use vertex labels only (no edge labels) |
 | `-t <seconds>` | `--timeout` | Abort search after this many seconds (0 = no limit) |
 | `-A <algo>` | `--algorithm` | Algorithm to run (see algorithm table below) |
+| `-p <prefix>` | `--proof` | Write a VeriPB model and proof to `<prefix>.opb` and `<prefix>.pbp` (see [Proof Logging](#proof-logging)) |
 
 #### Available Algorithms
 
@@ -207,6 +209,44 @@ One line, space-separated:
 | `unified_sym_pruned` | Branches pruned by symmetry or redundancy reduction |
 
 When run with `--with-ref` on HPC (see below), four extra fields are appended: `ref_size`, `ref_nodes`, `ref_time`, `match` (`PASS`/`FAIL`/`MISSING_DATA`).
+
+#### Proof Logging
+
+With `-p <prefix>`, the solver writes a pseudo-Boolean model of the instance to `<prefix>.opb` and a [VeriPB](https://gitlab.com/MIAOresearch/software/VeriPB) 3 proof to `<prefix>.pbp`. The proof certifies the reported solution size independently of the solver:
+
+```bash
+./solvers/bin/mcsp -A mcsplit -d -q -p proof g1.dimacs g2.dimacs
+veripb proof.opb proof.pbp
+```
+
+The model has a variable `x<v>_<w>` for each label-compatible pair (vertex `v` of the smaller graph mapped to `w`) and `x<v>_null` for `v` left unmapped, and minimises the number of unmapped vertices. On undirected unlabelled graphs, it's exactly the encoding used by [CakePB](https://cakeml.org/)'s verified checker for maximum common induced subgraph, `cake_pb_mcis`, so proofs can also be checked end to end by a formally verified checker that builds the model from the LAD files itself:
+
+```bash
+./solvers/bin/mcsp -A rrsplit -l -q -p proof g1.lad g2.lad
+veripb --elaborate proof.elab.pbp proof.opb proof.pbp
+cake_pb_mcis g1.lad g2.lad proof.elab.pbp
+```
+
+Here the smaller graph must come first, since `cake_pb_mcis` doesn't swap them. A complete run ends with `s VERIFIED BOUNDS k <= obj <= k`, so the maximum common induced subgraph has `|V(G)| - k` vertices. A run stopped by `-t` only certifies its best solution (`0 <= obj <= k`).
+
+Proof logging is supported for every algorithm. The RRSplit and SymSplit variants work on undirected unlabelled graphs only, since those algorithms ignore labels and direction:
+- McSplit's bidomain bound (all supported algorithms) is justified by summing at-least-one and at-most-one constraints.
+- DSB's bound (`dsb*`): the logger recomputes the edge and non-edge counting bounds itself, and justifies them by degree reasoning inside each bidomain.
+- LUM's leaf matching (`ll`, `ll_lum`, `dal`, `dal_dal`): each leaf pair is justified by redundance under the current branch. The leaf's alternatives are ruled out one at a time, each by moving the leaf onto its partner.
+- RRSplit's vertex-equivalence reduction and its tighter bound (`rrsplit_nomax`), and SymSplit's variable symmetry (`symsplit_varonly`), which is the same ordering. With these, the proof first loads a lexicographic order on the images, in branching order, so that it can use dominance. Before search, dominance derives an ordering on each class of twins (vertices with the same neighbourhood), with the swap of two twins as the witness. The tighter bound is then a counting argument over that ordering.
+- SymSplit's value symmetry (`symsplit_valonly`, `symsplit`): at each node, before any branch is explored, each value that has a smaller twin still available is ruled out, with the swap of the two twins in H as the witness. On its own, that's redundance under the current branch. With variable symmetry as well (`symsplit`), the smaller twin can lie below the image of v's previous twin, and then the symmetric solution that respects the twin ordering is in an earlier branch, which redundance can't appeal to. So for `symsplit`, value symmetry is by dominance under the lexicographic order. This works because SymSplit always branches on the smallest vertex of a bidomain, so each rewrite makes that vertex's image smaller and otherwise only touches later vertices.
+- The maximality reduction (`rrsplit*`, `symsplit*`): when matching v to w splits no bidomain, v->w is forced under the current branch. As for LUM, v's alternatives are ruled out one at a time, each by moving v onto w. With the twin ordering, only v's later values (and, for SymSplit, which skips the exclude branch, leaving v unmapped) are ruled out, by dominance under the lexicographic order: v is the smallest vertex of its bidomain, and whoever held w is in the same bidomain. The proof uses one clause per incompatible pair of assignments, so it grows as O(|V(G)|² |V(H)|²) and is practical for graphs up to a few dozen vertices.
+
+To test proof logging, `solvers/test/check_proofs.py` runs every algorithm with `-p` on generated instances (random, directed, labelled, MIVIA binary, trees with many leaves, and stars with large twin classes) and on the stored instances in `solvers/test/instances`, and checks that VeriPB certifies exactly the size the solver reports. With `--cake`, it also checks the undirected unlabelled ones with `cake_pb_mcis`. `solvers/test/mutants.py` builds mutated solvers and loggers, each wrong in a different way, and checks that every one is caught:
+
+```bash
+cd solvers
+make check-proofs                                      # or: python3 test/check_proofs.py -n 3 -A symsplit
+make check-proofs CAKE_PB_MCIS=~/cakepb-dev/graph/cake_pb_mcis
+make check-mutants
+```
+
+Apart from `tiny`, the smallest instance where it happens at all, the stored instances are ones where full SymSplit's value symmetry skips a value in favour of a twin below the image of v's previous twin, and the search below that value can't be refuted by unit propagation, so they're the cases that need dominance rather than redundance.
 
 ---
 

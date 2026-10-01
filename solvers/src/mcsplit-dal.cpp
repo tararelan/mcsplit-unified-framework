@@ -2,6 +2,7 @@
 
 #include "graph.h"
 #include "common.h"
+#include "proof.h"
 #include <algorithm>
 #include <numeric>
 #include <vector>
@@ -28,9 +29,9 @@ int remove_matched_vertex(std::vector<int>& arr, int start, int len, const std::
 void remove_vtx_from_array(std::vector<int>& arr, int start_idx, int& len, int remove_idx);
 static void remove_bidomain(std::vector<Bidomain>& domains, int idx);
 std::vector<Bidomain> rewardfeed_RL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, std::vector<int>& g_matched, std::vector<int>& h_matched, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
-std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& V, std::vector<gtype>& Qv, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats);
-void solve_dal(const Graph& g, const Graph& h, std::vector<gtype>& V, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, std::vector<std::vector<gtype>>& Q, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, int& M, int& num, int Maxnum, int policy_mode, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout);
-std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout, int policy_mode = 0); // 0=hybrid, 1=RL_only, 2=DAL_only
+std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<int>& left, std::vector<int>& right, std::vector<gtype>& V, std::vector<gtype>& Qv, const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats, ProofLogger* proof);
+void solve_dal(const Graph& g, const Graph& h, std::vector<gtype>& V, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade, std::vector<std::vector<gtype>>& Q, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<int>& g_matched, std::vector<int>& h_matched, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, int& M, int& num, int Maxnum, int policy_mode, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof);
+std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway, Stats& stats, std::atomic<bool>& abort_due_to_timeout, int policy_mode = 0, ProofLogger* proof = nullptr); // 0=hybrid, 1=RL_only, 2=DAL_only
 
 /**
  * McSplit's upper bound: sum of min(left_len, right_len) over all bidomains.
@@ -341,13 +342,14 @@ std::vector<Bidomain> rewardfeed_RL(const std::vector<Bidomain>& d, std::vector<
  * @param w         Matched vertex in H
  * @param multiway  If true, further split adjacent bidomains by exact edge label (direction-aware)
  * @param stats     Search statistics (unused here, reserved for future use)
+ * @param proof     Proof logger (justifies each LUM pair), or nullptr if disabled
  * @return          New bidomain list after splitting
  */
 std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector<VtxPair>& current,
         std::vector<int>& g_matched, std::vector<int>& h_matched,
         std::vector<int>& left, std::vector<int>& right,
         std::vector<gtype>& V, std::vector<gtype>& Qv,
-        const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats) {
+        const Graph& g, const Graph& h, int v, int w, bool multiway, Stats& stats, ProofLogger* proof) {
     current.push_back(VtxPair(v, w));
     g_matched[v] = 1;
     h_matched[w] = 1;
@@ -368,6 +370,7 @@ std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector
                 else if (h_matched[leaf_h[q]]) { q++; }
                 else {
                     int v_leaf = leaf_g[p], w_leaf = leaf_h[q];
+                    if (proof) { proof->lum_match(v_leaf, w_leaf); }
                     p++; q++;
                     current.push_back(VtxPair(v_leaf, w_leaf));
                     g_matched[v_leaf] = 1; // matched immediately - correct, unlike reference
@@ -490,6 +493,7 @@ std::vector<Bidomain> rewardfeed_DAL(const std::vector<Bidomain>& d, std::vector
  * @param stats                Search statistics (updated in place)
  * @param start_time           Search start time for elapsed time computation
  * @param abort_due_to_timeout Atomic flag set by timeout thread; checked at entry
+ * @param proof                Proof logger, or nullptr if proof logging is disabled
  */
 void solve_dal(const Graph& g, const Graph& h,
         std::vector<gtype>& V, std::vector<gtype>& lgrade, std::vector<gtype>& rgrade,
@@ -500,9 +504,12 @@ void solve_dal(const Graph& g, const Graph& h,
         unsigned int goal, bool multiway, int& M, int& num, int Maxnum,
         int policy_mode, Stats& stats,
 		std::chrono::time_point<std::chrono::steady_clock> start_time,
-		std::atomic<bool>& abort_due_to_timeout) {
+		std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof) {
 
-    if (abort_due_to_timeout) { return; }
+    if (abort_due_to_timeout) {
+        if (proof) { proof->abort(); }
+        return;
+    }
 
     stats.nodes++;
 
@@ -514,6 +521,7 @@ void solve_dal(const Graph& g, const Graph& h,
         stats.time_to_best = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - start_time).count();
 		num = 0;
+        if (proof) { proof->new_incumbent(current); }
     }
 
     // Prune if upper bound cannot beat incumbent
@@ -521,6 +529,7 @@ void solve_dal(const Graph& g, const Graph& h,
     if (bound <= (int)incumbent.size() || bound < (int)goal) {
         stats.cut_branches++;
         stats.bound_pruned++;
+        if (proof) { proof->prune_by_bound(domains, left, right); }
         return;
     }
 
@@ -536,7 +545,10 @@ void solve_dal(const Graph& g, const Graph& h,
     int bd_idx = -1;
     if (M == 1) { bd_idx = select_bidomain_dal(domains, left, lgrade, current.size()); }
     else        { bd_idx = select_bidomain_dal(domains, left, V, current.size()); }
-    if (bd_idx == -1) { return; }
+    if (bd_idx == -1) {
+        if (proof) { proof->backtrack(); }
+        return;
+    }
 
     Bidomain& bd = domains[bd_idx];
 
@@ -583,15 +595,17 @@ void solve_dal(const Graph& g, const Graph& h,
         // Apply reward function for current policy
         // rewardfeed_RL: adds (v,w) to current, splits domains, updates RL scores
         // rewardfeed_DAL: adds (v,w) + leaf matches to current, splits domains, updates DAL scores
+        if (proof) { proof->push_match(v, w); }
         if (M == 1) {
             new_domains = rewardfeed_RL(domains, current, left, right, lgrade, rgrade, g_matched, h_matched, g, h, v, w, multiway, stats);
         } else {
-            new_domains = rewardfeed_DAL(domains, current, g_matched, h_matched, left, right, V, Q[v], g, h, v, w, multiway, stats);
+            new_domains = rewardfeed_DAL(domains, current, g_matched, h_matched, left, right, V, Q[v], g, h, v, w, multiway, stats, proof);
         }
 
         solve_dal(g, h, V, lgrade, rgrade, Q, incumbent, current,
 			g_matched, h_matched, new_domains, left, right, goal,
-			multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout);
+			multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout, proof);
+        if (proof) { proof->pop(); }
 
         // Undo all matches added by the reward function (v,w and any LUM leaves)
         while (current.size() > cur_len) {
@@ -605,10 +619,19 @@ void solve_dal(const Graph& g, const Graph& h,
     bd.right_len++;
     if (bd.left_len == 0) { remove_bidomain(domains, bd_idx); }
 
-    // Branch where v is not matched at all
+    // Branch where v is not matched at all. v is marked in g_matched for
+    // the duration, so that LUM can't pair it as a leaf further down
+    // (doing so would explore solutions outside this branch)
+    g_matched[v] = 1;
+    if (proof) { proof->push_exclude(v); }
     solve_dal(g, h, V, lgrade, rgrade, Q, incumbent, current,
         g_matched, h_matched, domains, left, right, goal,
-        multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout);
+        multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout, proof);
+    if (proof) { proof->pop(); }
+    g_matched[v] = 0;
+
+    // Every way of extending the current trail has now been refuted
+    if (proof) { proof->backtrack(); }
 }
 
 /**
@@ -624,12 +647,13 @@ void solve_dal(const Graph& g, const Graph& h,
  * @param stats                Search statistics (updated in place)
  * @param abort_due_to_timeout Atomic flag set by timeout thread
  * @param policy_mode          0 = hybrid alternation, 1 = force RL only, 2 = force DAL only
+ * @param proof                Proof logger, or nullptr if proof logging is disabled
  * @return                     Maximum common induced subgraph as matched vertex pairs,
  *                             indexed into the original unsorted graphs
  */
 std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
-        int policy_mode) {
+        int policy_mode, ProofLogger* proof) {
 
     // Calculate degrees for vertex sorting (total degree: outgoing + incoming,
     // matching the reference's calculate_degrees)
@@ -667,6 +691,7 @@ std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway,
 
     Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
     Graph h_sorted = induced_subgraph(const_cast<Graph&>(h), vv1);
+    if (proof) { proof->set_vertex_orders(vv0, vv1); }
 
     // Precompute leaf vertex lists for LUM optimisation
     pack_leaves(g_sorted);
@@ -724,7 +749,7 @@ std::vector<VtxPair> mcs_dal(const Graph& g, const Graph& h, bool multiway,
     // consistent with every other argument.
     solve_dal(g_sorted, h_sorted, V, lgrade, rgrade, Q, incumbent, current,
         g_matched, h_matched, domains, left, right,
-        1, multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout);
+        1, multiway, M, num, Maxnum, policy_mode, stats, start_time, abort_due_to_timeout, proof);
 
     // Convert solution indices back to original (unsorted) vertex indices
     for (auto& p : incumbent) {

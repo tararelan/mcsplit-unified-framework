@@ -2,6 +2,7 @@
 
 #include "graph.h"
 #include "common.h"
+#include "proof.h"
 #include <algorithm>
 #include <numeric>
 #include <vector>
@@ -34,11 +35,11 @@ static std::vector<Bidomain> filter_domains_dsb(const std::vector<Bidomain>& d, 
 static int index_of_next_smallest_dsb(const std::vector<int>& arr, int start_idx, int len, int w);
 static void remove_vtx_from_left_domain_dsb(std::vector<int>& left, Bidomain& bd, int v);
 static void remove_bidomain_dsb(std::vector<Bidomain>& domains, int idx);
-void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, long double* array, bool& bound_enabled, bool& count_enabled, int& called_count, int& success_count, int max_count, int max_success, int* s_degrees);
+void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent, std::vector<VtxPair>& current, std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right, unsigned int goal, bool multiway, Stats& stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool>& abort_due_to_timeout, long double* array, bool& bound_enabled, bool& count_enabled, int& called_count, int& success_count, int max_count, int max_success, int* s_degrees, ProofLogger* proof);
 // max_count/max_success default to the reference's MAX_COUNT=100, MAX_SUCCESS=30 at the mcs_dsb call site
 std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
-        int bound_mode = 0);
+        int bound_mode = 0, ProofLogger* proof = nullptr);
 
 /**
  * Initialises a probability array to a neutral prior (1.0 everywhere)
@@ -478,6 +479,7 @@ static void remove_bidomain_dsb(std::vector<Bidomain>& domains, int idx) {
  * @param max_count Call-count threshold at which gating is (re-)evaluated.
  * @param max_success Success-count threshold required to keep the bound enabled.
  * @param s_degrees Scratch buffer for per-vertex degree counts within a bidomain.
+ * @param proof Proof logger, or nullptr if proof logging is disabled.
  */
 void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         std::vector<VtxPair>& current, std::vector<Bidomain>& domains,
@@ -487,9 +489,12 @@ void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         std::atomic<bool>& abort_due_to_timeout,
         long double* array, bool& bound_enabled, bool& count_enabled,
         int& called_count, int& success_count, int max_count, int max_success,
-        int* s_degrees) {
+        int* s_degrees, ProofLogger* proof) {
 
-    if (abort_due_to_timeout) { return; }
+    if (abort_due_to_timeout) {
+        if (proof) { proof->abort(); }
+        return;
+    }
 
     stats.nodes++;
 
@@ -499,6 +504,7 @@ void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
         stats.nodes_to_best = stats.nodes;
         stats.time_to_best = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - start_time).count();
+        if (proof) { proof->new_incumbent(current); }
     }
 
     unsigned int bound = calc_bound_dsb(g, h, domains, left, right, incumbent, current,
@@ -508,11 +514,15 @@ void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
     if (bound <= (unsigned int)incumbent.size() || bound < goal) {
         stats.cut_branches++;
         stats.bound_pruned++;
+        if (proof) { proof->prune_by_bound(domains, left, right); }
         return;
     }
 
     int bd_idx = select_bidomain_dsb(domains, left, current.size());
-    if (bd_idx == -1) { return; }
+    if (bd_idx == -1) {
+        if (proof) { proof->backtrack(); }
+        return;
+    }
 
     Bidomain& bd = domains[bd_idx];
 
@@ -536,10 +546,12 @@ void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
 
         auto new_domains = filter_domains_dsb(domains, left, right, g, h, v, w, multiway);
         current.push_back(VtxPair(v, w));
+        if (proof) { proof->push_match(v, w); }
         solve_dsb(g, h, incumbent, current, new_domains, left, right, goal,
                 multiway, stats, start_time, abort_due_to_timeout,
                 array, bound_enabled, count_enabled, called_count, success_count,
-                max_count, max_success, s_degrees);
+                max_count, max_success, s_degrees, proof);
+        if (proof) { proof->pop(); }
         current.pop_back();
     }
 
@@ -547,10 +559,15 @@ void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
     if (bd.left_len == 0) { remove_bidomain_dsb(domains, bd_idx); }
 
     // Branch where v is not matched at all
+    if (proof) { proof->push_exclude(v); }
     solve_dsb(g, h, incumbent, current, domains, left, right, goal,
             multiway, stats, start_time, abort_due_to_timeout,
             array, bound_enabled, count_enabled, called_count, success_count,
-            max_count, max_success, s_degrees);
+            max_count, max_success, s_degrees, proof);
+    if (proof) { proof->pop(); }
+
+    // Every way of extending the current trail has now been refuted
+    if (proof) { proof->backtrack(); }
 }
 
 /**
@@ -564,11 +581,13 @@ void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
  * @param stats Search statistics, updated in-place.
  * @param abort_due_to_timeout Flag checked to abort the search early.
  * @param bound_mode Controls the DSB bound gating: 0 = gated (default), 1 = always on, 2 = never on.
+ * @param proof Proof logger, or nullptr if proof logging is disabled.
  * @return The largest common subgraph solution found, as vertex pairs in the original graphs' indices.
  */
 std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout,
-        int bound_mode)   // 0 = gated (default), 1 = always, 2 = never
+        int bound_mode,   // 0 = gated (default), 1 = always, 2 = never
+        ProofLogger* proof)
 		{
 
 	// bound_mode: 0=gated, 1=always on, 2=never on
@@ -608,6 +627,10 @@ std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
 
     Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
     Graph h_sorted = induced_subgraph(const_cast<Graph&>(h), vv1);
+    if (proof) {
+        proof->set_vertex_orders(vv0, vv1);
+        proof->enable_unused_vertex_vars();
+    }
 
     // Build per-label bidomains - DSB uses label splitting like McSplit
     std::vector<int> left, right;
@@ -651,7 +674,7 @@ std::vector<VtxPair> mcs_dsb(const Graph& g, const Graph& h, bool multiway,
     solve_dsb(g_sorted, h_sorted, incumbent, current, domains, left, right, 1,
             multiway, stats, start_time, abort_due_to_timeout,
             array, bound_enabled, count_enabled, called_count, success_count,
-            max_count, max_success, s_degrees);
+            max_count, max_success, s_degrees, proof);
 
     for (auto& p : incumbent) {
         p.v = vv0[p.v];
