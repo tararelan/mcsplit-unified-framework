@@ -28,7 +28,8 @@ std::vector<VtxPair> mcs_dal(const Graph &g, const Graph &h, bool multiway,
 							 int policy_mode = 0, ProofLogger *proof = nullptr);
 // bound_mode: 0 = gated (adaptive), 1 = always on, 2 = never on (plain McSplit bound)
 std::vector<VtxPair> mcs_dsb(const Graph &g, const Graph &h, bool multiway,
-							 Stats &stats, std::atomic<bool> &abort_due_to_timeout, int bound_mode = 0);
+							 Stats &stats, std::atomic<bool> &abort_due_to_timeout, int bound_mode = 0,
+							 ProofLogger *proof = nullptr);
 // red_mode: bitmask - bit 0 = vertex-equivalence, bit 1 = maximality, bit 2 = tighter bound
 std::vector<VtxPair> mcs_rr(const Graph &g, const Graph &h, Stats &stats,
 							std::atomic<bool> &abort_due_to_timeout, int red_mode = 7);
@@ -174,14 +175,15 @@ int main(int argc, char **argv)
 	if (g.n > h.n)
 		std::swap(g, h);
 
-	// proof logging covers the algorithms whose only pruning is McSplit's
-	// bidomain bound; the others need justifications that aren't written yet
-	// (LUM in ll, ll_lum, dal and dal_dal; the degree-sequence bound in dsb;
-	// the symmetry and maximality reductions in rrsplit and symsplit)
+	// proof logging covers the algorithms whose pruning is McSplit's or
+	// DSB's bidomain bound; the others need justifications that aren't
+	// written yet (LUM in ll, ll_lum, dal and dal_dal; the symmetry and
+	// maximality reductions in rrsplit and symsplit)
 	std::unique_ptr<ProofLogger> proof;
 	if (!arguments.proof_prefix.empty())
 	{
-		static const std::set<std::string> proof_algorithms = {"mcsplit", "rl", "ll_lsm", "dal_rl"};
+		static const std::set<std::string> proof_algorithms = {"mcsplit", "rl", "ll_lsm", "dal_rl",
+																	"dsb", "dsb_always", "dsb_never"};
 		if (!proof_algorithms.count(arguments.algorithm))
 		{
 			std::cerr << "Proof logging is not supported for algorithm " << arguments.algorithm << std::endl;
@@ -247,11 +249,11 @@ int main(int argc, char **argv)
 		solution = mcs_dal(g, h, multiway, stats, abort_due_to_timeout, 2);
 
 	else if (arguments.algorithm == "dsb")
-		solution = mcs_dsb(g, h, multiway, stats, abort_due_to_timeout);
+		solution = mcs_dsb(g, h, multiway, stats, abort_due_to_timeout, 0, proof.get());
 	else if (arguments.algorithm == "dsb_always")
-		solution = mcs_dsb(g, h, multiway, stats, abort_due_to_timeout, 1);
+		solution = mcs_dsb(g, h, multiway, stats, abort_due_to_timeout, 1, proof.get());
 	else if (arguments.algorithm == "dsb_never")
-		solution = mcs_dsb(g, h, multiway, stats, abort_due_to_timeout, 2);
+		solution = mcs_dsb(g, h, multiway, stats, abort_due_to_timeout, 2, proof.get());
 
 	else if (arguments.algorithm == "rrsplit")
 		solution = mcs_rr(g, h, stats, abort_due_to_timeout, 7); // all on

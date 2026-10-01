@@ -22,6 +22,15 @@
 // at-least-one constraints of the left side and the injectivity constraints
 // of the right side of every bidomain with |L| > |R|; unit propagation then
 // sees the conflict. New incumbents are logged with soli.
+//
+// McSplit+DSB's tighter bound counts edges (or non-edges) inside a bidomain:
+// if the smaller side S has more internal edges than the larger side B, the
+// unmatched vertices of S must cover the difference in degree. The logger
+// recomputes this bound itself and, when McSplit's bound is not enough,
+// justifies the prune with a pbc subproof under the trail (see
+// derive_degree_bound). When the H side is the smaller one, this needs the
+// proof-only variables y<w> <=> "w is not the image of any vertex", which
+// enable_unused_vertex_vars() introduces.
 
 #include "graph.h"
 #include "common.h"
@@ -54,6 +63,12 @@ public:
 	 */
 	void set_vertex_orders(const std::vector<int> &g_order, const std::vector<int> &h_order);
 
+	/**
+	 * Introduces y<w> <=> "w is unused" for every vertex w of H. Required
+	 * before searching with the DSB bound; must be called at the top level.
+	 */
+	void enable_unused_vertex_vars();
+
 	/// Logs a new incumbent (in sorted indices) with soli.
 	void new_incumbent(const std::vector<VtxPair> &current);
 
@@ -67,9 +82,11 @@ public:
 	void pop();
 
 	/**
-	 * Justifies a McSplit bound prune at the current node and logs the
-	 * backtrack clause. left and right are the solver's vertex arrays that
-	 * the bidomains index into (sorted indices).
+	 * Justifies a bound prune at the current node and logs the backtrack
+	 * clause. left and right are the solver's vertex arrays that the
+	 * bidomains index into (sorted indices). Uses McSplit's bound when that
+	 * suffices, and the DSB degree bounds otherwise; throws if neither
+	 * justifies pruning against the current incumbent.
 	 */
 	void prune_by_bound(const std::vector<Bidomain> &domains,
 						const std::vector<int> &left, const std::vector<int> &right);
@@ -88,13 +105,35 @@ public:
 	void finish(int best_size);
 
 private:
+	// How the logger justifies the bound on one bidomain (L, R): the number
+	// of matched vertices of L is at most `bound`.
+	struct BidomainPlan
+	{
+		enum Kind
+		{
+			MinSize, // min(|L|, |R|), McSplit's bound
+			Pair,	 // 2x2 bidomain whose internal adjacencies differ: at most 1
+			Degree	 // DSB edge or non-edge counting on one side
+		} kind = MinSize;
+		int bound = 0;
+		bool s_is_left = true;	 // Degree: is S (the counted side) the G side?
+		bool complement = false; // Degree: count non-edges instead of edges
+		int r = 0;				 // Degree: at least r vertices of S are unmatched
+	};
+
 	std::ofstream opb;
 	std::ofstream pbp;
 
 	int g_n = 0, h_n = 0;
 	std::vector<std::vector<bool>> compatible; // compatible[v][w]: model has x<v>_<w>
+	std::vector<std::vector<unsigned int>> g_adj, h_adj; // model adjacency matrices
+	std::vector<int> users;					   // users[w]: number of v compatible with w
 	std::vector<long long> inj_id;			   // constraint ID of "w used at most once", -1 if absent
+	std::vector<long long> unused_alo_id;	   // ID of y<w> + sum_v x<v>_<w> >= 1, -1 if absent
+	std::vector<long long> unused_amo_id;	   // ID of y<w> + sum_v x<v>_<w> <= 1, -1 if absent
 	std::vector<int> g_order, h_order;
+	int incumbent_size = 0;
+	int n_matched = 0; // match decisions on the trail
 
 	long long next_id = 1;	   // ID the next constraint-producing rule will receive
 	long long obj_id = -1;	   // ID of the most recent objective-improving constraint
@@ -102,10 +141,17 @@ private:
 	bool aborted = false;
 
 	std::vector<std::string> trail;					 // decision literals, outermost first
+	std::vector<bool> trail_is_match;				 // whether each decision is v->w
 	std::vector<std::vector<long long>> child_nogoods; // per depth: backtrack clauses awaiting deletion
 
 	long long alo_id(int v) const { return v + 1; }
 	long long amo_id(int v) const { return g_n + v + 1; }
 
 	void write_backtrack_clause();
+	void record_backtrack_clause(long long id);
+	void write_trail_clause();
+
+	BidomainPlan plan_bidomain(const std::vector<int> &L, const std::vector<int> &R) const;
+	long long derive_pair_bound(const std::vector<int> &L, const std::vector<int> &R);
+	long long derive_degree_bound(const std::vector<int> &L, const std::vector<int> &R, const BidomainPlan &plan);
 };
