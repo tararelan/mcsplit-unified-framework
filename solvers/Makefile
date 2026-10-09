@@ -6,7 +6,7 @@ BOOST_DIR = boost_1_84_0
 BOOST_URL = https://archives.boost.io/release/$(BOOST_VERSION)/source/$(BOOST_DIR).tar.gz
 BOOST_INC = $(HOME)/work/$(BOOST_DIR)
 
-SRC = src/main.cpp src/mcsplit.cpp src/mcsplit-dal.cpp src/rrsplit.cpp src/symsplit.cpp src/mcsplit-ll.cpp src/mcsplit-dsb.cpp src/mcsplit-rl.cpp src/graph.cpp
+SRC = src/main.cpp src/mcsplit.cpp src/mcsplit-down.cpp src/mcsplit-dal.cpp src/rrsplit.cpp src/symsplit.cpp src/mcsplit-ll.cpp src/mcsplit-dsb.cpp src/mcsplit-rl.cpp src/mcsplit-rl-pair.cpp src/mcsplit-rl-rate.cpp src/mcsplit-rl-down.cpp src/graph.cpp
 
 all: bin/mcsp
 

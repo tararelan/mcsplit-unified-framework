@@ -34,6 +34,8 @@ fi
 REF_SIZE=""
 REF_NODES=""
 REF_TIME=""
+REF_BIDOMAIN_MEAN=""
+REF_BIDOMAIN_MAX=""
 
 case "$ALGO" in
     mcsplit)
@@ -42,6 +44,9 @@ case "$ALGO" in
         REF_NODES=$(echo "$REF_OUT" | grep "^Nodes:" | awk '{print $NF}')
         REF_TIME_MS=$(echo "$REF_OUT" | grep "^CPU time" | awk '{print $NF}')
         REF_TIME=$(echo "$REF_TIME_MS" | awk '{printf "%.6f", $1/1000}')
+        REF_BIDOMAIN_RAW=$(echo "$REF_OUT" | grep "^BIDOMAINS:" | sed 's/^BIDOMAINS://')
+        REF_BIDOMAIN_MEAN=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f1)
+        REF_BIDOMAIN_MAX=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f2)
         ;;
     rl)
         REF_OUT=$(timeout 1000 ./reference/mcsplit-rl/mcsp+RL min_max $REF_DIRECTED_FLAG -l -q "$A" "$B" 2>/dev/null)
@@ -49,6 +54,9 @@ case "$ALGO" in
         REF_NODES=$(echo "$REF_OUT" | grep "^Nodes:" | awk '{print $NF}')
         REF_TIME_MS=$(echo "$REF_OUT" | grep "^CPU time" | awk '{print $NF}')
         REF_TIME=$(echo "$REF_TIME_MS" | awk '{printf "%.6f", $1/1000}')
+        REF_BIDOMAIN_RAW=$(echo "$REF_OUT" | grep "^BIDOMAINS:" | sed 's/^BIDOMAINS://')
+        REF_BIDOMAIN_MEAN=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f1)
+        REF_BIDOMAIN_MAX=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f2)
         ;;
     dal)
         REF_OUT=$(timeout 1000 ./reference/mcsplit-dal/mcspDAL min_max $REF_DIRECTED_FLAG -l -l -q "$A" "$B" 2>/dev/null)
@@ -56,6 +64,9 @@ case "$ALGO" in
         REF_NODES=$(echo "$REF_OUT" | grep "^#2:" | awk '{print $3}')
         REF_TIME_MS=$(echo "$REF_OUT" | grep "^#2:" | awk '{print $4}')
         REF_TIME=$(echo "$REF_TIME_MS" | awk '{printf "%.6f", $1/1000}')
+        REF_BIDOMAIN_RAW=$(echo "$REF_OUT" | grep "^BIDOMAINS:" | sed 's/^BIDOMAINS://')
+        REF_BIDOMAIN_MEAN=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f1)
+        REF_BIDOMAIN_MAX=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f2)
         ;;
     ll)
         REF_OUT=$(timeout 1000 ./reference/mcsplit-ll/mcsp+ll min_max $REF_DIRECTED_FLAG -l -q "$A" "$B" 2>/dev/null)
@@ -63,12 +74,18 @@ case "$ALGO" in
         REF_NODES=$(echo "$REF_OUT" | grep "^Nodes:" | awk '{print $NF}')
         REF_TIME_MS=$(echo "$REF_OUT" | grep "^CPU time" | awk '{print $NF}')
         REF_TIME=$(echo "$REF_TIME_MS" | awk '{printf "%.6f", $1/1000}')
+        REF_BIDOMAIN_RAW=$(echo "$REF_OUT" | grep "^BIDOMAINS:" | sed 's/^BIDOMAINS://')
+        REF_BIDOMAIN_MEAN=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f1)
+        REF_BIDOMAIN_MAX=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f2)
         ;;
     dsb)
         REF_OUT=$(timeout 1000 ./reference/mcsplit-dsb/bin/run.o min_max $REF_DIRECTED_FLAG -l -q "$A" "$B" 2>/dev/null)
         REF_SIZE=$(echo "$REF_OUT" | awk -F',' '{print $1}' | tr -d ' ')
         REF_TIME=$(echo "$REF_OUT" | awk -F',' '{print $4}' | tr -d ' ')
         REF_NODES=$(echo "$REF_OUT" | awk -F',' '{print $5}' | tr -d ' ')
+        REF_BIDOMAIN_RAW=$(echo "$REF_OUT" | grep "^BIDOMAINS:" | sed 's/^BIDOMAINS://')
+        REF_BIDOMAIN_MEAN=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f1)
+        REF_BIDOMAIN_MAX=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f2)
         ;;
     rrsplit)
         REF_OUT=$(timeout 1000 ./reference/rrsplit/mcsp min_max $REF_DIRECTED_FLAG -l -q "$A" "$B" 2>/dev/null)
@@ -76,13 +93,19 @@ case "$ALGO" in
         REF_NODES=$(echo "$REF_OUT" | grep "^#2:" | awk '{print $3}')
         REF_TIME_MS=$(echo "$REF_OUT" | grep "^#2:" | awk '{print $4}')
         REF_TIME=$(echo "$REF_TIME_MS" | awk '{printf "%.6f", $1/1000}')
+        REF_BIDOMAIN_RAW=$(echo "$REF_OUT" | grep "^BIDOMAINS:" | sed 's/^BIDOMAINS://')
+        REF_BIDOMAIN_MEAN=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f1)
+        REF_BIDOMAIN_MAX=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f2)
         ;;
     symsplit)
         REF_OUT=$(timeout 1000 ./reference/symsplit/bin/run.o min_max $REF_DIRECTED_FLAG -l -q "$A" "$B" 2>/dev/null)
         REF_SIZE=$(echo "$REF_OUT" | awk -F',' '{print $1}' | tr -d ' ')
         REF_TIME=$(echo "$REF_OUT" | awk -F',' '{print $4}' | tr -d ' ')
         REF_NODES=$(echo "$REF_OUT" | awk -F',' '{print $5}' | tr -d ' ')
+        REF_BIDOMAIN_RAW=$(echo "$REF_OUT" | grep "^BIDOMAINS:" | sed 's/^BIDOMAINS://')
+        REF_BIDOMAIN_MEAN=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f1)
+        REF_BIDOMAIN_MAX=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f2)
         ;;
 esac
 
-echo "$(basename "$A"),$(basename "$B"),$ALGO,$REF_SIZE,$REF_NODES,$REF_TIME" > "$OUTFILE"
+echo "$(basename "$A"),$(basename "$B"),$ALGO,$REF_SIZE,$REF_NODES,$REF_TIME,$REF_BIDOMAIN_MEAN,$REF_BIDOMAIN_MAX" > "$OUTFILE"

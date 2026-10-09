@@ -505,6 +505,7 @@ void solve_dal(const Graph& g, const Graph& h,
     if (abort_due_to_timeout) { return; }
 
     stats.nodes++;
+    stats.bidomain_counts.push_back(domains.size());
 
     // Update incumbent if current solution is the best seen so far
     if (current.size() > incumbent.size()) {

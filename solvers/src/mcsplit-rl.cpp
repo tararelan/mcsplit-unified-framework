@@ -333,6 +333,7 @@ static void solve_rl(const Graph& g, const Graph& h,
     if (abort_due_to_timeout) { return; }
 
     stats.nodes++;
+    stats.bidomain_counts.push_back(domains.size());
 
     if (current.size() > incumbent.size()) {
         incumbent = current;

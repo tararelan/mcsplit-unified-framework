@@ -41,7 +41,10 @@ This validation uncovered two previously undocumented defects in published refer
 This repository contains reimplementations of the following algorithms:
 
 - **McSplit** - C. McCreesh and P. Prosser and J. Trimble. [A Partitioning Algorithm for Maximum Common Subgraph Problems](https://doi.org/10.24963/ijcai.2017/99). IJCAI 2017.
+- **McSplit-down** - the same top-down ("big-first") search strategy from C. McCreesh and P. Prosser and J. Trimble's paper above, re-implemented as its own algorithm rather than a runtime flag.
 - **McSplit+RL** - Y. Liu and C.-M. Li and H. Jiang and K. He. [A Learning Based Branch and Bound for Maximum Common Subgraph Related Problems](https://doi.org/10.1609/aaai.v34i03.5619). AAAI 2020.
+- **McSplit+RL Pair** and **McSplit+RL Rate** - ablations of McSplit+RL from the same paper above (per-pair scoring and rate-normalised reward respectively); the McSplit-RL reference repository only ships base RL, so these two follow the paper's formulas directly (Section 2.8, 2.9 of the dissertation).
+- **McSplit+RL-down** - McSplit+RL's branching heuristic combined with McSplit-down's search strategy (Section 2.10). This combination has no published paper or reference implementation; it follows the dissertation's own description of the two mechanisms as independent/composable.
 - **McSplit+LL** - J. Zhou and K. He and J. Zheng and C.-M. Li and Y. Liu. [A Strengthened Branch and Bound Algorithm for the Maximum Common (Connected) Subgraph Problem](https://doi.org/10.24963/ijcai.2022/265). IJCAI 2022.
 - **McSplit+DAL** - Y. Liu and J. Zhao and C.-M. Li and H. Jiang and K. He. [Hybrid Learning with New Value Function for the Maximum Common Induced Subgraph Problem](https://doi.org/10.1609/aaai.v37i4.25519). AAAI 2023.
 - **McSplit+DSB** - B. W. Kothalawala and H. Koehler and Q. Wang. [Learning to Bound for Maximum Common Subgraph Algorithms](https://doi.org/10.4230/LIPIcs.CP.2025.22). CP 2025.
@@ -145,7 +148,11 @@ make -C solvers
 | Flag | Algorithm |
 |------|-----------|
 | `mcsplit` | McSplit (baseline) |
+| `down` | McSplit-down (top-down / "big-first" search) |
 | `rl` | McSplit+RL |
+| `rl_pair` | McSplit+RL with per-pair (v,w) scoring instead of per-vertex |
+| `rl_rate` | McSplit+RL with rate-normalised reward |
+| `rl_down` | McSplit+RL branching combined with McSplit-down's search strategy |
 | `ll` | McSplit+LL (full: LSM + LUM) |
 | `ll_lsm` | McSplit+LL with LSM only |
 | `ll_lum` | McSplit+LL with LUM only |

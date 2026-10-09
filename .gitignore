@@ -1,3 +1,7 @@
 .vscode/
 instances/
 misc/
+output.txt
+run_demo.sh
+evaluation/scripts/run_demo.sh
+.gitignore

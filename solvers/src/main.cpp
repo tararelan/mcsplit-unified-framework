@@ -10,11 +10,20 @@
 #include <condition_variable>
 #include <atomic>
 #include <argp.h>
+#include <fstream>
 
 std::vector<VtxPair> mcs(const Graph &g, const Graph &h, bool multiway,
 						 Stats &stats, std::atomic<bool> &abort_due_to_timeout);
 std::vector<VtxPair> mcs_rl(const Graph &g, const Graph &h, bool multiway,
 							Stats &stats, std::atomic<bool> &abort_due_to_timeout);
+std::vector<VtxPair> mcs_down(const Graph &g, const Graph &h, bool multiway,
+						Stats &stats, std::atomic<bool> &abort_due_to_timeout);
+std::vector<VtxPair> mcs_rl_pair(const Graph &g, const Graph &h, bool multiway,
+						Stats &stats, std::atomic<bool> &abort_due_to_timeout);
+std::vector<VtxPair> mcs_rl_rate(const Graph &g, const Graph &h, bool multiway,
+						Stats &stats, std::atomic<bool> &abort_due_to_timeout);
+std::vector<VtxPair> mcs_rl_down(const Graph &g, const Graph &h, bool multiway,
+						Stats &stats, std::atomic<bool> &abort_due_to_timeout);
 // use_lum: enable leaf union matching; use_lsm: enable long-short memory scoring
 std::vector<VtxPair> mcs_ll(const Graph &g, const Graph &h, bool multiway, Stats &stats,
 							std::atomic<bool> &abort_due_to_timeout, bool use_lum = true, bool use_lsm = true);
@@ -49,7 +58,7 @@ static struct argp_option options[] = {
 	{"labelled", 'a', 0, 0, "Use both vertex and edge labels"},
 	{"vertex-labelled", 'x', 0, 0, "Use vertex labels only (no edge labels)"},
 	{"timeout", 't', "timeout", 0, "Abort search after this many seconds (0 = no limit)"},
-	{"algorithm", 'A', "algo", 0, "Algorithm to run: mcsplit, rl, ll, dal, dsb, rrsplit, symsplit"},
+	{"algorithm", 'A', "algo", 0, "Algorithm to run: mcsplit, down, rl, rl_pair, rl_rate, rl_down, ll, dal, dsb, rrsplit, symsplit"},
 	{0}};
 
 // Parsed argument state, populated by the argp parser and read by main().
@@ -204,8 +213,17 @@ int main(int argc, char **argv)
 	// dispatch table: algorithm name -> mcs_* call with the matching
 	// mode/bitmask (see the declarations and options[] table above for
 	// what each mode value means)
-	if (arguments.algorithm == "rl")
+	if (arguments.algorithm == "down")
+		solution = mcs_down(g, h, multiway, stats, abort_due_to_timeout);
+
+	else if (arguments.algorithm == "rl")
 		solution = mcs_rl(g, h, multiway, stats, abort_due_to_timeout);
+	else if (arguments.algorithm == "rl_pair")
+		solution = mcs_rl_pair(g, h, multiway, stats, abort_due_to_timeout);
+	else if (arguments.algorithm == "rl_rate")
+		solution = mcs_rl_rate(g, h, multiway, stats, abort_due_to_timeout);
+	else if (arguments.algorithm == "rl_down")
+		solution = mcs_rl_down(g, h, multiway, stats, abort_due_to_timeout);
 
 	else if (arguments.algorithm == "ll")
 		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, true, true);
@@ -279,6 +297,28 @@ int main(int argc, char **argv)
 			  << stats.cut_branches << " "
 			  << stats.bound_pruned << " "
 			  << stats.sym_pruned << " ";
+
+	// Per-node bidomain-count summary (see each solve_*'s stats.nodes++ site,
+	// where stats.bidomain_counts is populated) - mean and max across the
+	// whole search, rather than the full per-node sequence, so this stays a
+	// fixed couple of numbers regardless of how many nodes were visited.
+	// Fields 11 and 12, which hpc/run_instance.sh reads straight into the
+	// results CSV. Used to test whether directed (BI) instances really do
+	// produce more bidomains per node on average than undirected ones.
+	double bidomain_mean = 0.0;
+	unsigned int bidomain_max = 0;
+	if (!stats.bidomain_counts.empty())
+	{
+		unsigned long long sum = 0;
+		for (unsigned int count : stats.bidomain_counts)
+		{
+			sum += count;
+			if (count > bidomain_max)
+				bidomain_max = count;
+		}
+		bidomain_mean = static_cast<double>(sum) / stats.bidomain_counts.size();
+	}
+	std::cout << bidomain_mean << " " << bidomain_max << std::endl;
 
 	return 0;
 }
