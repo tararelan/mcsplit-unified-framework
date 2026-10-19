@@ -12,8 +12,8 @@
 
 // McSplit-down ("McSplit↓" / "big-first" search, Section 2.6): rather than
 // building a mapping from empty and maximising, this variant asks "does a
-// mapping of size k exist?" starting at k = |V(G)| (assuming G is the
-// smaller graph, per main.cpp's convention) and decrementing k until one is
+// mapping of size k exist?" starting at k = |V(G)| (G is the first input
+// graph, as in the reference - no swap) and decrementing k until one is
 // found. Everything else - bidomain representation, branching heuristic,
 // bound, filter_domains' multiway split - is identical to plain McSplit
 // (mcsplit.cpp); only the pruning condition and the top-level driving loop
@@ -332,11 +332,13 @@ std::vector<VtxPair> mcs_down(const Graph& g, const Graph& h, bool multiway,
     std::vector<int> g_deg = calc_degrees(g);
     std::vector<int> h_deg = calc_degrees(h);
 
+    // Threshold n(n-1)/2, as in reference/mcsplit/mcsp.c (run with -b),
+    // which is this variant's reference - see mcsplit.cpp.
     int g_edges = 0, h_edges = 0;
     for (int d : g_deg) g_edges += d;
     for (int d : h_deg) h_edges += d;
-    bool h_dense = h_edges > h.n * (h.n - 1);
-    bool g_dense = g_edges > g.n * (g.n - 1);
+    bool h_dense = h_edges > h.n * (h.n - 1) / 2;
+    bool g_dense = g_edges > g.n * (g.n - 1) / 2;
 
     std::vector<int> vv0(g.n), vv1(h.n);
     std::iota(vv0.begin(), vv0.end(), 0);

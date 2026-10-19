@@ -49,7 +49,7 @@ Graph::~Graph()
  * @param w             Target vertex
  * @param edge_val      Edge label value (used only if edge_labelled is true)
  * @param directed      If true, encode edge direction asymmetrically
- * @param edge_labelled If true, use edge_val; otherwise use fixed values (1/2)
+ * @param edge_labelled If true, use edge_val; otherwise use fixed values (1 / 1<<16)
  */
 static void add_edge(Graph &g, int v, int w, unsigned int edge_val, bool directed, bool edge_labelled)
 {
@@ -70,12 +70,19 @@ static void add_edge(Graph &g, int v, int w, unsigned int edge_val, bool directe
 		}
 		else
 		{
-			// unlabelled directed case uses fixed bits instead of edge_val:
-			// bit 0 = forward, bit 1 = reverse (see docstring above)
+			// unlabelled directed case: forward edge = 1 in the low 16 bits,
+			// reverse edge = 1 in the high 16 bits, exactly as the C++
+			// reference implementations (RL, LL, DAL, DSB, RRSplit, SymSplit)
+			// store it. The degree calculation in every solver counts
+			// (adjmat & 0xFFFF) and (adjmat & ~0xFFFF) separately, so this is
+			// what makes degree = in-degree + out-degree on directed graphs.
+			// (The previous 1/2 encoding put both bits inside 0xFFFF, so a
+			// vertex's in- and out-edges to the same neighbour were counted
+			// once - a different vertex order from every reference.)
 			if (directed)
 			{
 				g.adjmat[v][w] |= 1;
-				g.adjmat[w][v] |= 2;
+				g.adjmat[w][v] |= (1u << 16);
 			}
 			else
 			{

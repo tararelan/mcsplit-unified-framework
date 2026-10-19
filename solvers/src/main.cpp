@@ -169,9 +169,13 @@ int main(int argc, char **argv)
 	Graph h = readGraph(arguments.filename2, format, arguments.directed,
 						arguments.edge_labelled, arguments.vertex_labelled);
 
-	// convention: g is always the smaller graph; several algorithms'
-	// complexity bounds (see Section 2.13) assume |V(G)| <= |V(H)|
-	if (g.n > h.n)
+	// Only RRSplit and SymSplit swap so that G is the smaller graph - their
+	// reference implementations do this in main(). Every other reference
+	// (McSplit, McSplit+RL, LL, DAL, DSB) keeps the input order, and swapping
+	// changes the search tree, so for fidelity those keep the order given.
+	bool ref_swaps = arguments.algorithm.rfind("rrsplit", 0) == 0 ||
+					 arguments.algorithm.rfind("symsplit", 0) == 0;
+	if (ref_swaps && g.n > h.n)
 		std::swap(g, h);
 
 	if (!arguments.quiet)

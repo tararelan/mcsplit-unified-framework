@@ -344,8 +344,9 @@ std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway,
         Stats& stats, std::atomic<bool>& abort_due_to_timeout) {
 
     // Calculate degree of each vertex for sorting.
-    // Only counts outgoing edges (adjmat[v][w] & 1) - consistent with
-    // the reference implementation's degree-based vertex ordering.
+    // Counts outgoing (low 16 bits) and incoming (high 16 bits) edges
+    // separately, so on directed graphs degree = in-degree + out-degree,
+    // matching reference/mcsplit/mcsp.c's calculate_all_degrees.
     auto calc_degrees = [](const Graph& g) {
 		std::vector<int> degree(g.n, 0);
 		for (int v = 0; v < g.n; v++)
@@ -365,11 +366,14 @@ std::vector<VtxPair> mcs(const Graph& g, const Graph& h, bool multiway,
     // Sparse graphs: sort descending (high-degree vertices first).
     // The sort is applied to G using H's density and vice versa - this
     // matches the reference implementation's sorting logic.
+    // Threshold is n(n-1)/2 (integer division), as in reference/mcsplit/mcsp.c
+    // (graph_edge_count(g) > g->n*(g->n-1)/2). The C++ references (RL, LL,
+    // DAL, DSB) use n(n-1) instead, so their solver files keep that.
     int g_edges = 0, h_edges = 0;
     for (int d : g_deg) g_edges += d;
     for (int d : h_deg) h_edges += d;
-    bool h_dense = h_edges > h.n * (h.n - 1);
-    bool g_dense = g_edges > g.n * (g.n - 1);
+    bool h_dense = h_edges > h.n * (h.n - 1) / 2;
+    bool g_dense = g_edges > g.n * (g.n - 1) / 2;
 
     std::vector<int> vv0(g.n), vv1(h.n);
     std::iota(vv0.begin(), vv0.end(), 0);

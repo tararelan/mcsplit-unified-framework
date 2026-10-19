@@ -69,6 +69,19 @@ if [ "$WITH_REF" = "1" ]; then
             REF_BIDOMAIN_MEAN=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f1)
             REF_BIDOMAIN_MAX=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f2)
             ;;
+        down)
+            # McSplit-down has no separate reference: it is reference/mcsplit/mcsp
+            # run with --big-first (-b). Same -i -> -r swap as the mcsplit case.
+            MCSPLIT_FORMAT_FLAG=$(echo "$FORMAT_FLAG" | sed 's/-i/-r/')
+            REF_OUT=$(timeout 1000 ./reference/mcsplit/mcsp -b $MCSPLIT_FORMAT_FLAG -q "$A" "$B" 2>/dev/null)
+            REF_SIZE=$(echo "$REF_OUT" | grep "Solution size" | awk '{print $3}')
+            REF_NODES=$(echo "$REF_OUT" | grep "^Nodes:" | awk '{print $NF}')
+            REF_TIME_MS=$(echo "$REF_OUT" | grep "^CPU time" | awk '{print $NF}')
+            REF_TIME=$(echo "$REF_TIME_MS" | awk '{printf "%.6f", $1/1000}')
+            REF_BIDOMAIN_RAW=$(echo "$REF_OUT" | grep "^BIDOMAINS:" | sed 's/^BIDOMAINS://')
+            REF_BIDOMAIN_MEAN=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f1)
+            REF_BIDOMAIN_MAX=$(echo "$REF_BIDOMAIN_RAW" | cut -d',' -f2)
+            ;;
         rl)
             REF_OUT=$(timeout 1000 ./reference/mcsplit-rl/mcsp+RL min_max $FORMAT_FLAG -q "$A" "$B" 2>/dev/null)
             REF_SIZE=$(echo "$REF_OUT" | grep "Solution size" | awk '{print $3}')
