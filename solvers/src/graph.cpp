@@ -467,9 +467,10 @@ void set_adjlist(Graph &g)
  * Vertices with degree 0 are skipped and left with class label 0,
  * as isolated vertices cannot share a neighbourhood with others.
  *
- * NOTE: relies on g.adjmat/g.adjlist, which (per set_adjlist) do not
- * distinguish edge direction - see Section 4.1.2.2 for the resulting
- * limitation on directed graphs.
+ * Direction-aware: neighbours are found via adjlist (either direction),
+ * but neighbourhoods are compared by exact adjmat value, so on directed
+ * graphs two vertices are only grouped if they have identical out- and
+ * in-neighbourhoods (and any edge between them is bidirectional).
  *
  * @param g        Graph with adjmat, adjlist, and degree initialised
  * @param EqClass  Output array of length g.n; EqClass[v] holds the
@@ -502,16 +503,29 @@ void GetEqClass(Graph &g, ui *&EqClass)
 			if (g.degree[i] == g.degree[node_neg] && node_neg > i)
 			{
 				// verify every neighbour of the candidate is also
-				// a neighbour of i (i.e. neighbourhoods match exactly)
+				// a neighbour of i (i.e. neighbourhoods match exactly).
+				// The edge VALUE must match, not just "adjacent or not":
+				// on directed graphs adjmat holds out-edges in the low 16
+				// bits and in-edges in the high 16 bits, so equal values
+				// mean the same out- AND in-neighbours. On undirected
+				// unlabelled graphs every edge value is 1, so this is the
+				// same test as before.
 				equiv = true;
 				for (ui k = 0; k < g.degree[node_neg]; k++)
 				{
 					node_nneg = g.adjlist[node_neg][k];
-					if (node_nneg != i && g.adjmat[i][node_nneg] == 0)
+					if (node_nneg != i && g.adjmat[i][node_nneg] != g.adjmat[node_neg][node_nneg])
 					{
 						equiv = false;
 						break;
 					}
+				}
+				// if i and the candidate are adjacent to each other,
+				// swapping them reverses that edge, so on directed graphs
+				// it must go both ways (always true when undirected)
+				if (equiv && g.adjmat[i][node_neg] != g.adjmat[node_neg][i])
+				{
+					equiv = false;
 				}
 				if (equiv)
 				{

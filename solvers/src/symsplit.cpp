@@ -11,13 +11,23 @@
 #include <limits.h>
 #include <boost/functional/hash.hpp>
 
-// NOTE: like RRSplit, SymSplit does not implement the multiway
-// (direction/label-aware) split - see Section 4.1.2.2. SymSplit uses
-// its own equivalence-class computation (find_vertices_with_common_
-// neighbors, below) rather than graph.h's GetEqClass, which RRSplit
-// uses exclusively - the two are separate implementations, not shared
-// code, so any direction-blindness in one is not automatically present
-// in the other and needs separately confirming.
+// DIRECTED GRAPHS: the reference SymSplit ignores edge direction (Section
+// 4.1.2.2), so it can return invalid solutions on directed instances. This
+// re-implementation is direction-aware and therefore deliberately differs
+// from the reference on directed graphs (and only there):
+//   1. filter_domains_sym splits the adjacent part of each bidomain by exact
+//      edge value (out / in / both), as McSplit's multiway split does.
+//   2. The maximality test treats an "all adjacent" bidomain as cleanly
+//      split only if all those edges also have the same direction.
+//   3. find_vertices_with_common_neighbors (SymSplit's own symmetry
+//      classes, separate from graph.cpp's GetEqClass used by RRSplit) only
+//      groups vertices with identical out- AND in-neighbourhoods.
+// sym_multiway is set automatically when the input graphs are directed; on
+// undirected graphs every code path is unchanged from before.
+
+// true when the input graphs are directed (set in mcs_sym); enables the
+// direction-aware split in filter_domains_sym
+static bool sym_multiway = false;
 
 // Forward declarations
 static int calc_bound_sym(const std::vector<Bidomain> &domains);
@@ -306,8 +316,8 @@ int partition_sparse_sym(std::vector<int> &all_vv, int start, int len,
  * mapping cannot be extended further - used by the maximality reduction
  * in SymSplit to detect and record maximal solutions early.
  *
- * No multiway/direction-aware split - see the note at the top of this
- * file re: SymSplit's direction-blindness (Section 4.1.2.2).
+ * On directed graphs (sym_multiway) the adjacent part is additionally
+ * split by edge direction - see the note at the top of this file.
  *
  * @param d            Current bidomain list
  * @param left         G-side permutation array (modified in place)
@@ -348,8 +358,34 @@ std::vector<Bidomain> filter_domains_sym(const std::vector<Bidomain> &d, std::ve
 		int left_len_noedge = old_bd.left_len - left_len;
 		int right_len_noedge = old_bd.right_len - right_len;
 
+		// Directed graphs: split the adjacent part further by edge type
+		// (exact adjmat value = out / in / both), as McSplit's multiway split
+		// does, so an edge u->x is never matched with x->u. index_right is
+		// resynchronised after the right side is reordered. adj_uniform
+		// records whether all adjacent vertices share one edge value, which
+		// the maximality test below needs.
+		bool adj_uniform = true;
+		if (sym_multiway && left_len && right_len)
+		{
+			const std::vector<unsigned int> &adjrow_v = g.adjmat[v];
+			const std::vector<unsigned int> &adjrow_w = h.adjmat[w];
+			std::sort(left.begin() + l, left.begin() + l + left_len,
+					  [&](int a, int b) { return adjrow_v[a] < adjrow_v[b]; });
+			std::sort(right.begin() + r, right.begin() + r + right_len,
+					  [&](int a, int b) { return adjrow_w[a] < adjrow_w[b]; });
+			for (int k = r; k < r + right_len; k++)
+			{
+				index_right[right[k]] = k;
+			}
+			adj_uniform = adjrow_v[left[l]] == adjrow_v[left[l + left_len - 1]] &&
+						  adjrow_w[right[r]] == adjrow_w[right[r + right_len - 1]] &&
+						  adjrow_v[left[l]] == adjrow_w[right[r]];
+		}
+
+		// on directed graphs "all adjacent" is only a clean split if those
+		// edges also all have the same direction (adj_uniform)
 		if ((left_len == 0 && right_len == 0) ||
-			(left_len_noedge == 0 && right_len_noedge == 0) ||
+			(left_len_noedge == 0 && right_len_noedge == 0 && adj_uniform) ||
 			old_bd.left_len == 0)
 		{
 			ccount++;
@@ -359,7 +395,33 @@ std::vector<Bidomain> filter_domains_sym(const std::vector<Bidomain> &d, std::ve
 		{
 			new_d.push_back({l + left_len, r + right_len, left_len_noedge, right_len_noedge, old_bd.is_adjacent});
 		}
-		if (left_len && right_len)
+		if (sym_multiway && left_len && right_len)
+		{
+			// one bidomain per edge value present on both sides
+			const std::vector<unsigned int> &adjrow_v = g.adjmat[v];
+			const std::vector<unsigned int> &adjrow_w = h.adjmat[w];
+			int li = l, ri = r, l_top = l + left_len, r_top = r + right_len;
+			while (li < l_top && ri < r_top)
+			{
+				unsigned int lv = adjrow_v[left[li]], rv = adjrow_w[right[ri]];
+				if (lv < rv)
+				{
+					li++;
+				}
+				else if (lv > rv)
+				{
+					ri++;
+				}
+				else
+				{
+					int lmin = li, rmin = ri;
+					do { li++; } while (li < l_top && adjrow_v[left[li]] == lv);
+					do { ri++; } while (ri < r_top && adjrow_w[right[ri]] == lv);
+					new_d.push_back({lmin, rmin, li - lmin, ri - rmin, true});
+				}
+			}
+		}
+		else if (left_len && right_len)
 		{
 			new_d.push_back({l, r, left_len, right_len, true});
 		}
@@ -403,11 +465,8 @@ static void hash_combine(std::size_t &seed, std::size_t v)
  * consistent with the O(n^2) symmetry detection bound stated in the
  * SymSplit paper.
  *
- * NOTE: g.adjmat[v][u] is tested as a boolean (nonzero = adjacent), not
- * compared by exact value, so this does not distinguish edge direction
- * on directed graphs - same limitation as graph.cpp's GetEqClass (used
- * by RRSplit), independently implemented here rather than shared code.
- * See Section 4.1.2.2.
+ * Direction-aware on directed graphs: edge values (out / in / both) are
+ * hashed too - see the comment inside the function.
  *
  * NOTE: n_syms may double-count vertices that fall into a non-trivial
  * group under both n_hash and p_hash, since each vertex is pushed into
@@ -427,6 +486,23 @@ int find_vertices_with_common_neighbors(const Graph &g, std::vector<int> &eqn_cl
 	n_groups.reserve(g.n);
 	eqn_classes.assign(g.n, -1);
 
+	// Directed graphs (some reverse-edge bits set): also hash each edge's
+	// value (out / in / both), so vertices are only grouped if they have the
+	// same out- AND in-neighbours. For the closed-neighbourhood hash, a
+	// vertex's own slot is hashed as a two-way edge, so two ADJACENT vertices
+	// only match if the edge between them is bidirectional - otherwise
+	// swapping them would reverse that edge. On undirected graphs nothing
+	// extra is hashed, so the classes are exactly as before.
+	bool directed = false;
+	for (int v = 0; v < g.n && !directed; v++)
+		for (int u = 0; u < g.n; u++)
+			if (g.adjmat[v][u] & 0xFFFF0000u)
+			{
+				directed = true;
+				break;
+			}
+	const unsigned int both_ways = 1u | (1u << 16);
+
 	for (int v = 0; v < g.n; v++)
 	{
 		std::size_t n_hash = 0, p_hash = 0;
@@ -436,10 +512,19 @@ int find_vertices_with_common_neighbors(const Graph &g, std::vector<int> &eqn_cl
 			{
 				boost::hash_combine(n_hash, (unsigned int)u);
 				boost::hash_combine(p_hash, (unsigned int)u);
+				if (directed)
+				{
+					boost::hash_combine(n_hash, g.adjmat[v][u]);
+					boost::hash_combine(p_hash, g.adjmat[v][u]);
+				}
 			}
 			if (v == u)
 			{
 				boost::hash_combine(p_hash, (unsigned int)v);
+				if (directed)
+				{
+					boost::hash_combine(p_hash, both_ways);
+				}
 			}
 		}
 		n_groups[p_hash].push_back(v);
@@ -775,6 +860,23 @@ std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h,
 
 	Graph g_sorted = induced_subgraph(const_cast<Graph &>(g), vv0);
 	Graph h_sorted = induced_subgraph(const_cast<Graph &>(h), vv1);
+
+	// directed input <=> some reverse-edge bits (high 16 bits) are set
+	sym_multiway = false;
+	for (int i = 0; i < g.n && !sym_multiway; i++)
+		for (int j = 0; j < g.n; j++)
+			if (g.adjmat[i][j] & 0xFFFF0000u)
+			{
+				sym_multiway = true;
+				break;
+			}
+	for (int i = 0; i < h.n && !sym_multiway; i++)
+		for (int j = 0; j < h.n; j++)
+			if (h.adjmat[i][j] & 0xFFFF0000u)
+			{
+				sym_multiway = true;
+				break;
+			}
 
 	set_adjlist(g_sorted);
 	set_adjlist(h_sorted);

@@ -10,17 +10,24 @@
 #include <limits.h>
 #include <iostream>
 
-// NOTE: RRSplit does not implement the multiway (direction/label-aware)
-// split used by the other six algorithms - see Section 4.1.2.2. A fix was
-// attempted (patching filter_domains_rr with the same split used
-// elsewhere) and confirmed sound via brute-force testing, but it
-// surfaced a deeper issue: EqClass (structural equivalence, see graph.cpp)
-// is itself computed without regard to edge direction, so the equivalence
-// reduction can discard vertices that are not actually redundant on
-// directed graphs, producing valid-but-suboptimal solutions. Fixing this
-// properly would require making EqClass direction-aware, which was out
-// of scope for this project's timeline. RRSplit is validated and used
-// for undirected datasets (MIVIA, LV) only; it is excluded from BI.
+// DIRECTED GRAPHS: the reference RRSplit ignores edge direction (Section
+// 4.1.2.2), so it can return invalid solutions on directed instances. This
+// re-implementation is direction-aware and therefore deliberately differs
+// from the reference on directed graphs (and only there):
+//   1. filter_domains_rr splits the adjacent part of each bidomain by exact
+//      edge value (out / in / both), as McSplit's multiway split does.
+//   2. The maximality test treats an "all adjacent" bidomain as cleanly
+//      split only if all those edges also have the same direction.
+//   3. EqClass (graph.cpp GetEqClass) only groups two vertices if they have
+//      the same out- AND in-neighbours (and, if adjacent to each other, the
+//      edge between them goes both ways), so the equivalence reductions
+//      only discard genuinely interchangeable vertices.
+// rr_multiway is set automatically when the input graphs are directed; on
+// undirected graphs every code path is unchanged from before.
+
+// true when the input graphs are directed (set in mcs_rr); enables the
+// direction-aware split in filter_domains_rr
+static bool rr_multiway = false;
 
 // Forward declarations
 static int calc_bound(const std::vector<Bidomain>& domains);
@@ -212,9 +219,9 @@ int partition_sparse_rr(std::vector<int>& all_vv, int start, int len,
 }
 
 /**
- * Splits bidomains after matching (v, w). No multiway/direction-aware
- * split - see the note at the top of this file re: RRSplit's
- * direction-blindness (Section 4.1.2.2).
+ * Splits bidomains after matching (v, w). On directed graphs
+ * (rr_multiway) the adjacent part is additionally split by edge
+ * direction - see the note at the top of this file.
  *
  * best_match (via ccount) implements RRSplit's maximality reduction:
  * ccount counts, across all bidomains, how many were either fully
@@ -261,10 +268,34 @@ std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vec
         int left_len_noedge = old_bd.left_len - left_len;
         int right_len_noedge = old_bd.right_len - right_len;
 
+        // Directed graphs: the adjacent part is split further by edge type
+        // (v->x, x->v, or both - i.e. the exact adjmat value), exactly as
+        // McSplit's multiway split does. Without this, an edge u->x could be
+        // matched with x->u, giving an invalid solution. Both sides are
+        // sorted by edge value and index_right is resynchronised afterwards.
+        // adj_uniform records whether every adjacent vertex on both sides
+        // has the same edge value, which the maximality test below needs.
+        bool adj_uniform = true;
+        if (rr_multiway && left_len && right_len) {
+            const std::vector<unsigned int>& adjrow_v = g.adjmat[v];
+            const std::vector<unsigned int>& adjrow_w = h.adjmat[w];
+            std::sort(left.begin() + l, left.begin() + l + left_len,
+                    [&](int a, int b) { return adjrow_v[a] < adjrow_v[b]; });
+            std::sort(right.begin() + r, right.begin() + r + right_len,
+                    [&](int a, int b) { return adjrow_w[a] < adjrow_w[b]; });
+            for (int k = r; k < r + right_len; k++) { index_right[right[k]] = k; }
+            adj_uniform = adjrow_v[left[l]] == adjrow_v[left[l + left_len - 1]] &&
+                          adjrow_w[right[r]] == adjrow_w[right[r + right_len - 1]] &&
+                          adjrow_v[left[l]] == adjrow_w[right[r]];
+        }
+
         // this bidomain contributes to a "clean" split (or was already
-        // empty) - see docstring above for what this means for best_match
+        // empty) - see docstring above for what this means for best_match.
+        // On directed graphs "all adjacent" only counts as clean if every
+        // adjacent vertex also has the same edge direction (adj_uniform),
+        // otherwise the bidomain is still cut into several pieces.
         if ((left_len == 0 && right_len == 0) ||
-            (left_len_noedge == 0 && right_len_noedge == 0) ||
+            (left_len_noedge == 0 && right_len_noedge == 0 && adj_uniform) ||
             old_bd.left_len == 0) {
             ccount++;
         }
@@ -272,7 +303,23 @@ std::vector<Bidomain> filter_domains_rr(const std::vector<Bidomain>& d, std::vec
         if (left_len_noedge && right_len_noedge) {
             new_d.push_back({l + left_len, r + right_len, left_len_noedge, right_len_noedge, old_bd.is_adjacent});
         }
-        if (left_len && right_len) {
+        if (rr_multiway && left_len && right_len) {
+            // one bidomain per edge value present on both sides
+            const std::vector<unsigned int>& adjrow_v = g.adjmat[v];
+            const std::vector<unsigned int>& adjrow_w = h.adjmat[w];
+            int li = l, ri = r, l_top = l + left_len, r_top = r + right_len;
+            while (li < l_top && ri < r_top) {
+                unsigned int lv = adjrow_v[left[li]], rv = adjrow_w[right[ri]];
+                if (lv < rv) { li++; }
+                else if (lv > rv) { ri++; }
+                else {
+                    int lmin = li, rmin = ri;
+                    do { li++; } while (li < l_top && adjrow_v[left[li]] == lv);
+                    do { ri++; } while (ri < r_top && adjrow_w[right[ri]] == lv);
+                    new_d.push_back({lmin, rmin, li - lmin, ri - rmin, true});
+                }
+            }
+        } else if (left_len && right_len) {
             new_d.push_back({l, r, left_len, right_len, true});
         }
     }
@@ -514,9 +561,18 @@ std::vector<VtxPair> mcs_rr(const Graph& g, const Graph& h,
     Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
     Graph h_sorted = induced_subgraph(const_cast<Graph&>(h), vv1);
 
-    // adjacency lists + structural equivalence classes, both required by
-    // RRSplit's reductions (see the direction-blindness note at the top
-    // of this file - both set_adjlist and GetEqClass are boolean-only)
+    // directed input <=> some reverse-edge bits (high 16 bits) are set
+    rr_multiway = false;
+    for (int i = 0; i < g.n && !rr_multiway; i++)
+        for (int j = 0; j < g.n; j++)
+            if (g.adjmat[i][j] & 0xFFFF0000u) { rr_multiway = true; break; }
+    for (int i = 0; i < h.n && !rr_multiway; i++)
+        for (int j = 0; j < h.n; j++)
+            if (h.adjmat[i][j] & 0xFFFF0000u) { rr_multiway = true; break; }
+
+    // adjacency lists (neighbours in either direction - only used to find
+    // candidates quickly) + structural equivalence classes, which are
+    // direction-aware (see GetEqClass in graph.cpp)
     set_adjlist(g_sorted);
     set_adjlist(h_sorted);
 
