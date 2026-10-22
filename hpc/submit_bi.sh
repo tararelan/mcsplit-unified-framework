@@ -1,13 +1,20 @@
 #!/bin/bash
 # submit_bi.sh - submit one algorithm for the BI dataset
-# Usage: bash hpc/submit_bi.sh <algo> [--with-ref]
+# Usage: bash hpc/submit_bi.sh <algo> [--with-ref] [--swap]
 # --with-ref: also run reference binary and compare
+# --swap:     uniform preprocessing - smaller graph first for EVERY algorithm
+#             (solver -s flag); results go to hpc/results/..._swap/
 
 ALGO=$1
 WITH_REF=0
-if [ "$2" = "--with-ref" ]; then
-    WITH_REF=1
-fi
+SWAP=0
+for opt in "${@:2}"; do
+    case "$opt" in
+        --with-ref) WITH_REF=1 ;;
+        --swap)     SWAP=1 ;;
+        *) echo "Unknown option: $opt"; exit 1 ;;
+    esac
+done
 
 if [ -z "$ALGO" ]; then
     echo "Usage: bash hpc/submit_bi.sh <algo> [--with-ref]"
@@ -35,11 +42,16 @@ else
     SCRIPT="hpc/job_${ALGO}_bi.slurm"
 fi
 
+# separate generated script per mode so swap and faithful jobs don't overwrite each other
+if [ "$SWAP" = "1" ]; then
+    SCRIPT="${SCRIPT%.slurm}_swap.slurm"
+fi
+
 sed "s/{ALGO}/$ALGO/g; s/{NJOBS}/$NJOBS/g; s/{DATASET}/bi/g; s/{WITH_REF}/$WITH_REF/g; s#{LIST}#$LIST#g" \
-    hpc/job_array.slurm > "$SCRIPT"
+    hpc/job_array.slurm | sed "s/{SWAP}/$SWAP/g" > "$SCRIPT"
 sed -i 's/\r$//' "$SCRIPT"
 
-if grep -qE "\{ALGO\}|\{NJOBS\}|\{DATASET\}|\{LIST\}|\{WITH_REF\}" "$SCRIPT"; then
+if grep -qE "\{ALGO\}|\{NJOBS\}|\{DATASET\}|\{LIST\}|\{WITH_REF\}|\{SWAP\}" "$SCRIPT"; then
     echo "ERROR: placeholder not replaced in $SCRIPT"
     exit 1
 fi
@@ -49,4 +61,5 @@ if [ "$WITH_REF" = "1" ]; then
 else
     echo "Submitting $ALGO BI: $((NJOBS+1)) jobs"
 fi
+[ "$SWAP" = "1" ] && echo "  (uniform preprocessing: --swap)"
 sbatch "$SCRIPT"

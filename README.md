@@ -19,6 +19,7 @@
     - [Available Algorithms](#available-algorithms)
     - [Examples](#examples)
     - [Output Format](#output-format)
+  - [Validation Runs vs Comparison Runs](#validation-runs-vs-comparison-runs)
   - [Running Experiments on HPC](#running-experiments-on-hpc-hypatia)
     - [1. Sync files to Hypatia](#1-sync-files-to-hypatia)
     - [2. Build on Hypatia](#2-build-on-hypatia)
@@ -66,6 +67,9 @@ Original author code used for validation (Section 4.1 of the dissertation) was s
 | McSplit+DSB | [mcsplit-dsb](https://github.com/BuddhiWathsala/mcsplit-dsb) |
 | RRSplit | [SIGMOD25-MCSS](https://github.com/KaiqiangYu/SIGMOD25-MCSS) (`./RRSplit` subfolder) |
 | SymSplit | [symsplit](https://github.com/mcsolver/symsplit) |
+| McSplit-down | No separate code: the McSplit reference run with `-b` (`--big-first`) |
+
+McSplit+RL Pair, McSplit+RL Rate and McSplit+RL-down have no reference implementation; they are validated by solution-size agreement and switch-off tests instead (see the dissertation).
 
 Your local `reference/` folder should be laid out as:
 
@@ -127,7 +131,7 @@ make -C solvers
 ### Running a Single Instance
 
 ```bash
-./solvers/bin/mcsp -A <algorithm> -t <timeout> [-l] -q <graph1> <graph2>
+./solvers/bin/mcsp -A <algorithm> -t <timeout> [-l] [-i] [-s] -q <graph1> <graph2>
 ```
 
 #### Options
@@ -142,6 +146,7 @@ make -C solvers
 | `-x` | `--vertex-labelled` | Use vertex labels only (no edge labels) |
 | `-t <seconds>` | `--timeout` | Abort search after this many seconds (0 = no limit) |
 | `-A <algo>` | `--algorithm` | Algorithm to run (see algorithm table below) |
+| `-s` | `--swap-smaller` | Uniform preprocessing: make the smaller graph G for **every** algorithm (see [Validation Runs vs Comparison Runs](#validation-runs-vs-comparison-runs)). Without it, each algorithm follows its reference: only RRSplit and SymSplit swap |
 
 #### Available Algorithms
 
@@ -179,9 +184,9 @@ make -C solvers
     instances/MIVIA/mcs10/bvg/b03/mcs10_b03_s40.B00
 ```
 
-**SIP LAD format (BI - biochemical reactions):**
+**SIP LAD format (BI - biochemical reactions, directed):**
 ```bash
-./solvers/bin/mcsp -A rrsplit -t 1000 -l -q \
+./solvers/bin/mcsp -A rrsplit -t 1000 -l -i -q \
     instances/SIP/biochemicalReactions/001.txt \
     instances/SIP/biochemicalReactions/002.txt
 ```
@@ -197,7 +202,7 @@ make -C solvers
 
 One line, space-separated:
 ```
-<unified_size> <unified_edges> <unified_nodes> <unified_time> <unified_aborted> <unified_nodes_to_best> <unified_time_to_best> <unified_cut_branches> <unified_bound_pruned> <unified_sym_pruned>
+<unified_size> <unified_edges> <unified_nodes> <unified_time> <unified_aborted> <unified_nodes_to_best> <unified_time_to_best> <unified_cut_branches> <unified_bound_pruned> <unified_sym_pruned> <unified_bidomain_mean> <unified_bidomain_max>
 ```
 
 | Field | Description |
@@ -212,8 +217,21 @@ One line, space-separated:
 | `unified_cut_branches` | Total branches pruned |
 | `unified_bound_pruned` | Branches pruned by the algorithm's bound |
 | `unified_sym_pruned` | Branches pruned by symmetry or redundancy reduction |
+| `unified_bidomain_mean` | Mean number of bidomains per search node |
+| `unified_bidomain_max` | Largest number of bidomains at any search node |
 
-When run with `--with-ref` on HPC (see below), four extra fields are appended: `ref_size`, `ref_nodes`, `ref_time`, `match` (`PASS`/`FAIL`/`MISSING_DATA`).
+When run with `--with-ref` on HPC (see below), six extra fields are appended: `ref_size`, `ref_nodes`, `ref_time`, `ref_bidomain_mean`, `ref_bidomain_max`, `match` (`PASS`/`FAIL`/`MISSING_DATA`).
+
+---
+
+### Validation Runs vs Comparison Runs
+
+The framework is used in two ways, which need different setups:
+
+- **Validation (fidelity):** does each re-implementation match its reference? Every algorithm copies its reference's preprocessing exactly, so any difference in nodes explored can only be an implementation mistake. This is the default (no `-s`), run with `--with-ref` on HPC.
+- **Comparison (performance):** which algorithm design is actually better? Here every algorithm should get the *same* preprocessing, otherwise part of a difference can come from setup rather than search. In particular, the RRSplit and SymSplit references put the smaller graph first and the others do not. `-s` / `--swap` applies that step to every algorithm. Swapping never changes the solution size (MCS(G, H) = MCS(H, G)), only the search effort. Comparison runs don't need the reference.
+
+**Directed graphs (BI):** the RRSplit and SymSplit references ignore edge direction and can return invalid solutions on directed instances. The re-implementations here are direction-aware (direction-split bidomains and direction-aware equivalence classes), so on BI they deliberately differ from their references: validate them there against McSplit's solution sizes, not against the reference. On undirected datasets (MIVIA, LV) they behave exactly as before.
 
 ---
 
@@ -241,7 +259,7 @@ cd ~/work/[target-directory]/solvers && rm -f bin/mcsp && make
 
 #### 4. Submit scripts
 
-Submit one algorithm at a time so as not to hit the QOS limits. Each script accepts an optional `--with-ref` flag to also run the corresponding reference binary and record a PASS/FAIL/MISSING_DATA comparison alongside the unified solver's results.
+Submit one algorithm at a time so as not to hit the QOS limits. Each script accepts an optional `--with-ref` flag (validation) and an optional `--swap` flag (uniform preprocessing for comparison runs - see [Validation Runs vs Comparison Runs](#validation-runs-vs-comparison-runs)); the two can be combined. Swap runs write to separate `..._swap` result folders. `--with-ref` also runs the corresponding reference binary and record a PASS/FAIL/MISSING_DATA comparison alongside the unified solver's results.
 
 ```bash
 cd ~/work/[target-directory]
@@ -251,11 +269,17 @@ bash hpc/submit_mivia.sh mcsplit
 bash hpc/submit_bi.sh dsb
 bash hpc/submit_lv.sh symsplit
 
-# with reference comparison
+# with reference comparison (validation)
 bash hpc/submit_mivia.sh mcsplit --with-ref
 bash hpc/submit_bi.sh dsb --with-ref
 bash hpc/submit_lv.sh symsplit --with-ref
+
+# uniform preprocessing (comparison) - results in hpc/results/<algo>_<dataset>_swap/
+bash hpc/submit_bi.sh dsb --swap
+bash hpc/submit_lv.sh symsplit --swap
 ```
+
+`run_instance.sh` skips any instance pair whose output CSV already exists, so to re-run an algorithm, first move its old result folder aside (e.g. `mv hpc/results/dsb_bi_with_ref hpc/results_old/`).
 
 Wait for each array to finish (`squeue -u [account]`) before submitting the next, to stay within QOS limits.
 
@@ -265,6 +289,7 @@ Wait for each array to finish (`squeue -u [account]`) before submitting the next
 squeue -u [account]                                    # job status
 ls hpc/results/<algo>_<dataset>/ | wc -l               # instances completed (plain mode)
 ls hpc/results/<algo>_<dataset>_with_ref/ | wc -l      # instances completed (ref mode)
+ls hpc/results/<algo>_<dataset>_swap/ | wc -l          # instances completed (swap mode)
 head -5 -q hpc/results/<algo>_<dataset>/*.csv          # spot-check output
 ```
 
@@ -275,23 +300,24 @@ e.g. `ls hpc/results/mcsplit_mivia/ | wc -l` or `ls hpc/results/dsb_bi_with_ref/
 Per-instance CSVs (one file per instance pair, no header) are merged into a single file with the correct header using `hpc/merge_results.sh`:
 
 ```bash
-bash hpc/merge_results.sh <algo> <dataset> [--with-ref]
+bash hpc/merge_results.sh <algo> <dataset> [--with-ref] [--swap]
 ```
 
 e.g.:
 ```bash
 bash hpc/merge_results.sh dsb bi                   # → hpc/results/dsb_bi_all.csv
 bash hpc/merge_results.sh symsplit lv --with-ref   # → hpc/results/symsplit_lv_with_ref_all.csv
+bash hpc/merge_results.sh dsb bi --swap            # → hpc/results/dsb_bi_swap_all.csv
 ```
 
-Plain-mode header (13 columns):
+Plain-mode and swap-mode header (15 columns):
 ```
-instance_a,instance_b,algo,unified_size,unified_edges,unified_nodes,unified_time,unified_aborted,unified_nodes_to_best,unified_time_to_best,unified_cut_branches,unified_bound_pruned,unified_sym_pruned
+instance_a,instance_b,algo,unified_size,unified_edges,unified_nodes,unified_time,unified_aborted,unified_nodes_to_best,unified_time_to_best,unified_cut_branches,unified_bound_pruned,unified_sym_pruned,unified_bidomain_mean,unified_bidomain_max
 ```
 
-Ref-mode header (17 columns):
+Ref-mode header (21 columns):
 ```
-instance_a,instance_b,algo,unified_size,unified_edges,unified_nodes,unified_time,unified_aborted,unified_nodes_to_best,unified_time_to_best,unified_cut_branches,unified_bound_pruned,unified_sym_pruned,ref_size,ref_nodes,ref_time,match
+instance_a,instance_b,algo,unified_size,unified_edges,unified_nodes,unified_time,unified_aborted,unified_nodes_to_best,unified_time_to_best,unified_cut_branches,unified_bound_pruned,unified_sym_pruned,unified_bidomain_mean,unified_bidomain_max,ref_size,ref_nodes,ref_time,ref_bidomain_mean,ref_bidomain_max,match
 ```
 
 #### 7. Copy results back to local machine

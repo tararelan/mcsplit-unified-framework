@@ -59,6 +59,7 @@ static struct argp_option options[] = {
 	{"vertex-labelled", 'x', 0, 0, "Use vertex labels only (no edge labels)"},
 	{"timeout", 't', "timeout", 0, "Abort search after this many seconds (0 = no limit)"},
 	{"algorithm", 'A', "algo", 0, "Algorithm to run: mcsplit, down, rl, rl_pair, rl_rate, rl_down, ll, dal, dsb, rrsplit, symsplit"},
+	{"swap-smaller", 's', 0, 0, "Uniform preprocessing: make the smaller graph G for every algorithm (default: each reference's own behaviour)"},
 	{0}};
 
 // Parsed argument state, populated by the argp parser and read by main().
@@ -70,6 +71,7 @@ static struct
 	bool directed = false;			   // treat input as directed graphs
 	bool edge_labelled = false;		   // read and match edge labels
 	bool vertex_labelled = false;	   // read and match vertex labels
+	bool swap_smaller = false;		   // -s: swap so G is the smaller graph, for every algorithm
 	int timeout = 0;				   // search timeout in seconds (0 = unlimited)
 	std::string algorithm = "mcsplit"; // algorithm identifier
 	char *filename1 = nullptr;		   // path to first input graph
@@ -117,6 +119,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		break;
 	case 't':
 		arguments.timeout = std::stoi(arg);
+		break;
+	case 's':
+		arguments.swap_smaller = true;
 		break;
 	case 'A':
 		arguments.algorithm = arg;
@@ -175,7 +180,12 @@ int main(int argc, char **argv)
 	// changes the search tree, so for fidelity those keep the order given.
 	bool ref_swaps = arguments.algorithm.rfind("rrsplit", 0) == 0 ||
 					 arguments.algorithm.rfind("symsplit", 0) == 0;
-	if (ref_swaps && g.n > h.n)
+	// -s (--swap-smaller) applies the same swap to EVERY algorithm. This is
+	// the uniform-preprocessing mode used for the fair performance
+	// comparison; without -s each algorithm keeps its reference's own
+	// behaviour, which is what the fidelity (validation) runs use. Swapping
+	// never changes the solution size - MCS(G, H) = MCS(H, G).
+	if ((ref_swaps || arguments.swap_smaller) && g.n > h.n)
 		std::swap(g, h);
 
 	if (!arguments.quiet)

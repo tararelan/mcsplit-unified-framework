@@ -4,12 +4,19 @@ A=$2
 B=$3
 DATASET=${4:-"mivia"}  # mivia, bi, or lv (default: mivia)
 WITH_REF=${5:-0}       # 1 = also run reference binary
+SWAP=${6:-0}           # 1 = uniform preprocessing: smaller graph first for every algorithm (-s)
 
 # Output directory
 if [ "$WITH_REF" = "1" ]; then
     OUTDIR="hpc/results/${ALGO}_${DATASET}_with_ref"
 else
     OUTDIR="hpc/results/${ALGO}_${DATASET}"
+fi
+# swap runs go to their own folder so they never mix with the faithful runs
+SWAP_FLAG=""
+if [ "$SWAP" = "1" ]; then
+    OUTDIR="${OUTDIR}_swap"
+    SWAP_FLAG="-s"
 fi
 mkdir -p "$OUTDIR"
 
@@ -31,7 +38,7 @@ fi
 # Bidomain-count summary (mean, max across the whole search) rides along as
 # fields 11-12 of this same summary line, rather than the full per-node
 # sequence or a separate dump file - kept small regardless of node count.
-UNIFIED_RESULT=$(./solvers/bin/mcsp -A "$ALGO" -t 1000 $FORMAT_FLAG -q "$A" "$B" 2>/dev/null)
+UNIFIED_RESULT=$(./solvers/bin/mcsp -A "$ALGO" -t 1000 $FORMAT_FLAG $SWAP_FLAG -q "$A" "$B" 2>/dev/null)
 UNIFIED_SIZE=$(echo "$UNIFIED_RESULT" | awk '{print $1}')
 UNIFIED_EDGES=$(echo "$UNIFIED_RESULT" | awk '{print $2}')
 UNIFIED_NODES=$(echo "$UNIFIED_RESULT" | awk '{print $3}')
