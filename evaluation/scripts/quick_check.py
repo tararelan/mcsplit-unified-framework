@@ -51,6 +51,6 @@ axes[0].set_ylabel("reference nodes")
 fig.suptitle(f"{ALGO} on {DS}: unified vs reference search nodes (completed, size-matching pairs)")
 fig.tight_layout()
 out = root / f"fidelity_{ALGO}_{DS}.png"
-fig.savefig(out, dpi=150)
+# fig.savefig(out, dpi=150)
 print("saved", out)
 plt.show()
