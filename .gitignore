@@ -5,3 +5,4 @@ output.txt
 run_demo.sh
 evaluation/scripts/run_demo.sh
 .gitignore
+analysis/__pycache__/

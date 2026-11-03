@@ -1,0 +1,31 @@
+dataset,key,algorithm,n,median_us,mean_us,ref_n,ref_median_us,ref_mean_us
+MIVIA,mcsplit,McSplit,1049,0.13,0.148,1065.0,0.112,0.129
+MIVIA,down,McSplit-down,1457,0.151,0.18,,,
+MIVIA,rl,McSplit+RL,988,0.162,0.18,1006.0,0.143,0.158
+MIVIA,rl_pair,McSplit+RL Pair,1004,0.166,0.181,,,
+MIVIA,rl_rate,McSplit+RL Rate,980,0.167,0.18,,,
+MIVIA,rl_down,McSplit+RL-down,1420,0.191,0.216,,,
+MIVIA,ll,McSplit+LL,1038,0.166,0.189,1043.0,0.157,0.177
+MIVIA,dal,McSplit+DAL,1008,0.175,0.196,1025.0,0.163,0.182
+MIVIA,dsb,McSplit+DSB,1042,0.143,0.157,1043.0,0.143,0.156
+MIVIA,rrsplit,RRSplit,1069,0.377,0.411,1076.0,0.369,0.403
+MIVIA,symsplit,SymSplit,1083,0.121,0.135,1085.0,0.118,0.131
+LV,mcsplit,McSplit,296,0.178,0.511,304.0,0.167,0.45
+LV,rl,McSplit+RL,316,0.272,0.752,319.0,0.261,0.758
+LV,rl_pair,McSplit+RL Pair,294,0.29,0.84,,,
+LV,rl_rate,McSplit+RL Rate,306,0.236,0.652,,,
+LV,rl_down,McSplit+RL-down,408,0.418,1.281,,,
+LV,ll,McSplit+LL,314,0.29,0.742,320.0,0.281,0.701
+LV,dal,McSplit+DAL,288,0.291,0.806,306.0,0.304,0.756
+LV,dsb,McSplit+DSB,300,0.199,0.596,302.0,0.185,0.558
+LV,rrsplit,RRSplit,447,0.925,11.941,432.0,0.897,7.404
+LV,symsplit,SymSplit,471,0.167,1.56,472.0,0.161,1.43
+BI,mcsplit,McSplit,1032,0.106,0.113,1030.0,0.11,0.118
+BI,down,McSplit-down,1191,0.118,0.135,1184.0,0.123,0.136
+BI,rl,McSplit+RL,1112,0.165,0.18,1115.0,0.162,0.177
+BI,rl_pair,McSplit+RL Pair,1073,0.198,0.22,,,
+BI,rl_rate,McSplit+RL Rate,1105,0.17,0.185,,,
+BI,rl_down,McSplit+RL-down,1264,0.183,0.202,,,
+BI,ll,McSplit+LL,1154,0.174,0.19,1156.0,0.176,0.189
+BI,dal,McSplit+DAL,1124,0.195,0.218,1165.0,0.196,0.218
+BI,dsb,McSplit+DSB,1024,0.117,0.126,1024.0,0.119,0.128
