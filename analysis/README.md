@@ -48,10 +48,10 @@ move its folder to the top of that dataset's list.
 
 | Dataset | Preferred source | Falls back to |
 |---|---|---|
-| BI | `hpc/publication/results` (current pipeline) | `hpc/publication/old`, `hpc/cross-dataset-evaluation` |
-| MIVIA | `hpc/validation/results` (dissertation runs) | `hpc/publication/*` |
-| LV | `hpc/cross-dataset-evaluation/results` (dissertation runs) | `hpc/publication/*` |
-| Ablation (MIVIA) | `hpc/ablation/results` | – |
+| BI | `hpc/publication` (`{algo}_bi_with_ref_all.csv`, or `_all.csv` when there is no reference) | none |
+| MIVIA | `hpc/publication` (same naming) | none |
+| LV | `hpc/publication` (same naming) | none |
+| Ablation | `hpc/publication/{variant}_{ds}_all.csv` | none |
 
 The loader reads every file layout into one standard table (documented at the top of `config.py`), stitches
 together DSB/SymSplit rows that an older `run_instance.sh` split in two (in memory; the files are not changed), and

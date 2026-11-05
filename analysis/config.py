@@ -71,12 +71,15 @@ ALGOS = {a.key: a for a in [
     Algo("rl_rate", "McSplit+RL Rate",    "rl",       "#5bbcf2", ":",  "s"),
     Algo("rl_down", "McSplit+RL-down",    "rl",       "#12a3c7", "-.", "s"),
     Algo("ll",      "McSplit+LL",         "ll",       _AQUA,    "-",  "^"),
-    Algo("dal",     "McSplit+DAL",        "dal",      _ORANGE,  "-",  "*"),   # DAL: comment out to drop it everywhere
+    # Algo("dal",     "McSplit+DAL",        "dal",      _ORANGE,  "-",  "*"),   # DAL: comment out to drop it everywhere
     Algo("dsb",     "McSplit+DSB",        "dsb",      _YELLOW,  "-",  "D"),
     Algo("rrsplit", "RRSplit",            "rr",       _VIOLET,  "-",  "p"),
     Algo("symsplit", "SymSplit",          "sym",      _MAGENTA, "-",  "h"),
 ]}
-ALL_ALGOS = list(ALGOS)
+# Algorithms that keep their colour/label/marker but are shown ONLY in the ablation (03_ablation.py), not in the
+# cactus, validation, performance or bidomain figures. Empty this set to show DAL everywhere.
+ABLATION_ONLY = {"dal"}
+ALL_ALGOS = [k for k in ALGOS if k not in ABLATION_ONLY]
 
 # Marker shape = algorithm family, the same in every figure: circle McSplit / down, square the RL family,
 # triangle LL, star DAL, diamond DSB, pentagon RRSplit, hexagon SymSplit. (Colour and line style tell variants apart.)
@@ -130,8 +133,8 @@ UNSOUND = {("rrsplit", "bi"), ("symsplit", "bi")}
 VARIANTS = [
     ("ll_lsm",           "LSM only",              "ll"),
     ("ll_lum",           "LUM only",              "ll"),
-    ("dal_rl",           "RL policy only",        "dal"),   # DAL: comment out to drop it from the ablation
-    ("dal_dal",          "DAL policy only",       "dal"),   # DAL
+    # ("dal_rl",           "RL policy only",        "dal"),   # DAL: comment out to drop it from the ablation
+    # ("dal_dal",          "DAL policy only",       "dal"),   # DAL
     ("dsb_never",        "No DSB",                "dsb"),
     ("dsb_always",       "Always DSB",            "dsb"),
     ("rrsplit_nomax",    "No maximality",         "rrsplit"),
@@ -155,21 +158,19 @@ DATASETS = {"mivia": "MIVIA", "lv": "LV", "bi": "BI"}
 #   pub  hpc/publication  21-column "with_ref" files (current pipeline, has bidomain columns)
 #   val  hpc/validation   original validation files (unified + reference in one row)
 #   xds  hpc/cross-dataset-evaluation  unified columns; reference may be in a separate *_reference_all.csv
-SOURCES = {
-    "bi": [("hpc/publication/results", "{a}_bi_with_ref_all.csv", "pub"),
-           ("hpc/publication/old", "{a}_bi_with_ref_all.csv", "pub"),
-           ("hpc/cross-dataset-evaluation/results", "{a}_bi_all.csv", "xds")],
-    "mivia": [("hpc/validation/results", "{a}_all.csv", "val"),
-              ("hpc/publication/results", "{a}_mivia_with_ref_all.csv", "pub"),
-              ("hpc/publication/old", "{a}_mivia_with_ref_all.csv", "pub")],
-    "lv": [("hpc/publication/old", "{a}_lv_with_ref_all.csv", "pub"),
-           ("hpc/cross-dataset-evaluation/results", "{a}_lv_all.csv", "xds"),
-           ("hpc/publication/results", "{a}_lv_with_ref_all.csv", "pub")],
-}
-# Ablation runs (unified solver only). Tried in order; the old MIVIA run has no dataset in its file names.
-ABLATION_SOURCES = ["hpc/ablation/results/{a}_{ds}_all.csv",
-                    "hpc/ablation/results/{ds}/{a}_all.csv",
-                    "hpc/ablation/results/{a}_all.csv"]       # MIVIA only (used for ds == "mivia")
+# hpc/publication is the only source (one flat folder, no fallbacks). A run WITH a reference binary is
+# {algo}_{ds}_with_ref_all.csv; a run without one (the RL variants, the ablation variants) is {algo}_{ds}_all.csv.
+# An algorithm with no file there is treated as having no results.
+PUB = "hpc/publication"
+
+
+def _pub(ds):
+    return [(PUB, "{a}_" + ds + "_with_ref_all.csv", "pub"),
+            (PUB, "{a}_" + ds + "_all.csv", "pub")]
+
+
+SOURCES = {ds: _pub(ds) for ds in ("mivia", "lv", "bi")}
+ABLATION_SOURCES = [PUB + "/{a}_{ds}_all.csv"]      # ablation variants: no reference
 
 # --------------------------------------------------------------------------- loading
 _RENAME = {

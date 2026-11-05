@@ -3,7 +3,7 @@
 #SBATCH --partition=large-short
 #SBATCH --array=0-{NJOBS}%168
 #SBATCH --time=00:40:00
-#SBATCH --mem=36G
+#SBATCH --mem=20G
 #SBATCH --cpus-per-task=1
 #SBATCH --output=hpc/logs/{ALGO}_%A_%a.out
 #SBATCH --error=hpc/logs/{ALGO}_%A_%a.err

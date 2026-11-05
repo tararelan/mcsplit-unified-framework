@@ -1,6 +1,5 @@
 dataset,key,algorithm,pairs,median_mean_bidomains,median_max_bidomains
 MIVIA,mcsplit,McSplit,8005,3.764,13.0
-MIVIA,down,McSplit-down,8140,4.453,15.0
 MIVIA,rl_pair,McSplit+RL Pair,8140,3.664,13.0
 MIVIA,rl_rate,McSplit+RL Rate,8119,3.665,13.0
 MIVIA,rl_down,McSplit+RL-down,8140,4.402,15.0
@@ -15,5 +14,3 @@ BI,rl_pair,McSplit+RL Pair,9173,1.951,6.0
 BI,rl_rate,McSplit+RL Rate,9132,1.97,6.0
 BI,rl_down,McSplit+RL-down,9180,2.163,6.0
 BI,ll,McSplit+LL,9157,1.93,6.0
-BI,dal,McSplit+DAL,9145,1.924,6.0
-BI,dsb,McSplit+DSB,8979,1.947,6.0

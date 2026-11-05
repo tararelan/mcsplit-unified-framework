@@ -13,7 +13,7 @@ dataset (medium = defined in config.py), by instances solved, plus the counters 
   SymSplit  SymSplit vs variable-only / value-only symmetry
 
 McSplit and RL variants are complete algorithms and come from the normal results. LL / DSB / RRSplit /
-SymSplit variants come from hpc/ablation/results (config.ABLATION_SOURCES); a dataset with no ablation file for
+SymSplit variants come from hpc/publication ({variant}_{ds}_all.csv); a dataset with no ablation file for
 a variant simply has no point for it. RRSplit and SymSplit are skipped on BI (unsound reference).
 
 Output:
@@ -32,7 +32,7 @@ import pandas as pd
 import config as C
 
 FOLDER = "ablation"
-PARENTS = ["mcsplit", "rl", "ll", "dal", "dsb", "rrsplit", "symsplit"]   # remove "dal" to drop it
+PARENTS = [p for p in ["mcsplit", "rl", "ll", "dal", "dsb", "rrsplit", "symsplit"] if p in C.ALGOS]   # "dal" only while its ALGOS line is not commented out
 
 
 def load_variant(key, ds):
