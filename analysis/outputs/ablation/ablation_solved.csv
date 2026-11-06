@@ -18,16 +18,17 @@ mivia,RRSplit,variant,rrsplit_noveq,No vertex equivalence,1493,1075,72.0,241.51,
 mivia,SymSplit,full,symsplit,SymSplit (full),1493,1081,72.4,228.36,3.05,0.121,0.0
 mivia,SymSplit,variant,symsplit_varonly,Variable symmetry only,1493,1082,72.47,231.13,2.05,0.119,0.07
 mivia,SymSplit,variant,symsplit_valonly,Value symmetry only,1493,1071,71.73,223.22,2.3,0.12,-0.67
-lv,McSplit,full,mcsplit,McSplit (plain),570,296,51.93,232.09,0.0,0.178,0.0
-lv,McSplit+RL,full,rl,McSplit+RL (full),570,316,55.44,180.8,0.0,0.272,0.0
-lv,McSplit+RL,variant,rl_pair,Pair reward,570,294,51.58,140.75,0.0,0.29,-3.86
-lv,McSplit+RL,variant,rl_rate,Rate reward,570,306,53.68,166.72,0.0,0.236,-1.76
-lv,McSplit+RL,variant,rl_down,Down,570,408,71.58,176.48,0.0,0.418,16.14
-lv,McSplit+RL,variant,ll,LL,570,314,55.09,136.49,0.0,0.29,-0.35
-lv,McSplit+LL,full,ll,McSplit+LL (full),570,314,55.09,136.49,0.0,0.29,0.0
-lv,McSplit+DSB,full,dsb,McSplit+DSB (full),570,300,52.63,199.69,0.0,0.199,0.0
-lv,RRSplit,full,rrsplit,RRSplit (full),570,447,78.42,294.26,34.32,0.925,0.0
-lv,SymSplit,full,symsplit,SymSplit (full),570,471,82.63,260.21,90.73,0.167,0.0
+lv,McSplit,full,mcsplit,McSplit (plain),575,298,51.83,232.09,0.0,0.18,0.0
+lv,McSplit,variant,down,Down,575,402,69.91,195.42,0.0,0.359,18.08
+lv,McSplit+RL,full,rl,McSplit+RL (full),575,318,55.3,180.8,0.0,0.273,0.0
+lv,McSplit+RL,variant,rl_pair,Pair reward,575,296,51.48,140.75,0.0,0.291,-3.82
+lv,McSplit+RL,variant,rl_rate,Rate reward,575,308,53.57,166.72,0.0,0.237,-1.73
+lv,McSplit+RL,variant,rl_down,Down,575,410,71.3,176.48,0.0,0.42,16.0
+lv,McSplit+RL,variant,ll,LL,575,316,54.96,136.49,0.0,0.294,-0.34
+lv,McSplit+LL,full,ll,McSplit+LL (full),575,316,54.96,136.49,0.0,0.294,0.0
+lv,McSplit+DSB,full,dsb,McSplit+DSB (full),575,302,52.52,199.69,0.0,0.204,0.0
+lv,RRSplit,full,rrsplit,RRSplit (full),575,449,78.09,294.26,34.32,0.949,0.0
+lv,SymSplit,full,symsplit,SymSplit (full),575,473,82.26,260.21,90.73,0.167,0.0
 bi,McSplit,full,mcsplit,McSplit (plain),1418,1029,72.57,239.99,0.0,0.105,0.0
 bi,McSplit,variant,down,Down,1418,1189,83.85,200.31,0.0,0.118,11.28
 bi,McSplit+RL,full,rl,McSplit+RL (full),1418,1109,78.21,141.03,0.0,0.165,0.0

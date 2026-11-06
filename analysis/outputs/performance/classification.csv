@@ -2,9 +2,9 @@ dataset,difficulty,count,pct
 MIVIA,easy,2888,35.52
 MIVIA,medium,1493,18.36
 MIVIA,hard,3750,46.12
-LV,easy,624,10.23
-LV,medium,570,9.34
-LV,hard,4906,80.43
+LV,easy,622,10.2
+LV,medium,575,9.43
+LV,hard,4903,80.38
 BI,easy,5473,59.74
 BI,medium,1418,15.48
 BI,hard,2271,24.79

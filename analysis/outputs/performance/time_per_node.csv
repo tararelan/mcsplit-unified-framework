@@ -8,15 +8,16 @@ MIVIA,ll,McSplit+LL,1036,0.167,0.189,1041.0,0.157,0.178
 MIVIA,dsb,McSplit+DSB,1040,0.143,0.157,1041.0,0.143,0.156
 MIVIA,rrsplit,RRSplit,1067,0.377,0.411,1074.0,0.369,0.403
 MIVIA,symsplit,SymSplit,1081,0.121,0.135,1083.0,0.118,0.131
-LV,mcsplit,McSplit,296,0.178,0.511,304.0,0.167,0.45
-LV,rl,McSplit+RL,316,0.272,0.752,319.0,0.261,0.758
-LV,rl_pair,McSplit+RL Pair,294,0.29,0.84,,,
-LV,rl_rate,McSplit+RL Rate,306,0.236,0.652,,,
-LV,rl_down,McSplit+RL-down,408,0.418,1.281,,,
-LV,ll,McSplit+LL,314,0.29,0.742,320.0,0.281,0.701
-LV,dsb,McSplit+DSB,300,0.199,0.596,302.0,0.185,0.558
-LV,rrsplit,RRSplit,447,0.925,11.941,432.0,0.897,7.404
-LV,symsplit,SymSplit,471,0.167,1.56,472.0,0.161,1.43
+LV,mcsplit,McSplit,298,0.18,0.517,306.0,0.167,0.45
+LV,down,McSplit-down,402,0.359,0.99,400.0,0.316,0.866
+LV,rl,McSplit+RL,318,0.273,0.757,321.0,0.261,0.763
+LV,rl_pair,McSplit+RL Pair,296,0.291,0.85,,,
+LV,rl_rate,McSplit+RL Rate,308,0.237,0.661,,,
+LV,rl_down,McSplit+RL-down,410,0.42,1.282,,,
+LV,ll,McSplit+LL,316,0.294,0.753,322.0,0.282,0.708
+LV,dsb,McSplit+DSB,302,0.204,0.6,304.0,0.192,0.562
+LV,rrsplit,RRSplit,449,0.949,12.015,433.0,0.896,7.388
+LV,symsplit,SymSplit,473,0.167,1.686,474.0,0.162,1.574
 BI,mcsplit,McSplit,1029,0.105,0.113,1027.0,0.11,0.118
 BI,down,McSplit-down,1189,0.118,0.135,1182.0,0.123,0.136
 BI,rl,McSplit+RL,1109,0.165,0.18,1112.0,0.162,0.177

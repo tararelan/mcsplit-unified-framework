@@ -6,6 +6,7 @@ MIVIA,McSplit+DSB,dsb,8140,3929,0,4211,48.27,own
 MIVIA,RRSplit,rrsplit,8140,3958,0,4182,48.62,own
 MIVIA,SymSplit,symsplit,8140,3973,0,4167,48.81,own
 LV,McSplit,mcsplit,6100,927,0,5173,15.2,own
+LV,McSplit-down,down,6105,1025,0,5080,16.79,own
 LV,McSplit+RL,rl,6105,941,0,5164,15.41,own
 LV,McSplit+LL,ll,6105,940,0,5165,15.4,own
 LV,McSplit+DSB,dsb,6105,924,0,5181,15.14,own
