@@ -6,3 +6,4 @@ run_demo.sh
 evaluation/scripts/run_demo.sh
 .gitignore
 analysis/__pycache__/
+proof-merge/
