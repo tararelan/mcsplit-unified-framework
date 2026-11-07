@@ -30,7 +30,11 @@ check-proofs: bin/mcsp
 check-mutants: $(BOOST_INC)/boost/functional/hash.hpp
 	CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS) -I $(BOOST_INC)" python3 test/mutants.py
 
+# Checks that mutants which ignore edge direction are caught on directed instances
+check-mutants-directed: bin/mcsp $(BOOST_INC)/boost/functional/hash.hpp
+	CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS) -I $(BOOST_INC)" python3 test/mutants_directed.py
+
 clean:
 	rm -f bin/mcsp src/*.o
 
-.PHONY: all check-proofs check-mutants clean
+.PHONY: all check-proofs check-mutants check-mutants-directed clean
