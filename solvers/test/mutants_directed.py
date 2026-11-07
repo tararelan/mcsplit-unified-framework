@@ -57,7 +57,19 @@ def directed_star(seed, out, hubs, per):
         a = r.randrange(i)
         edges.add((a, i) if r.random() < 0.5 else (i, a))
     for h in range(hubs):
+        # a group of leaves with one shared orientation, so they look like
+        # twins; sometimes one arc joins two of them, and swapping those two
+        # would reverse it, so they are not twins. Plus a few loose leaves.
+        out_arcs = r.random() < 0.5
+        group = []
         for _ in range(r.randint(2, per)):
+            edges.add((h, n) if out_arcs else (n, h))
+            group.append(n)
+            n += 1
+        if len(group) >= 2 and r.random() < 0.6:
+            a, b = r.sample(group, 2)
+            edges.add((a, b))
+        for _ in range(r.randint(0, 2)):
             edges.add((h, n) if r.random() < 0.5 else (n, h))
             n += 1
     gen.write_dimacs(out, n, sorted(edges))
