@@ -23,7 +23,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import gen  # noqa: E402
 
-GENERAL = ["mcsplit", "rl", "ll", "ll_lsm", "ll_lum", "dal", "dal_rl", "dal_dal",
+GENERAL = ["mcsplit", "rl", "rl_pair", "rl_rate", "ll", "ll_lsm", "ll_lum", "dal", "dal_rl", "dal_dal",
            "dsb", "dsb_always", "dsb_never"]
 # these ignore direction and labels, so only run on undirected unlabelled instances
 UNDIRECTED_ONLY = ["rrsplit", "rrsplit_nomax", "rrsplit_noveq", "rrsplit_nobound",
@@ -32,7 +32,7 @@ UNDIRECTED_ONLY = ["rrsplit", "rrsplit_nomax", "rrsplit_noveq", "rrsplit_nobound
 # family -> (solver flags, works with UNDIRECTED_ONLY, LAD so CakePB can check it)
 FAMILIES = {
     "random": ([], True, True),
-    "directed": (["-i"], False, False),
+    "directed": (["-i"], True, False),
     "labelled": (["-x"], False, False),
     "binary": ([], True, False),
     "tree": ([], True, True),

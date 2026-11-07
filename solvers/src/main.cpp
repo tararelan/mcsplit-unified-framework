@@ -22,9 +22,9 @@ std::vector<VtxPair> mcs_rl(const Graph &g, const Graph &h, bool multiway,
 std::vector<VtxPair> mcs_down(const Graph &g, const Graph &h, bool multiway,
 						Stats &stats, std::atomic<bool> &abort_due_to_timeout);
 std::vector<VtxPair> mcs_rl_pair(const Graph &g, const Graph &h, bool multiway,
-						Stats &stats, std::atomic<bool> &abort_due_to_timeout);
+						Stats &stats, std::atomic<bool> &abort_due_to_timeout, ProofLogger *proof = nullptr);
 std::vector<VtxPair> mcs_rl_rate(const Graph &g, const Graph &h, bool multiway,
-						Stats &stats, std::atomic<bool> &abort_due_to_timeout);
+						Stats &stats, std::atomic<bool> &abort_due_to_timeout, ProofLogger *proof = nullptr);
 std::vector<VtxPair> mcs_rl_down(const Graph &g, const Graph &h, bool multiway,
 						Stats &stats, std::atomic<bool> &abort_due_to_timeout);
 // use_lum: enable leaf union matching; use_lsm: enable long-short memory scoring
@@ -206,7 +206,7 @@ int main(int argc, char **argv)
 	std::unique_ptr<ProofLogger> proof;
 	if (!arguments.proof_prefix.empty())
 	{
-		static const std::set<std::string> proof_algorithms = {"mcsplit", "rl", "ll", "ll_lsm", "ll_lum",
+		static const std::set<std::string> proof_algorithms = {"mcsplit", "rl", "rl_pair", "rl_rate", "ll", "ll_lsm", "ll_lum",
 																	"dal", "dal_rl", "dal_dal",
 																	"dsb", "dsb_always", "dsb_never",
 																	"rrsplit", "rrsplit_nomax", "rrsplit_noveq", "rrsplit_nobound",
@@ -219,9 +219,9 @@ int main(int argc, char **argv)
 		// RRSplit and SymSplit ignore labels and direction, so they only
 		// solve (and can only be certified on) undirected unlabelled instances
 		if ((arguments.algorithm.rfind("rrsplit", 0) == 0 || arguments.algorithm.rfind("symsplit", 0) == 0) &&
-			(arguments.directed || arguments.vertex_labelled || arguments.edge_labelled))
+			(arguments.vertex_labelled || arguments.edge_labelled))
 		{
-			std::cerr << "Proof logging for " << arguments.algorithm << " needs undirected unlabelled graphs" << std::endl;
+			std::cerr << "Proof logging for " << arguments.algorithm << " needs unlabelled graphs" << std::endl;
 			return 1;
 		}
 		proof = std::make_unique<ProofLogger>(arguments.proof_prefix);
@@ -267,24 +267,15 @@ int main(int argc, char **argv)
 	// dispatch table: algorithm name -> mcs_* call with the matching
 	// mode/bitmask (see the declarations and options[] table above for
 	// what each mode value means)
-	// if (arguments.algorithm == "down")
-	// 	solution = mcs_down(g, h, multiway, stats, abort_due_to_timeout, proof.get());
-		// what each mode value means)
 	if (arguments.algorithm == "down")
 		solution = mcs_down(g, h, multiway, stats, abort_due_to_timeout);
 
 	else if (arguments.algorithm == "rl")
 		solution = mcs_rl(g, h, multiway, stats, abort_due_to_timeout, proof.get());
-	// else if (arguments.algorithm == "rl_pair")
-	// 	solution = mcs_rl_pair(g, h, multiway, stats, abort_due_to_timeout, proof.get());
-	// else if (arguments.algorithm == "rl_rate")
-	// 	solution = mcs_rl_rate(g, h, multiway, stats, abort_due_to_timeout, proof.get());
-	// else if (arguments.algorithm == "rl_down")
-	// 	solution = mcs_rl_down(g, h, multiway, stats, abort_due_to_timeout, proof.get());
-		else if (arguments.algorithm == "rl_pair")
-		solution = mcs_rl_pair(g, h, multiway, stats, abort_due_to_timeout);
+	else if (arguments.algorithm == "rl_pair")
+		solution = mcs_rl_pair(g, h, multiway, stats, abort_due_to_timeout, proof.get());
 	else if (arguments.algorithm == "rl_rate")
-		solution = mcs_rl_rate(g, h, multiway, stats, abort_due_to_timeout);
+		solution = mcs_rl_rate(g, h, multiway, stats, abort_due_to_timeout, proof.get());
 	else if (arguments.algorithm == "rl_down")
 		solution = mcs_rl_down(g, h, multiway, stats, abort_due_to_timeout);
 

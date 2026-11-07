@@ -2,6 +2,7 @@
 
 #include "graph.h"
 #include "common.h"
+#include "proof.h"
 #include <algorithm>
 #include <numeric>
 #include <vector>
@@ -238,9 +239,12 @@ static void solve_rlp(const Graph& g, const Graph& h,
         std::vector<Bidomain>& domains, std::vector<int>& left, std::vector<int>& right,
         unsigned int goal, bool multiway, Stats& stats,
         std::chrono::time_point<std::chrono::steady_clock> start_time,
-        std::atomic<bool>& abort_due_to_timeout) {
+        std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof) {
 
-    if (abort_due_to_timeout) { return; }
+    if (abort_due_to_timeout) {
+        if (proof) { proof->abort(); }
+        return;
+    }
 
     stats.nodes++;
     stats.bidomain_counts.push_back(domains.size());
@@ -251,17 +255,22 @@ static void solve_rlp(const Graph& g, const Graph& h,
         stats.nodes_to_best = stats.nodes;
         stats.time_to_best = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - start_time).count();
+        if (proof) { proof->new_incumbent(current); }
     }
 
     int bound = current.size() + calc_bound_rlp(domains);
     if (bound <= (int)incumbent.size() || bound < (int)goal) {
         stats.cut_branches++;
         stats.bound_pruned++;
+        if (proof) { proof->prune_by_bound(domains, left, right); }
         return;
     }
 
     int bd_idx = select_bidomain_rlp(domains, left, lgrade, current.size());
-    if (bd_idx == -1) { return; }
+    if (bd_idx == -1) {
+        if (proof) { proof->backtrack(); }
+        return;
+    }
 
     Bidomain& bd = domains[bd_idx];
 
@@ -284,9 +293,11 @@ static void solve_rlp(const Graph& g, const Graph& h,
         std::vector<Bidomain> new_domains = rewardfeed_rlp(domains, current, g_matched, h_matched,
                 left, right, lgrade, pair_grade, g, h, v, w, multiway, stats);
 
+        if (proof) { proof->push_match(v, w); }
         solve_rlp(g, h, lgrade, pair_grade, incumbent, current,
                 g_matched, h_matched, new_domains, left, right,
-                goal, multiway, stats, start_time, abort_due_to_timeout);
+                goal, multiway, stats, start_time, abort_due_to_timeout, proof);
+        if (proof) { proof->pop(); }
 
         while (current.size() > cur_len) {
             VtxPair pr = current.back();
@@ -299,13 +310,18 @@ static void solve_rlp(const Graph& g, const Graph& h,
     bd.right_len++;
     if (bd.left_len == 0) { remove_bidomain_rlp(domains, bd_idx); }
 
+    if (proof) { proof->push_exclude(v); }
     solve_rlp(g, h, lgrade, pair_grade, incumbent, current,
             g_matched, h_matched, domains, left, right,
-            goal, multiway, stats, start_time, abort_due_to_timeout);
+            goal, multiway, stats, start_time, abort_due_to_timeout, proof);
+    if (proof) { proof->pop(); }
+
+    // Every way of extending the current trail has now been refuted
+    if (proof) { proof->backtrack(); }
 }
 
 std::vector<VtxPair> mcs_rl_pair(const Graph& g, const Graph& h, bool multiway,
-        Stats& stats, std::atomic<bool>& abort_due_to_timeout) {
+        Stats& stats, std::atomic<bool>& abort_due_to_timeout, ProofLogger* proof) {
 
     auto calc_degrees = [](const Graph& g) {
         std::vector<int> degree(g.n, 0);
@@ -339,6 +355,7 @@ std::vector<VtxPair> mcs_rl_pair(const Graph& g, const Graph& h, bool multiway,
 
     Graph g_sorted = induced_subgraph(const_cast<Graph&>(g), vv0);
     Graph h_sorted = induced_subgraph(const_cast<Graph&>(h), vv1);
+    if (proof) { proof->set_vertex_orders(vv0, vv1); }
 
     std::vector<int> left, right;
     std::vector<Bidomain> domains;
@@ -370,7 +387,7 @@ std::vector<VtxPair> mcs_rl_pair(const Graph& g, const Graph& h, bool multiway,
     auto start_time = std::chrono::steady_clock::now();
     solve_rlp(g_sorted, h_sorted, lgrade, pair_grade, incumbent, current,
             g_matched, h_matched, domains, left, right, 1,
-            multiway, stats, start_time, abort_due_to_timeout);
+            multiway, stats, start_time, abort_due_to_timeout, proof);
 
     for (auto& p : incumbent) {
         p.v = vv0[p.v];
