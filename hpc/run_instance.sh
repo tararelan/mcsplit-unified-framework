@@ -153,10 +153,10 @@ if [ "$WITH_REF" = "1" ]; then
     esac
 
 	MATCH="UNKNOWN"
-	if [ "$UNIFIED_SIZE" == "$REF_SIZE" ]; then
-		MATCH="PASS"
-	elif [ -z "$UNIFIED_SIZE" ] || [ -z "$REF_SIZE" ]; then
+	if [ -z "$UNIFIED_SIZE" ] || [ -z "$REF_SIZE" ]; then
 		MATCH="MISSING_DATA"
+	elif [ "$UNIFIED_SIZE" == "$REF_SIZE" ]; then
+		MATCH="PASS"
 	else
 		MATCH="FAIL"
 	fi

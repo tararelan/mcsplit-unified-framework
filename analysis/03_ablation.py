@@ -65,8 +65,7 @@ def ablation_table(ds):
 
     rows = []
     for parent in PARENTS:
-        if (parent, ds) in C.UNSOUND:
-            continue
+        # UNSOUND concerns the REFERENCE binaries; the ablation uses only the unified results, so no skip here
         whole = C.load(parent, ds)
         if whole is None:
             print(f"  [{ds}] skipping {parent}: no results"); continue

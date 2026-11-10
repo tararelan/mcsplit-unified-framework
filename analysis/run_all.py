@@ -9,7 +9,7 @@ here = Path(__file__).resolve().parent
 ds = sys.argv[1:] if sys.argv[1:2] == ["--datasets"] else []
 env = dict(os.environ, MPLBACKEND="Agg")
 for script, takes_ds in [("01_validation.py", True), ("02_performance.py", True),
-                         ("03_ablation.py", False), ("04_bidomain.py", False)]:
+                         ("03_ablation.py", False)]: #, ("04_bidomain.py", False)]:
     print(f"\n{'=' * 78}\n{script}\n{'=' * 78}", flush=True)
     r = subprocess.run([sys.executable, "-u", str(here / script)] + (ds if takes_ds else []), env=env, cwd=here)
     if r.returncode:

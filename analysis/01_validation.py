@@ -52,7 +52,7 @@ def main():
         name = C.DATASETS[ds]
         # only algorithms with a reference binary of their own: RL's variants (Pair/Rate/Down) have none,
         # so a comparison with RL's reference is not a fidelity check and is left out
-        algos = [k for k in C.available(ds, include_unsound=args.include_unsound) if k not in C.REF_BORROW]
+        algos = [k for k in C.available(ds, include_unsound=args.include_unsound, validation=True) if k not in C.REF_BORROW]
         frames = {k: C.load(k, ds) for k in algos}
         frames = {k: d for k, d in frames.items() if d is not None}
         if not frames:

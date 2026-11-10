@@ -62,7 +62,7 @@ def main():
             d = med[k]
             r = dict(dataset=name, key=k, algorithm=C.label(k), medium_pairs=nm,
                      solved=int(d["done"].sum()), solved_pct=round(100 * d["done"].sum() / nm, 2))
-            has_ref = k not in C.REF_BORROW and d["ref_done"].any()
+            has_ref = k not in C.REF_BORROW and (k, ds) not in C.UNSOUND and d["ref_done"].any()
             r["ref_solved"] = int(d["ref_done"].sum()) if has_ref else np.nan
             r["ref_solved_pct"] = round(100 * d["ref_done"].sum() / nm, 2) if has_ref else np.nan
             rows.append(r)
@@ -106,7 +106,7 @@ def main():
             upn = u["time"] / u["nodes"] * 1e6
             r = dict(dataset=name, key=k, algorithm=C.label(k), n=len(u),
                      median_us=round(upn.median(), 3), mean_us=round(upn.mean(), 3))
-            if k not in C.REF_BORROW and d["ref_done"].any():
+            if k not in C.REF_BORROW and (k, ds) not in C.UNSOUND and d["ref_done"].any():
                 q = d[d["ref_done"] & (d["ref_nodes"] > 0) & (d["ref_time"] > 0)]
                 rpn = q["ref_time"] / q["ref_nodes"] * 1e6
                 r.update(ref_n=len(q), ref_median_us=round(rpn.median(), 3), ref_mean_us=round(rpn.mean(), 3))

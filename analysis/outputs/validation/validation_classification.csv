@@ -1,5 +1,6 @@
 dataset,algorithm,key,pairs,PASS,FAIL,timed_out_or_missing,pass_pct,reference
 MIVIA,McSplit,mcsplit,8131,3953,0,4178,48.62,own
+MIVIA,McSplit-down,down,8140,4259,0,3881,52.32,own
 MIVIA,McSplit+RL,rl,8140,3891,0,4249,47.8,own
 MIVIA,McSplit+LL,ll,8140,3928,0,4212,48.26,own
 MIVIA,McSplit+DSB,dsb,8140,3929,0,4211,48.27,own
@@ -16,3 +17,4 @@ BI,McSplit,mcsplit,9163,6498,0,2665,70.92,own
 BI,McSplit-down,down,9180,6659,0,2521,72.54,own
 BI,McSplit+RL,rl,9179,6583,0,2596,71.72,own
 BI,McSplit+LL,ll,9180,6631,0,2549,72.23,own
+BI,McSplit+DSB,dsb,9180,6377,0,2803,69.47,own

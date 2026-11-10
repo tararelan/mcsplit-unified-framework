@@ -1,13 +1,14 @@
 dataset,key,algorithm,medium_pairs,solved,solved_pct,ref_solved,ref_solved_pct,rank,ref_rank
-MIVIA,mcsplit,McSplit,1493,1057,70.8,1062.0,71.13,4,3.0
-MIVIA,rl,McSplit+RL,1493,986,66.04,1004.0,67.25,8,6.0
-MIVIA,rl_pair,McSplit+RL Pair,1493,1002,67.11,,,7,
-MIVIA,rl_rate,McSplit+RL Rate,1493,978,65.51,,,9,
-MIVIA,rl_down,McSplit+RL-down,1493,1418,94.98,,,1,
-MIVIA,ll,McSplit+LL,1493,1036,69.39,1041.0,69.73,6,4.0
-MIVIA,dsb,McSplit+DSB,1493,1040,69.66,1041.0,69.73,5,4.0
-MIVIA,rrsplit,RRSplit,1493,1067,71.47,1074.0,71.94,3,2.0
-MIVIA,symsplit,SymSplit,1493,1081,72.4,1083.0,72.54,2,1.0
+MIVIA,mcsplit,McSplit,1497,1060,70.81,1065.0,71.14,5,4.0
+MIVIA,down,McSplit-down,1497,1374,91.78,1409.0,94.12,2,1.0
+MIVIA,rl,McSplit+RL,1497,989,66.07,1007.0,67.27,9,7.0
+MIVIA,rl_pair,McSplit+RL Pair,1497,1005,67.13,,,8,
+MIVIA,rl_rate,McSplit+RL Rate,1497,981,65.53,,,10,
+MIVIA,rl_down,McSplit+RL-down,1497,1421,94.92,,,1,
+MIVIA,ll,McSplit+LL,1497,1039,69.41,1044.0,69.74,7,5.0
+MIVIA,dsb,McSplit+DSB,1497,1043,69.67,1044.0,69.74,6,5.0
+MIVIA,rrsplit,RRSplit,1497,1070,71.48,1077.0,71.94,4,3.0
+MIVIA,symsplit,SymSplit,1497,1084,72.41,1086.0,72.55,3,2.0
 LV,mcsplit,McSplit,575,298,51.83,306.0,53.22,9,6.0
 LV,down,McSplit-down,575,402,69.91,404.0,70.26,4,3.0
 LV,rl,McSplit+RL,575,318,55.3,321.0,55.83,5,5.0
@@ -18,10 +19,13 @@ LV,ll,McSplit+LL,575,316,54.96,322.0,56.0,6,4.0
 LV,dsb,McSplit+DSB,575,302,52.52,304.0,52.87,8,7.0
 LV,rrsplit,RRSplit,575,449,78.09,451.0,78.43,2,2.0
 LV,symsplit,SymSplit,575,473,82.26,474.0,82.43,1,1.0
-BI,mcsplit,McSplit,1418,1029,72.57,1027.0,72.43,7,4.0
-BI,down,McSplit-down,1418,1189,83.85,1185.0,83.57,2,1.0
-BI,rl,McSplit+RL,1418,1109,78.21,1112.0,78.42,4,3.0
-BI,rl_pair,McSplit+RL Pair,1418,1070,75.46,,,6,
-BI,rl_rate,McSplit+RL Rate,1418,1102,77.72,,,5,
-BI,rl_down,McSplit+RL-down,1418,1264,89.14,,,1,
-BI,ll,McSplit+LL,1418,1154,81.38,1156.0,81.52,3,2.0
+BI,mcsplit,McSplit,1421,1032,72.62,1030.0,72.48,9,4.0
+BI,down,McSplit-down,1421,1192,83.88,1188.0,83.6,4,1.0
+BI,rl,McSplit+RL,1421,1112,78.25,1115.0,78.47,6,3.0
+BI,rl_pair,McSplit+RL Pair,1421,1073,75.51,,,8,
+BI,rl_rate,McSplit+RL Rate,1421,1105,77.76,,,7,
+BI,rl_down,McSplit+RL-down,1421,1267,89.16,,,1,
+BI,ll,McSplit+LL,1421,1157,81.42,1159.0,81.56,5,2.0
+BI,dsb,McSplit+DSB,1421,905,63.69,905.0,63.69,10,5.0
+BI,rrsplit,RRSplit,1421,1233,86.77,,,2,
+BI,symsplit,SymSplit,1421,1205,84.8,,,3,

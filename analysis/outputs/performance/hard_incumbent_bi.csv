@@ -1,8 +1,11 @@
-,McSplit,McSplit-down,McSplit+RL,McSplit+RL Pair,McSplit+RL Rate,McSplit+RL-down,McSplit+LL
-McSplit,,94.5,15.8,17.3,16.6,91.8,12.2
-McSplit-down,2.5,,2.2,2.8,2.4,30.3,2.2
-McSplit+RL,19.8,95.1,,13.4,7.1,92.7,10.8
-McSplit+RL Pair,15.9,93.8,6.6,,8.0,92.1,3.9
-McSplit+RL Rate,18.5,94.8,3.9,11.3,,92.0,8.6
-McSplit+RL-down,4.5,44.3,3.3,3.9,3.7,,3.4
-McSplit+LL,19.7,94.9,14.7,14.6,15.7,92.9,
+,McSplit,McSplit-down,McSplit+RL,McSplit+RL Pair,McSplit+RL Rate,McSplit+RL-down,McSplit+LL,McSplit+DSB,RRSplit,SymSplit
+McSplit,,94.5,15.8,17.3,16.6,91.8,12.2,0.0,2.2,0.5
+McSplit-down,2.5,,2.2,2.8,2.4,30.3,2.2,2.9,0.4,0.0
+McSplit+RL,19.8,95.1,,13.4,7.1,92.7,10.8,45.7,8.6,0.7
+McSplit+RL Pair,15.9,93.8,6.6,,8.0,92.1,3.9,42.9,7.6,0.7
+McSplit+RL Rate,18.5,94.8,3.9,11.3,,92.0,8.6,42.9,8.2,0.6
+McSplit+RL-down,4.5,44.3,3.3,3.9,3.7,,3.4,2.9,1.8,0.1
+McSplit+LL,19.7,94.9,14.7,14.6,15.7,92.9,,47.1,8.8,0.6
+McSplit+DSB,1.4,97.1,2.9,2.9,5.7,95.7,4.3,,0.0,0.0
+RRSplit,65.8,97.5,66.1,68.6,67.0,95.9,64.8,42.9,,0.1
+SymSplit,68.9,97.0,71.2,72.7,71.1,96.1,70.7,42.9,0.1,

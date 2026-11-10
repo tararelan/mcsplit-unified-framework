@@ -71,13 +71,14 @@ ALGOS = {a.key: a for a in [
     Algo("rl_rate", "McSplit+RL Rate",    "rl",       "#5bbcf2", ":",  "s"),
     Algo("rl_down", "McSplit+RL-down",    "rl",       "#12a3c7", "-.", "s"),
     Algo("ll",      "McSplit+LL",         "ll",       _AQUA,    "-",  "^"),
-    # Algo("dal",     "McSplit+DAL",        "dal",      _ORANGE,  "-",  "*"),   # DAL: comment out to drop it everywhere
+    Algo("dal",     "McSplit+DAL",        "dal",      _ORANGE,  "-",  "*"),   # DAL: comment out to drop it everywhere
     Algo("dsb",     "McSplit+DSB",        "dsb",      _YELLOW,  "-",  "D"),
     Algo("rrsplit", "RRSplit",            "rr",       _VIOLET,  "-",  "p"),
     Algo("symsplit", "SymSplit",          "sym",      _MAGENTA, "-",  "h"),
 ]}
 # Algorithms that keep their colour/label/marker but are shown ONLY in the ablation (03_ablation.py), not in the
-# cactus, validation, performance or bidomain figures. Empty this set to show DAL everywhere.
+# cactus, validation, performance or bidomain figures (its reference is unsound, so there is no fidelity check, and it
+# does not define difficulty). Its unified results still go into the ablation.
 ABLATION_ONLY = {"dal"}
 ALL_ALGOS = [k for k in ALGOS if k not in ABLATION_ONLY]
 
@@ -121,20 +122,21 @@ REF_BORROW = {"rl_pair": "rl", "rl_rate": "rl", "rl_down": "rl"}
 # reference of their own; their correctness is checked separately (proof logging).
 _ALL = ["mcsplit", "down", "rl", "rl_pair", "rl_rate", "rl_down", "ll", "dsb"]
 CORE = {
-    "mivia": _ALL + ["rrsplit", "symsplit"],
-    "lv":    _ALL + ["rrsplit", "symsplit"],
+    "mivia": list(_ALL) + ["rrsplit", "symsplit"],
+    "lv":    list(_ALL) + ["rrsplit", "symsplit"],
     "bi":    list(_ALL),
 }
 
-# Algorithms whose reference is known to be unsound on a dataset: shown nowhere unless include_unsound=True.
-UNSOUND = {("rrsplit", "bi"), ("symsplit", "bi")}
+# Algorithms whose REFERENCE is known to be unsound on a dataset: left out of the validation (fidelity) only; their
+# unified results are used everywhere else (performance, ablation). validation=True in available() applies this.
+UNSOUND = {("rrsplit", "bi"), ("symsplit", "bi"), ("dal", "mivia"), ("dal", "bi"), ("dal", "lv")}
 
 # Ablation variants (Table 11 of the dissertation): key, label, parent algorithm
 VARIANTS = [
     ("ll_lsm",           "LSM only",              "ll"),
     ("ll_lum",           "LUM only",              "ll"),
-    # ("dal_rl",           "RL policy only",        "dal"),   # DAL: comment out to drop it from the ablation
-    # ("dal_dal",          "DAL policy only",       "dal"),   # DAL
+    ("dal_rl",           "RL policy only",        "dal"),   # DAL: comment out to drop it from the ablation
+    ("dal_dal",          "DAL policy only",       "dal"),   # DAL
     ("dsb_never",        "No DSB",                "dsb"),
     ("dsb_always",       "Always DSB",            "dsb"),
     ("rrsplit_nomax",    "No maximality",         "rrsplit"),
@@ -170,7 +172,7 @@ def _pub(ds):
 
 
 SOURCES = {ds: _pub(ds) for ds in ("mivia", "lv", "bi")}
-ABLATION_SOURCES = [PUB + "/{a}_{ds}_all.csv"]      # ablation variants: no reference
+ABLATION_SOURCES = [PUB + "/ablation/{a}_{ds}_all.csv"]      # ablation variants: no reference
 
 # --------------------------------------------------------------------------- loading
 _RENAME = {
@@ -286,11 +288,11 @@ def load_validation(algo, ds):
     return df
 
 
-def available(ds, algos=None, include_unsound=False):
+def available(ds, algos=None, include_unsound=False, validation=False):
     """Algorithms (in ALGOS order) that have results for a dataset."""
     out = []
     for k in (algos or ALL_ALGOS):
-        if not include_unsound and (k, ds) in UNSOUND:
+        if validation and not include_unsound and (k, ds) in UNSOUND:   # UNSOUND = unsound REFERENCE: only validation skips it
             continue
         if load(k, ds) is not None:
             out.append(k)
