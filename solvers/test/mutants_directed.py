@@ -6,6 +6,7 @@ least one directed instance. The unmutated solver must pass them all,
 otherwise a "caught" result means nothing.
 
     python3 test/mutants_directed.py -n 40
+    python3 test/mutants_directed.py -n 40 --csv mutants_directed.csv   # also save the counts
 
 Instances are directed random graphs plus directed "stars": hubs with leaf
 groups whose arcs point randomly in or out, so twins exist and so do leaves
@@ -19,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import types
 from concurrent.futures import ThreadPoolExecutor
 
@@ -116,6 +118,38 @@ def run_jobs(solver, args, workdir, algos, instances):
     return jobs, errs
 
 
+def kind(err):
+    """Why a job failed: what the proof checker or the solver said."""
+    if err is None:
+        return "verified"
+    for prefix, name in (("VeriPB", "VeriPB rejected the proof"), ("solver timed out", "solver timed out"),
+                         ("solver failed", "solver crashed"), ("CakePB", "CakePB rejected the proof")):
+        if err.startswith(prefix):
+            return name
+    return "other"
+
+
+def tally(jobs, errs):
+    """(algorithm, family) -> [jobs, failed]. jobs are (algo, family, name, pattern, target, fmt)."""
+    t = {}
+    for j, e in zip(jobs, errs):
+        c = t.setdefault((j[0], j[1]), [0, 0])
+        c[0] += 1
+        c[1] += e is not None
+    return t
+
+
+def show(t, algos, families, label, ok_word):
+    """One line per algorithm x family. label says what the number counts (verified / caught)."""
+    for a in algos:
+        for f in families:
+            if (a, f) not in t:
+                continue
+            total, bad = t[(a, f)]
+            n = total - bad if ok_word == "verified" else bad
+            print(f"  {a:18} {f:9} {label} {n}/{total}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--solver", default=os.path.join(HERE, "..", "bin", "mcsp"), help="unmutated solver")
@@ -123,14 +157,28 @@ def main():
     ap.add_argument("-n", "--count", type=int, default=30, help="instances per family")
     ap.add_argument("-j", "--jobs", type=int, default=os.cpu_count())
     ap.add_argument("--timeout", type=int, default=30)
+    ap.add_argument("--csv", help="also write every (stage, algorithm, family) count to this CSV file")
+    ap.add_argument("--no-controls", action="store_true",
+                    help="only run the algorithms each mutant is meant to break (faster); by default the other "
+                         "algorithms are run too, to show the mutant does not leak into them")
     args = ap.parse_args()
 
+    t0 = time.time()
     workdir = tempfile.mkdtemp(prefix="mutants_directed_")
     instances = make_instances(args.count, workdir)
+    families = list(dict.fromkeys(i[0] for i in instances))
+    ALL = RR + SYM
+    print("instances: " + ", ".join(f"{f} {sum(1 for i in instances if i[0] == f)}" for f in families)
+          + f"   algorithms: {len(ALL)} ({len(RR)} RRSplit, {len(SYM)} SymSplit)")
+    rows = []                                              # for --csv
 
-    jobs, errs = run_jobs(args.solver, args, workdir, RR + SYM, instances)
+    jobs, errs = run_jobs(args.solver, args, workdir, ALL, instances)
     bad = [e for e in errs if e]
-    print(f"baseline (unmutated): {len(errs) - len(bad)}/{len(errs)} verified")
+    print(f"\nbaseline (unmutated): {len(errs) - len(bad)}/{len(errs)} verified   [{time.time() - t0:.0f}s]")
+    base = tally(jobs, errs)
+    show(base, ALL, families, "verified", "verified")
+    for (a, f), (n, b_) in base.items():
+        rows.append(dict(stage="baseline", mutant="", algorithm=a, family=f, role="baseline", jobs=n, failed=b_))
     if bad:
         print("  first failure:", bad[0])
         print("baseline must pass before the mutants mean anything")
@@ -138,15 +186,45 @@ def main():
 
     survived = 0
     for i, (name, file, old, new, times, algos) in enumerate(MUTANTS):
+        print(f"\nmutant {i + 1}: {name}   [{file}]")
         binary, err = build(workdir, f"m{i}", file, old, new, times)
         if err:
             print(f"?? {name}: {err}")
             survived += 1
             continue
-        jobs, errs = run_jobs(binary, args, workdir, algos, instances)
-        caught = sum(e is not None for e in errs)
-        print(f"{'ok' if caught else 'SURVIVED'} {name}: caught on {caught}/{len(jobs)}")
+        controls = [] if args.no_controls else [a for a in ALL if a not in algos]
+        jobs, errs = run_jobs(binary, args, workdir, algos + controls, instances)
+        hit = [(j, e) for j, e in zip(jobs, errs) if j[0] in algos]
+        caught = sum(e is not None for _, e in hit)
+        t = tally(jobs, errs)
+        print(f" affected algorithms (the mutant changes their code; VeriPB should reject):")
+        show(t, algos, families, "caught", "caught")
+        kinds = {}
+        for _, e in hit:
+            if e is not None:
+                kinds[kind(e)] = kinds.get(kind(e), 0) + 1
+        if kinds:
+            print("  how they were caught: " + ", ".join(f"{k} {v}" for k, v in sorted(kinds.items())))
+        if controls:
+            print(" other algorithms (code the mutant does not touch; should still verify):")
+            show(t, controls, families, "verified", "verified")
+            leaked = sum(t[k][1] for k in t if k[0] in controls)
+            if leaked:
+                print(f"  !! {leaked} control job(s) failed: the mutant leaks into algorithms it should not affect")
+        for (a, f), (n, b_) in t.items():
+            rows.append(dict(stage="mutant", mutant=name, algorithm=a, family=f,
+                             role="affected" if a in algos else "control", jobs=n, failed=b_))
+        print(f"{'ok' if caught else 'SURVIVED'} {name}: caught on {caught}/{len(hit)}")
         survived += caught == 0
+
+    print(f"\n{len(MUTANTS) - survived}/{len(MUTANTS)} mutants caught, {time.time() - t0:.0f}s in total")
+    if args.csv:
+        pd_cols = ["stage", "mutant", "algorithm", "family", "role", "jobs", "failed"]
+        with open(args.csv, "w") as f:
+            f.write(",".join(pd_cols) + "\n")
+            for r in rows:
+                f.write(",".join('"%s"' % str(r[c]) if c == "mutant" else str(r[c]) for c in pd_cols) + "\n")
+        print("wrote", args.csv)
     shutil.rmtree(workdir, ignore_errors=True)
     sys.exit(1 if survived else 0)
 
