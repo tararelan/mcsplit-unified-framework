@@ -1,0 +1,15 @@
+\begin{tabular}{llrrrrrrrrr}
+\toprule
+algorithm & dataset & pairs & no output \% & $=$ opt \% & $>$ opt \% & $<$ opt \% & max excess & max shortfall & unif. $=$ opt & unif. pairs \\
+\midrule
+McSplit+DAL & MIVIA & 3945 & 1.1 & 98.1 & 0.8 & 0.0 & 1 & 0 & 3888 & 3888 \\
+McSplit+DAL & LV & 920 & 3.2 & 96.4 & 0.4 & 0.0 & 1 & 0 & 844 & 848 \\
+McSplit+DAL & BI & 6502 & 1.0 & 94.3 & 4.6 & 0.0 & 2 & 0 & 6406 & 6406 \\
+RRSplit & MIVIA & 3945 & 0.2 & 99.8 & 0.0 & 0.0 & 0 & 0 & 3934 & 3934 \\
+RRSplit & LV & 920 & 0.0 & 98.8 & 1.2 & 0.0 & 144 & 0 & 909 & 920 \\
+RRSplit & BI & 6502 & 99.9 & 0.1 & 0.0 & 0.0 & 0 & 1 & 6500 & 6500 \\
+SymSplit & MIVIA & 3945 & 0.2 & 99.8 & 0.0 & 0.0 & 0 & 0 & 3939 & 3939 \\
+SymSplit & LV & 920 & 0.0 & 98.8 & 1.2 & 0.0 & 144 & 0 & 909 & 920 \\
+SymSplit & BI & 6502 & 3.0 & 28.9 & 21.8 & 46.2 & 6 & 13 & 6497 & 6497 \\
+\bottomrule
+\end{tabular}

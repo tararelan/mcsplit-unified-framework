@@ -99,13 +99,12 @@ def main():
             for ax, k in zip(axes, ks):
                 p = complete_pairs(frames[k])
                 exact = (p["nodes"] == p["ref_nodes"])
-                ax.scatter(p["nodes"], p["ref_nodes"], s=7, alpha=0.35, color=C.ALGOS[k].color, edgecolors="none")
+                ax.scatter(p["nodes"], p["ref_nodes"], s=22, alpha=0.35, color=C.ALGOS[k].color, edgecolors="none")
                 lo, hi = min(p["nodes"].min(), p["ref_nodes"].min()), max(p["nodes"].max(), p["ref_nodes"].max())
-                ax.plot([lo, hi], [lo, hi], color=C.INK2, ls="--", lw=0.9)
+                ax.plot([lo, hi], [lo, hi], color=C.INK2, ls="--", lw=1.8)
                 ax.set_xscale("log"); ax.set_yscale("log")
                 ax.set_xlabel("unified nodes"); ax.set_ylabel("reference nodes")
-                ax.set_title(f"{C.label(k)}{ref_note(k)}\nR²={r_squared(p['nodes'], p['ref_nodes']):.3f}, "
-                             f"exact {exact.mean():.1%}, n={len(p)}", fontsize=9.5)
+                ax.set_title(f"{C.label(k)}{ref_note(k)}\nR²={r_squared(p['nodes'], p['ref_nodes']):.3f}, n={len(p)}", fontsize=C.FONT)
             fig.suptitle(f"{name}: search-tree fidelity (dashed line = perfect agreement)")
             C.outer_labels(fig, axes)
             fig.tight_layout(); C.save(fig, FOLDER, f"nodes_{ds}.png"); plt.close(fig)
@@ -114,13 +113,13 @@ def main():
             for ax, k in zip(axes, ks):
                 p = complete_pairs(frames[k])
                 ut, rt = p["time"].clip(lower=1e-3), p["ref_time"].clip(lower=1e-3)
-                ax.scatter(ut, rt, s=7, alpha=0.35, color=C.ALGOS[k].color, edgecolors="none")
+                ax.scatter(ut, rt, s=22, alpha=0.35, color=C.ALGOS[k].color, edgecolors="none")
                 lo, hi = min(ut.min(), rt.min()), max(ut.max(), rt.max())
-                ax.plot([lo, hi], [lo, hi], color=C.INK2, ls="--", lw=0.9)
+                ax.plot([lo, hi], [lo, hi], color=C.INK2, ls="--", lw=1.8)
                 ax.set_xscale("log"); ax.set_yscale("log")
                 ax.set_xlabel("unified time (s)"); ax.set_ylabel("reference time (s)")
-                ax.set_title(f"{C.label(k)}{ref_note(k)}\nmedian unified/ref = "
-                             f"{(p['time'] / p['ref_time'].where(p['ref_time'] > 0)).median():.2f}, n={len(p)}", fontsize=9.5)
+                ax.set_title(f"{C.label(k)}{ref_note(k)}\nMedian unified/reference = "
+                             f"{(p['time'] / p['ref_time'].where(p['ref_time'] > 0)).median():.2f}, n={len(p)}", fontsize=C.FONT)
             fig.suptitle(f"{name}: runtime fidelity (dashed line = equal time; reference clocks are ms-resolution)")
             C.outer_labels(fig, axes)
             fig.tight_layout(); C.save(fig, FOLDER, f"runtime_{ds}.png"); plt.close(fig)

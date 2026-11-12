@@ -65,7 +65,7 @@ def main():
 
     # ---- histograms
     def hist_by_dataset(col, title, fname, log_x=False, clip_pct=None):
-        fig, axes = plt.subplots(1, len(frames), figsize=(4.6 * len(frames), 3.8), sharey=False)
+        fig, axes = plt.subplots(1, len(frames), figsize=(6.8 * len(frames), 5.8), sharey=False)
         axes = np.atleast_1d(axes)
         for ax, (ds, d) in zip(axes, frames.items()):
             v = d[col].values.astype(float)
@@ -76,11 +76,11 @@ def main():
             bins = np.logspace(np.log10(max(v.min(), 1e-2)), np.log10(v.max() + 1e-9), 40) if log_x \
                 else np.linspace(v.min(), v.max(), 40)
             ax.hist(v, bins=bins, color=ds_colors.get(ds, "grey"), alpha=0.9, edgecolor=C.SURFACE, linewidth=0.5)
-            ax.axvline(np.median(v), color=C.INK2, ls="--", lw=1)
+            ax.axvline(np.median(v), color=C.INK2, ls="--", lw=1.8)
             if log_x:
                 ax.set_xscale("log")
             ax.set_xlabel(title); ax.set_ylabel("pairs")
-            ax.set_title(f"{C.DATASETS[ds]}  (median {np.median(v):.2f}, n={len(v)}" + (f", {dropped} above p{clip_pct} hidden)" if dropped else ")"), fontsize=9.5)
+            ax.set_title(f"{C.DATASETS[ds]}  (median {np.median(v):.2f}, n={len(v)}" + (f", {dropped} above p{clip_pct} hidden)" if dropped else ")"), fontsize=C.FONT)
         fig.suptitle(f"{C.label(base)}: {title} per pair")
         fig.tight_layout(); C.save(fig, FOLDER, fname); plt.close(fig)
 
@@ -88,15 +88,15 @@ def main():
     hist_by_dataset("bd_max", "max bidomains at any node", "bidomain_max_hist.png", log_x=True)
 
     # ---- is it just instance size?
-    fig, ax = plt.subplots(figsize=(7.2, 4.8))
+    fig, ax = plt.subplots(figsize=(10, 7))
     for ds, d in frames.items():
         s = d[(d["size"] > 0)]
-        ax.scatter(s["size"], s["bd_mean"], s=7, alpha=0.2, color=ds_colors[ds], edgecolors="none")
+        ax.scatter(s["size"], s["bd_mean"], s=22, alpha=0.2, color=ds_colors[ds], edgecolors="none")
         edges = np.logspace(0, np.log10(s["size"].max() + 1), 15)
         mid = s.groupby(pd.cut(s["size"], edges), observed=True).agg(
             x=("size", "median"), y=("bd_mean", "median"), n=("bd_mean", "size"))
         mid = mid[mid["n"] >= 5]
-        ax.plot(mid["x"], mid["y"], color=ds_colors[ds], lw=2.2, marker="o", ms=4, label=C.DATASETS[ds])
+        ax.plot(mid["x"], mid["y"], color=ds_colors[ds], lw=2.4, marker="o", ms=6, label=C.DATASETS[ds])
     ax.set_xscale("log"); ax.set_yscale("log")
     ax.set_xlabel("solution size (vertices)"); ax.set_ylabel("mean bidomains per node")
     ax.set_title(f"{C.label(base)}: bidomains vs solution size (lines = per-size-bin medians)")
@@ -117,13 +117,13 @@ def main():
         a.to_csv(C.out_dir(FOLDER) / "bidomain_by_algorithm.csv", index=False)
         print("\nMedian mean-bidomains per node, by algorithm:")
         print(a.pivot(index="algorithm", columns="dataset", values="median_mean_bidomains").to_string())
-        fig, ax = plt.subplots(figsize=(8.2, 0.42 * a["algorithm"].nunique() + 1.8))
+        fig, ax = plt.subplots(figsize=(12, 0.7 * a["algorithm"].nunique() + 2.8))
         order = [C.label(k) for k in C.ALL_ALGOS if C.label(k) in set(a["algorithm"])]
         for i, name in enumerate(order):
             for j, ds in enumerate(C.DATASETS):
                 r = a[(a["algorithm"] == name) & (a["dataset"] == C.DATASETS[ds])]
                 if len(r):
-                    ax.plot(r["median_mean_bidomains"].iloc[0], i + (j - 1) * 0.2, "o", ms=6, color=ds_colors[ds],
+                    ax.plot(r["median_mean_bidomains"].iloc[0], i + (j - 1) * 0.2, "o", ms=8, color=ds_colors[ds],
                             label=C.DATASETS[ds] if i == 0 else None)
         ax.set_yticks(range(len(order))); ax.set_yticklabels(order); ax.invert_yaxis()
         ax.grid(axis="y", visible=False)

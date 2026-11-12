@@ -77,9 +77,9 @@ ALGOS = {a.key: a for a in [
     Algo("symsplit", "SymSplit",          "sym",      _MAGENTA, "-",  "h"),
 ]}
 # Algorithms that keep their colour/label/marker but are shown ONLY in the ablation (03_ablation.py), not in the
-# cactus, validation, performance or bidomain figures (its reference is unsound, so there is no fidelity check, and it
-# does not define difficulty). Its unified results still go into the ablation.
-ABLATION_ONLY = {"dal"}
+# cactus, validation, performance or bidomain figures. Empty now: DAL's REFERENCE is unsound (so it is skipped in
+# validation via UNSOUND below), but the unified DAL is correct (proof-logged), so it is in every other analysis.
+ABLATION_ONLY = set()
 ALL_ALGOS = [k for k in ALGOS if k not in ABLATION_ONLY]
 
 # Marker shape = algorithm family, the same in every figure: circle McSplit / down, square the RL family,
@@ -117,10 +117,10 @@ def label(key):
 REF_BORROW = {"rl_pair": "rl", "rl_rate": "rl", "rl_down": "rl"}
 
 # The set of algorithms that defines easy / medium / hard: every algorithm evaluated in the paper
-# (RRSplit and SymSplit are left out on BI because their reference is unsound there). Hard = none of them
+# (RRSplit and SymSplit are left out on BI until their agreement check; DAL is in, via its unified results). Hard = none of them
 # solves it, so adding a stronger algorithm shrinks the hard class. The RL variants (Pair/Rate/Down) have no
 # reference of their own; their correctness is checked separately (proof logging).
-_ALL = ["mcsplit", "down", "rl", "rl_pair", "rl_rate", "rl_down", "ll", "dsb"]
+_ALL = ["mcsplit", "down", "rl", "rl_pair", "rl_rate", "rl_down", "dal", "ll", "dsb"]
 CORE = {
     "mivia": list(_ALL) + ["rrsplit", "symsplit"],
     "lv":    list(_ALL) + ["rrsplit", "symsplit"],
@@ -336,7 +336,8 @@ def classify(ds, core=None):
 
 
 # --------------------------------------------------------------------------- plotting
-SAVE_DPI = 450   # resolution of every saved figure
+SAVE_DPI = 400   # resolution of every saved figure
+FONT = 16        # smallest text size in any figure, so they stay legible when printed small
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e6e5e1"
 
 
@@ -345,15 +346,16 @@ def style():
     plt.rcParams.update({
         "figure.facecolor": SURFACE, "axes.facecolor": SURFACE, "savefig.facecolor": SURFACE,
         "axes.edgecolor": INK2, "axes.labelcolor": INK2, "xtick.color": INK2, "ytick.color": INK2,
-        "text.color": INK, "axes.titlecolor": INK, "axes.titlesize": 10.5, "axes.labelsize": 9.5,
-        "xtick.labelsize": 8.5, "ytick.labelsize": 8.5, "legend.fontsize": 8.5, "legend.frameon": False,
+        "text.color": INK, "axes.titlecolor": INK, "font.size": FONT, "axes.titlesize": FONT, "axes.labelsize": FONT, "figure.titlesize": FONT,
+        "xtick.labelsize": FONT, "ytick.labelsize": FONT, "legend.fontsize": FONT, "legend.frameon": False,
         "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": GRID,
-        "grid.linewidth": 0.6, "axes.axisbelow": True, "lines.linewidth": 1.8, "figure.dpi": 110,
+        "grid.linewidth": 0.6, "axes.axisbelow": True, "lines.linewidth": 2.4, "axes.linewidth": 1.2,
+        "xtick.major.width": 1.2, "ytick.major.width": 1.2, "xtick.major.size": 5, "ytick.major.size": 5, "figure.dpi": 110,
     })
     return plt
 
 
-def grid(n, panel=3.7):
+def grid(n, panel=6.0):
     """Square panels in a balanced grid: 1-3 panels in one row, 4 in 2x2, 5-6 in 2x3, 7-8 in 2x4, more in rows
     of 4. Returns (fig, axes); axes in reading order, spare cells are hidden."""
     import matplotlib.pyplot as plt

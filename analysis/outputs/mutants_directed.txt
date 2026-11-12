@@ -1,0 +1,6 @@
+CXX="g++" CXXFLAGS="-O3 -march=native -Wall -std=c++17 -pthread -DDEBUG_RR -I /home/tararelan/work/boost_1_84_0" python3 test/mutants_directed.py
+baseline (unmutated): 420/420 verified
+ok twin test compares adjacency, not direction: caught on 99/420
+ok twin test drops the check on the edge between the twins: caught on 81/420
+ok RRSplit doesn't split bidomains by edge direction: caught on 237/240
+ok SymSplit doesn't split bidomains by edge direction: caught on 178/180

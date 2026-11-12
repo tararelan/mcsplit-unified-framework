@@ -78,23 +78,31 @@ def main():
         for metric, col, xlabel, fname in [("time", "time", "wall-clock time (s)", "cactus_time"),
                                            ("nodes", "nodes", "search nodes", "cactus_nodes")]:
             for log in (False, True):             # linear and log-x version of every cactus plot
-                fig, ax = plt.subplots(figsize=(10.5, 5.6))
+                fig, ax = plt.subplots(figsize=(14, 8))
                 for i, k in enumerate(algos):
                     d = med[k]
                     v = np.sort(d.loc[d["done"], col].dropna().values)
                     if len(v) == 0:
                         continue
                     a = C.ALGOS[k]
-                    ax.plot(np.clip(v, 1e-3 if col == "time" else 1, None), np.arange(1, len(v) + 1),
-                            color=a.color, ls=a.ls, marker=a.marker, lw=1.0, alpha=0.9, ms=3.2, mew=0,
+                    xv = np.clip(v, 1e-3 if col == "time" else 1, None)
+                    # markers evenly spaced ALONG THE X AXIS (log or linear, as plotted) from the first to the last
+                    # point of the curve, shifted a little per algorithm so they do not stack on each other
+                    lo, hi = xv.min(), xv.max()
+                    t = np.append((np.arange(10) + (i + 0.5) / len(algos)) / 10, 1.0)
+                    pos = np.geomspace(lo, hi, 400)[(t * 399).astype(int)] if log and hi > lo else lo + t * (hi - lo)
+                    marks = sorted(set(np.minimum(np.searchsorted(xv, pos), len(xv) - 1).tolist()))
+                    ax.plot(xv, np.arange(1, len(v) + 1),
+                            color=a.color, ls=a.ls, marker=a.marker, lw=2.0, alpha=0.95, ms=12 if a.marker == "*" else 8,
+                            mfc=a.color, mec=C.SURFACE, mew=1.2,
                             label=f"{a.label} ({len(v)})",
-                            markevery=(int(len(v) * i / (len(algos) * 8)), max(1, len(v) // 8)))
+                            markevery=marks)
                 if log:
                     ax.set_xscale("log")
                 ax.set_ylim(bottom=0)
                 ax.set_xlabel(xlabel + (" (log scale)" if log else "")); ax.set_ylabel("instances solved (medium set)")
                 ax.set_title(f"{name}: {xlabel} vs instances solved, medium instances (n={nm})")
-                ax.legend(loc="center left", bbox_to_anchor=(1.01, 0.5), title="algorithm (solved)", title_fontsize=8.5)
+                ax.legend(loc="center left", bbox_to_anchor=(1.01, 0.5), title="algorithm (solved)", title_fontsize=C.FONT)
                 fig.tight_layout(); C.save(fig, FOLDER, f"{fname}{'_log' if log else ''}_{ds}.png"); plt.close(fig)
 
         # ---- 4. time per node on the medium set
@@ -128,7 +136,7 @@ def main():
             m.round(1).to_csv(C.out_dir(FOLDER) / f"hard_incumbent_{ds}.csv")
             print(f"\n5. % of hard instances (n={len(hard)}) where the ROW algorithm found a larger incumbent than the COLUMN algorithm")
             print(m.round(0).to_string(float_format=lambda x: f"{x:.0f}"))
-            fig, ax = plt.subplots(figsize=(0.75 * len(algos) + 2.5, 0.65 * len(algos) + 1.8))
+            fig, ax = plt.subplots(figsize=(1.15 * len(algos) + 3.5, 1.0 * len(algos) + 3.0))
             from matplotlib.colors import LinearSegmentedColormap
             cmap = LinearSegmentedColormap.from_list("blue", ["#fcfcfb", "#9ec5f4", "#256abf", "#0d366b"])
             ax.imshow(m.values.astype(float), cmap=cmap, vmin=0, vmax=30)   # capped so the top-down columns (see README) do not wash out the rest
@@ -139,9 +147,9 @@ def main():
                 for j in range(len(algos)):
                     v = m.values[i, j]
                     if not np.isnan(v):
-                        ax.text(j, i, f"{v:.0f}", ha="center", va="center", fontsize=8,
+                        ax.text(j, i, f"{v:.0f}", ha="center", va="center", fontsize=C.FONT,
                                 color="white" if v > 17 else C.INK)
-            ax.set_title(f"{name}: % of hard instances where row found a larger incumbent than column (n={len(hard)})", fontsize=9.5)
+            ax.set_title(f"{name}: % of hard instances where row found a\nlarger incumbent than column (n={len(hard)})", fontsize=C.FONT)
             fig.tight_layout(); C.save(fig, FOLDER, f"hard_incumbent_{ds}.png"); plt.close(fig)
 
     out = C.out_dir(FOLDER)

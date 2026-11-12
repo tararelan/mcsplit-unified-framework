@@ -1,0 +1,11 @@
+CXX="g++" CXXFLAGS="-O3 -march=native -Wall -std=c++17 -pthread -DDEBUG_RR -I /home/tararelan/work/boost_1_84_0" python3 test/mutants.py
+ok mcsplit prunes one too early: caught on 24/24
+ok RRSplit skips the value after the previous twin's: caught on 26/48
+ok SymSplit skips the value after the previous twin's: caught on 30/48
+ok SymSplit value symmetry ignores twin classes: caught on 24/48
+ok SymSplit maximality doesn't rule out bottom: caught on 4/48
+ok LUM doesn't rule out the leaf being unmapped: caught on 48/72
+ok lex order reversed: caught on 46/48
+ok value symmetry swaps with the wrong vertex: caught on 36/48
+ok maximality rewrite unmaps the holder instead: caught on 28/72
+ok McSplit bound ignores a bidomain's excess: caught on 2/24
