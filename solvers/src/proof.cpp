@@ -459,7 +459,6 @@ void ProofLogger::new_incumbent(const std::vector<VtxPair> &current)
 {
 	if (aborted)
 		return;
-	incumbent_size = current.size();
 	std::vector<int> image(g_n, -1);
 	for (const VtxPair &p : current)
 		image[g_order[p.v]] = h_order[p.w];
@@ -467,7 +466,102 @@ void ProofLogger::new_incumbent(const std::vector<VtxPair> &current)
 	for (int v = 0; v < g_n; v++)
 		pbp << " " << (image[v] == -1 ? bottom_var(v) : match_var(v, image[v]));
 	pbp << " ;\n";
-	obj_id = next_id++;
+	if (goal == 0)
+	{
+		incumbent_size = current.size();
+		obj_id = next_id++;
+		return;
+	}
+	// during a goal search, prunes stay justified against the goal
+	real_incumbent_size = current.size();
+	real_obj_id = next_id++;
+	if (real_incumbent_size >= goal)
+	{
+		// the search below is cut, not refuted, so log nothing more
+		goal_reached = true;
+		aborted = true;
+	}
+}
+
+static std::string goal_var(int k)
+{
+	return "goal" + std::to_string(k);
+}
+
+void ProofLogger::begin_goal(int k)
+{
+	if (!trail.empty())
+		throw std::logic_error("proof logging: begin_goal needs an empty trail");
+	goal = k;
+	real_incumbent_size = incumbent_size;
+	real_obj_id = obj_id;
+
+	// the flag is pushed even if nothing is logged, so the trail stays balanced
+	trail.push_back(goal_var(k));
+	trail_is_match.push_back(false);
+	trail_vertex.push_back(-1);
+	trail_lum.emplace_back();
+	trail_attached_ids.emplace_back();
+
+	if (aborted)
+		return;
+	if (incumbent_size >= k)
+	{
+		goal_reached = true;
+		aborted = true;
+		return;
+	}
+
+	// goal<k> => sum_v ~x<v>_null >= k
+	pbp << "red " << k << " ~" << goal_var(k);
+	for (int v = 0; v < g_n; v++)
+		pbp << " 1 ~" << bottom_var(v);
+	pbp << " >= " << k << " : " << goal_var(k) << " -> 0 ;\n";
+	long long fwd = next_id++;
+	// ~goal<k> => sum_v x<v>_null >= g_n - k + 1
+	pbp << "red " << g_n - k + 1 << " " << goal_var(k);
+	for (int v = 0; v < g_n; v++)
+		pbp << " 1 " << bottom_var(v);
+	pbp << " >= " << g_n - k + 1 << " : " << goal_var(k) << " -> 1 ;\n";
+	goal_bwd_id = next_id++;
+
+	// under goal<k>, fwd is what a size k-1 incumbent's objective-improving
+	// constraint would be
+	obj_id = fwd;
+	incumbent_size = k - 1;
+}
+
+void ProofLogger::end_goal()
+{
+	if (!aborted)
+	{
+		// the root of the search, with only goal<k> on the trail, has been
+		// refuted, and its backtrack clause is ~goal<k>
+		if (child_nogoods.size() < 2 || child_nogoods[1].size() != 1)
+			throw std::logic_error("proof logging: goal search ended without refuting its root");
+		long long not_goal = child_nogoods[1].back();
+		pbp << "pol " << goal_bwd_id << " " << not_goal << " " << g_n - goal + 1 << " * + ;\n";
+		long long lb_id = next_id++;
+		pbp << "del id " << not_goal;
+		if (goal_lb_id != -1)
+			pbp << " " << goal_lb_id;
+		pbp << " ;\n";
+		goal_lb = g_n - goal + 1;
+		goal_lb_id = lb_id;
+	}
+
+	// clauses left over from a search cut at the goal are not deleted, and
+	// the next goal's search starts afresh
+	child_nogoods.clear();
+	trail.pop_back();
+	trail_is_match.pop_back();
+	trail_vertex.pop_back();
+	trail_lum.pop_back();
+	trail_attached_ids.pop_back();
+
+	obj_id = real_obj_id;
+	incumbent_size = real_incumbent_size;
+	goal = 0;
 }
 
 void ProofLogger::push_match(int v, int w)
@@ -1108,7 +1202,14 @@ void ProofLogger::finish(int best_size)
 	int best_obj = g_n - best_size;
 	long long lb_id = contra_id;
 	int lb = best_obj;
-	if (aborted || contra_id == -1)
+	if (goal_lb_id != -1)
+	{
+		// top-down search: the last goal refuted gives the lower bound, which
+		// is tight unless the search was interrupted
+		lb_id = goal_lb_id;
+		lb = goal_lb;
+	}
+	else if (aborted || contra_id == -1)
 	{
 		// search incomplete: only the best logged solution is certified, with
 		// the trivial lower bound sum_v x<v>_null >= 0

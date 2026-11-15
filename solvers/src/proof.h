@@ -61,6 +61,20 @@
 // otherwise touches vertices in the same bidomain, so the branching
 // vertex is the most significant one that changes, and its image gets
 // smaller.
+//
+// McSplit-down and McSplit+RL-down search top-down: for k = |V(g)|,
+// |V(g)|-1, ..., they search for a mapping of size k, pruning any node
+// whose bound is below k, and stop at the first k reached. For each k the
+// logger introduces a flag goal<k> <=> "at least k vertices are mapped"
+// (two red steps, as for y<w>) and pushes goal<k> onto the trail as if it
+// were a decision (begin_goal). Under the flag, its forward constraint plays
+// the role of the objective-improving constraint of a size k-1 incumbent,
+// so a node pruned because its bound is below k is justified exactly as an
+// ordinary bound prune. If the search for k finishes without reaching k, the
+// root's backtrack clause is ~goal<k>, which with the flag's backward
+// constraint gives sum_v x<v>_null >= |V(g)| - k + 1, the lower bound that
+// finish() concludes with (end_goal). Once k is reached, the search below is
+// cut without being refuted, so nothing more is logged for that goal.
 
 #include "graph.h"
 #include "common.h"
@@ -181,6 +195,20 @@ public:
 	/// Logs the backtrack clause for a node whose children have all been refuted.
 	void backtrack();
 
+	/**
+	 * Starts the search for a mapping of size goal (McSplit-down's goal-size
+	 * loop). Until end_goal, prune_by_bound and backtrack justify against
+	 * the goal rather than the incumbent, so every node whose bound is below
+	 * goal can be pruned. Must be called with an empty trail.
+	 */
+	void begin_goal(int goal);
+
+	/**
+	 * Ends the search started by begin_goal. If that search finished without
+	 * reaching the goal, derives that fewer than goal vertices can be mapped.
+	 */
+	void end_goal();
+
 	/// Records that the search was interrupted; no further reasoning is logged.
 	void abort();
 
@@ -237,6 +265,18 @@ private:
 	long long obj_id = -1;	   // ID of the most recent objective-improving constraint
 	long long contra_id = -1;  // ID of the root contradiction, once derived
 	bool aborted = false;
+
+	// set by begin_goal: the goal size being searched for (0 if none), the
+	// incumbent and objective-improving constraint it stands in for, and the
+	// goal flag's backward constraint
+	int goal = 0;
+	bool goal_reached = false;
+	int real_incumbent_size = 0;
+	long long real_obj_id = -1;
+	long long goal_bwd_id = -1;
+	// the best lower bound on sum_v x<v>_null derived by end_goal, and its ID
+	int goal_lb = 0;
+	long long goal_lb_id = -1;
 
 	// set by enable_lex_order; lex_weight[v] is model vertex v's weight, in
 	// decimal since it overflows

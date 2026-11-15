@@ -20,13 +20,13 @@ std::vector<VtxPair> mcs(const Graph &g, const Graph &h, bool multiway,
 std::vector<VtxPair> mcs_rl(const Graph &g, const Graph &h, bool multiway,
 							Stats &stats, std::atomic<bool> &abort_due_to_timeout, ProofLogger *proof = nullptr);
 std::vector<VtxPair> mcs_down(const Graph &g, const Graph &h, bool multiway,
-						Stats &stats, std::atomic<bool> &abort_due_to_timeout);
+						Stats &stats, std::atomic<bool> &abort_due_to_timeout, ProofLogger *proof = nullptr);
 std::vector<VtxPair> mcs_rl_pair(const Graph &g, const Graph &h, bool multiway,
 						Stats &stats, std::atomic<bool> &abort_due_to_timeout, ProofLogger *proof = nullptr);
 std::vector<VtxPair> mcs_rl_rate(const Graph &g, const Graph &h, bool multiway,
 						Stats &stats, std::atomic<bool> &abort_due_to_timeout, ProofLogger *proof = nullptr);
 std::vector<VtxPair> mcs_rl_down(const Graph &g, const Graph &h, bool multiway,
-						Stats &stats, std::atomic<bool> &abort_due_to_timeout);
+						Stats &stats, std::atomic<bool> &abort_due_to_timeout, ProofLogger *proof = nullptr);
 // use_lum: enable leaf union matching; use_lsm: enable long-short memory scoring
 std::vector<VtxPair> mcs_ll(const Graph &g, const Graph &h, bool multiway, Stats &stats,
 							std::atomic<bool> &abort_due_to_timeout, bool use_lum = true, bool use_lsm = true,
@@ -206,7 +206,7 @@ int main(int argc, char **argv)
 	std::unique_ptr<ProofLogger> proof;
 	if (!arguments.proof_prefix.empty())
 	{
-		static const std::set<std::string> proof_algorithms = {"mcsplit", "rl", "rl_pair", "rl_rate", "ll", "ll_lsm", "ll_lum",
+		static const std::set<std::string> proof_algorithms = {"mcsplit", "down", "rl", "rl_pair", "rl_rate", "rl_down", "ll", "ll_lsm", "ll_lum",
 																	"dal", "dal_rl", "dal_dal",
 																	"dsb", "dsb_always", "dsb_never",
 																	"rrsplit", "rrsplit_nomax", "rrsplit_noveq", "rrsplit_nobound",
@@ -268,7 +268,7 @@ int main(int argc, char **argv)
 	// mode/bitmask (see the declarations and options[] table above for
 	// what each mode value means)
 	if (arguments.algorithm == "down")
-		solution = mcs_down(g, h, multiway, stats, abort_due_to_timeout);
+		solution = mcs_down(g, h, multiway, stats, abort_due_to_timeout, proof.get());
 
 	else if (arguments.algorithm == "rl")
 		solution = mcs_rl(g, h, multiway, stats, abort_due_to_timeout, proof.get());
@@ -277,7 +277,7 @@ int main(int argc, char **argv)
 	else if (arguments.algorithm == "rl_rate")
 		solution = mcs_rl_rate(g, h, multiway, stats, abort_due_to_timeout, proof.get());
 	else if (arguments.algorithm == "rl_down")
-		solution = mcs_rl_down(g, h, multiway, stats, abort_due_to_timeout);
+		solution = mcs_rl_down(g, h, multiway, stats, abort_due_to_timeout, proof.get());
 
 	else if (arguments.algorithm == "ll")
 		solution = mcs_ll(g, h, multiway, stats, abort_due_to_timeout, true, true, proof.get());
