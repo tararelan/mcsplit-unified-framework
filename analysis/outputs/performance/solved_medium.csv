@@ -1,34 +1,34 @@
 dataset,key,algorithm,medium_pairs,solved,solved_pct,ref_solved,ref_solved_pct,rank,ref_rank
-MIVIA,mcsplit,McSplit,1503,1066,70.92,1071.0,71.26,5,4.0
-MIVIA,down,McSplit-down,1503,1380,91.82,1415.0,94.15,2,1.0
-MIVIA,rl,McSplit+RL,1503,995,66.2,1013.0,67.4,10,7.0
-MIVIA,rl_pair,McSplit+RL Pair,1503,1011,67.27,,,9,
-MIVIA,rl_rate,McSplit+RL Rate,1503,987,65.67,,,11,
-MIVIA,rl_down,McSplit+RL-down,1503,1427,94.94,,,1,
-MIVIA,ll,McSplit+LL,1503,1045,69.53,1050.0,69.86,7,5.0
-MIVIA,dal,McSplit+DAL,1503,1015,67.53,,,8,
-MIVIA,dsb,McSplit+DSB,1503,1049,69.79,1050.0,69.86,6,5.0
-MIVIA,rrsplit,RRSplit,1503,1076,71.59,1083.0,72.06,4,3.0
-MIVIA,symsplit,SymSplit,1503,1090,72.52,1092.0,72.65,3,2.0
-LV,mcsplit,McSplit,611,318,52.05,326.0,53.36,9,6.0
-LV,down,McSplit-down,611,422,69.07,426.0,69.72,4,3.0
-LV,rl,McSplit+RL,611,338,55.32,341.0,55.81,5,5.0
-LV,rl_pair,McSplit+RL Pair,611,316,51.72,,,10,
-LV,rl_rate,McSplit+RL Rate,611,328,53.68,,,7,
-LV,rl_down,McSplit+RL-down,611,430,70.38,,,3,
-LV,ll,McSplit+LL,611,336,54.99,342.0,55.97,6,4.0
-LV,dal,McSplit+DAL,611,315,51.55,,,11,
-LV,dsb,McSplit+DSB,611,322,52.7,324.0,53.03,8,7.0
-LV,rrsplit,RRSplit,611,469,76.76,471.0,77.09,2,2.0
-LV,symsplit,SymSplit,611,493,80.69,494.0,80.85,1,1.0
-BI,mcsplit,McSplit,1442,1046,72.54,1044.0,72.4,10,4.0
-BI,down,McSplit-down,1442,1205,83.56,1201.0,83.29,4,1.0
-BI,rl,McSplit+RL,1442,1126,78.09,1129.0,78.29,7,3.0
-BI,rl_pair,McSplit+RL Pair,1442,1087,75.38,,,9,
-BI,rl_rate,McSplit+RL Rate,1442,1119,77.6,,,8,
-BI,rl_down,McSplit+RL-down,1442,1280,88.77,,,1,
-BI,ll,McSplit+LL,1442,1171,81.21,1173.0,81.35,5,2.0
-BI,dal,McSplit+DAL,1442,1148,79.61,,,6,
-BI,dsb,McSplit+DSB,1442,919,63.73,919.0,63.73,11,5.0
-BI,rrsplit,RRSplit,1442,1249,86.62,,,2,
-BI,symsplit,SymSplit,1442,1220,84.6,,,3,
+MIVIA,mcsplit,McSplit,1386,976,70.42,980.0,70.71,4,3.0
+MIVIA,down,McSplit↓,1386,1380,99.57,1380.0,99.57,1,1.0
+MIVIA,rl,McSplit+RL,1386,943,68.04,950.0,68.54,10,7.0
+MIVIA,rl_pair,McSplit+RL$_{\mathrm{Pair}}$,1386,958,69.12,,,8,
+MIVIA,rl_rate,McSplit+RL$_{\mathrm{Rate}}$,1386,939,67.75,,,11,
+MIVIA,rl_down,McSplit+RL↓,1386,1378,99.42,,,2,
+MIVIA,ll,McSplit+LL,1386,967,69.77,968.0,69.84,7,6.0
+MIVIA,dal,McSplit+DAL,1386,958,69.12,,,8,
+MIVIA,dsb,McSplit+DSB,1386,969,69.91,970.0,69.99,6,5.0
+MIVIA,rrsplit,RRSplit,1386,975,70.35,979.0,70.63,5,4.0
+MIVIA,symsplit,SymSplit,1386,982,70.85,983.0,70.92,3,2.0
+LV,mcsplit,McSplit,570,300,52.63,308.0,54.04,10,6.0
+LV,down,McSplit↓,570,401,70.35,405.0,71.05,4,3.0
+LV,rl,McSplit+RL,570,316,55.44,319.0,55.96,6,5.0
+LV,rl_pair,McSplit+RL$_{\mathrm{Pair}}$,570,296,51.93,,,11,
+LV,rl_rate,McSplit+RL$_{\mathrm{Rate}}$,570,305,53.51,,,8,
+LV,rl_down,McSplit+RL↓,570,405,71.05,,,3,
+LV,ll,McSplit+LL,570,316,55.44,322.0,56.49,6,4.0
+LV,dal,McSplit+DAL,570,325,57.02,,,5,
+LV,dsb,McSplit+DSB,570,304,53.33,306.0,53.68,9,7.0
+LV,rrsplit,RRSplit,570,444,77.89,446.0,78.25,2,2.0
+LV,symsplit,SymSplit,570,467,81.93,468.0,82.11,1,1.0
+BI,mcsplit,McSplit,968,916,94.63,916.0,94.63,5,2.0
+BI,down,McSplit↓,968,937,96.8,936.0,96.69,1,1.0
+BI,rl,McSplit+RL,968,899,92.87,898.0,92.77,9,5.0
+BI,rl_pair,McSplit+RL$_{\mathrm{Pair}}$,968,891,92.05,,,10,
+BI,rl_rate,McSplit+RL$_{\mathrm{Rate}}$,968,891,92.05,,,10,
+BI,rl_down,McSplit+RL↓,968,924,95.45,,,4,
+BI,ll,McSplit+LL,968,913,94.32,913.0,94.32,7,4.0
+BI,dal,McSplit+DAL,968,911,94.11,,,8,
+BI,dsb,McSplit+DSB,968,916,94.63,916.0,94.63,5,2.0
+BI,rrsplit,RRSplit,968,925,95.56,,,2,
+BI,symsplit,SymSplit,968,925,95.56,,,2,

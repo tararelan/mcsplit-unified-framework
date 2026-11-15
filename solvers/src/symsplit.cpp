@@ -652,7 +652,7 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
 	}
 
 	stats.nodes++;
-	stats.bidomain_counts.push_back(domains.size());
+	stats.record_bidomains(domains.size());
 
 	int bound = current.size() + calc_bound_sym(domains);
 	if (bound <= (int)incumbent.size() || bound < (int)goal)

@@ -443,7 +443,7 @@ void solve_rr(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
     int w = w_lower;
 
     stats.nodes++;
-    stats.bidomain_counts.push_back(domains.size());
+    stats.record_bidomains(domains.size());
 
 #ifdef DEBUG_RR
     if (stats.nodes <= 5) {

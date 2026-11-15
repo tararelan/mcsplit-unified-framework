@@ -1,34 +1,34 @@
 dataset,key,algorithm,n,median_us,mean_us,ref_n,ref_median_us,ref_mean_us
-MIVIA,mcsplit,McSplit,1066,0.123,0.134,1071.0,0.116,0.128
-MIVIA,down,McSplit-down,1380,0.154,0.182,1402.0,0.147,0.171
-MIVIA,rl,McSplit+RL,995,0.162,0.18,1013.0,0.143,0.158
-MIVIA,rl_pair,McSplit+RL Pair,1011,0.166,0.181,,,
-MIVIA,rl_rate,McSplit+RL Rate,987,0.167,0.179,,,
-MIVIA,rl_down,McSplit+RL-down,1427,0.191,0.215,,,
-MIVIA,ll,McSplit+LL,1045,0.166,0.188,1050.0,0.157,0.177
-MIVIA,dal,McSplit+DAL,1015,0.175,0.196,,,
-MIVIA,dsb,McSplit+DSB,1049,0.143,0.157,1050.0,0.143,0.156
-MIVIA,rrsplit,RRSplit,1076,0.376,0.41,1083.0,0.368,0.403
-MIVIA,symsplit,SymSplit,1090,0.121,0.135,1092.0,0.118,0.131
-LV,mcsplit,McSplit,318,0.194,0.569,326.0,0.182,0.499
-LV,down,McSplit-down,422,0.384,1.032,422.0,0.343,0.926
-LV,rl,McSplit+RL,338,0.29,0.81,341.0,0.274,0.836
-LV,rl_pair,McSplit+RL Pair,316,0.309,0.942,,,
-LV,rl_rate,McSplit+RL Rate,328,0.254,0.738,,,
-LV,rl_down,McSplit+RL-down,430,0.463,1.316,,,
-LV,ll,McSplit+LL,336,0.312,0.826,342.0,0.29,0.77
-LV,dal,McSplit+DAL,315,0.314,0.97,,,
-LV,dsb,McSplit+DSB,322,0.213,0.674,324.0,0.208,0.621
-LV,rrsplit,RRSplit,469,0.965,11.922,451.0,0.908,7.18
-LV,symsplit,SymSplit,493,0.175,1.752,494.0,0.171,1.63
-BI,mcsplit,McSplit,1046,0.105,0.113,1044.0,0.11,0.117
-BI,down,McSplit-down,1205,0.117,0.135,1198.0,0.123,0.136
-BI,rl,McSplit+RL,1126,0.164,0.18,1129.0,0.162,0.177
-BI,rl_pair,McSplit+RL Pair,1087,0.198,0.22,,,
-BI,rl_rate,McSplit+RL Rate,1119,0.17,0.184,,,
-BI,rl_down,McSplit+RL-down,1280,0.182,0.202,,,
-BI,ll,McSplit+LL,1171,0.174,0.19,1173.0,0.176,0.189
-BI,dal,McSplit+DAL,1148,0.196,0.218,,,
-BI,dsb,McSplit+DSB,919,0.116,0.125,919.0,0.119,0.128
-BI,rrsplit,RRSplit,1249,0.635,1.199,,,
-BI,symsplit,SymSplit,1220,0.119,0.137,,,
+MIVIA,mcsplit,McSplit,976,0.124,0.135,980.0,0.117,0.129
+MIVIA,down,McSplit↓,1380,0.154,0.182,1367.0,0.149,0.172
+MIVIA,rl,McSplit+RL,943,0.162,0.18,950.0,0.143,0.158
+MIVIA,rl_pair,McSplit+RL$_{\mathrm{Pair}}$,958,0.166,0.182,,,
+MIVIA,rl_rate,McSplit+RL$_{\mathrm{Rate}}$,939,0.168,0.18,,,
+MIVIA,rl_down,McSplit+RL↓,1378,0.195,0.217,,,
+MIVIA,ll,McSplit+LL,967,0.167,0.19,968.0,0.159,0.179
+MIVIA,dal,McSplit+DAL,958,0.175,0.197,,,
+MIVIA,dsb,McSplit+DSB,969,0.144,0.158,970.0,0.143,0.157
+MIVIA,rrsplit,RRSplit,975,0.38,0.414,979.0,0.375,0.407
+MIVIA,symsplit,SymSplit,982,0.124,0.137,983.0,0.12,0.133
+LV,mcsplit,McSplit,300,0.182,0.518,308.0,0.167,0.451
+LV,down,McSplit↓,401,0.363,0.987,401.0,0.321,0.892
+LV,rl,McSplit+RL,316,0.273,0.764,319.0,0.261,0.769
+LV,rl_pair,McSplit+RL$_{\mathrm{Pair}}$,296,0.294,0.856,,,
+LV,rl_rate,McSplit+RL$_{\mathrm{Rate}}$,305,0.238,0.669,,,
+LV,rl_down,McSplit+RL↓,405,0.432,1.287,,,
+LV,ll,McSplit+LL,316,0.299,0.757,322.0,0.283,0.713
+LV,dal,McSplit+DAL,325,0.259,0.774,,,
+LV,dsb,McSplit+DSB,304,0.207,0.6,306.0,0.196,0.563
+LV,rrsplit,RRSplit,444,0.937,12.137,428.0,0.893,7.461
+LV,symsplit,SymSplit,467,0.171,1.706,468.0,0.163,1.592
+BI,mcsplit,McSplit,916,0.109,0.117,916.0,0.114,0.122
+BI,down,McSplit↓,937,0.118,0.137,933.0,0.123,0.137
+BI,rl,McSplit+RL,899,0.161,0.18,898.0,0.159,0.177
+BI,rl_pair,McSplit+RL$_{\mathrm{Pair}}$,891,0.193,0.219,,,
+BI,rl_rate,McSplit+RL$_{\mathrm{Rate}}$,891,0.166,0.184,,,
+BI,rl_down,McSplit+RL↓,924,0.176,0.201,,,
+BI,ll,McSplit+LL,913,0.171,0.19,913.0,0.172,0.19
+BI,dal,McSplit+DAL,911,0.191,0.222,,,
+BI,dsb,McSplit+DSB,916,0.116,0.125,916.0,0.119,0.128
+BI,rrsplit,RRSplit,925,0.64,1.291,,,
+BI,symsplit,SymSplit,925,0.12,0.141,,,

@@ -82,11 +82,18 @@ struct Stats
 	int incumbent_size = 0;				  // number of vertices in the best solution found
 	int solution_edges = 0;				  // number of edges in the best solution found
 	bool aborted = false;				  // true if the timeout was reached before completion
-	// Bidomain count recorded at every search-tree node, in visit order - one entry per
-	// stats.nodes increment, across every algorithm (see each solve_*'s stats.nodes++ site).
-	// Added for the directed-search fidelity investigation (Section 4.1.3/5.2): this is a
-	// direct per-node measurement of branching-decision count, rather than the cut_branches-
-	// per-node proxy the dissertation used, which only counts pruning events, not domains
-	// produced. Empty unless the caller opts in (see main.cpp's --dump-bidomains).
-	std::vector<unsigned int> bidomain_counts;
+	// Bidomain count at every search-tree node, kept as running statistics (sum, number of nodes, max)
+	// rather than one entry per node: a hard instance visits billions of nodes, and one stored entry
+	// per node exhausted memory. Mean and max are what main.cpp reports (results CSV fields 11-12).
+	unsigned long long bidomain_sum = 0;
+	unsigned long long bidomain_nodes = 0;
+	unsigned int bidomain_max = 0;
+	void record_bidomains(std::size_t n)
+	{
+		unsigned int c = static_cast<unsigned int>(n);
+		bidomain_sum += c;
+		++bidomain_nodes;
+		if (c > bidomain_max)
+			bidomain_max = c;
+	}
 };

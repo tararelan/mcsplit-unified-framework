@@ -44,6 +44,10 @@ def main():
         cls = C.classify(ds)
         core = cls.attrs.get("core", [])
         n = len(cls)
+        bl = {k: v for k, v in cls.attrs.get("blank", {}).items() if v}
+        if cls.attrs.get("excluded"):
+            print(f"   EXCLUDED: {cls.attrs['excluded']} pairs with a blank (killed) run for at least one core algorithm; "
+                  f"blank rows per algorithm: {bl}")
         counts = cls["cls"].value_counts()
         print(f"1. difficulty classes (core algorithms: {', '.join(C.label(k) for k in core)})")
         for c in ("easy", "medium", "hard"):
@@ -95,14 +99,14 @@ def main():
                     ax.plot(xv, np.arange(1, len(v) + 1),
                             color=a.color, ls=a.ls, marker=a.marker, lw=2.0, alpha=0.95, ms=12 if a.marker == "*" else 8,
                             mfc=a.color, mec=C.SURFACE, mew=1.2,
-                            label=f"{a.label} ({len(v)})",
+                            label=f"{a.label}",
                             markevery=marks)
                 if log:
                     ax.set_xscale("log")
                 ax.set_ylim(bottom=0)
                 ax.set_xlabel(xlabel + (" (log scale)" if log else "")); ax.set_ylabel("instances solved (medium set)")
                 ax.set_title(f"{name}: {xlabel} vs instances solved, medium instances (n={nm})")
-                ax.legend(loc="center left", bbox_to_anchor=(1.01, 0.5), title="algorithm (solved)", title_fontsize=C.FONT)
+                ax.legend(loc="upper left" if log else "lower right")      # inside the axes: top-left on the log plot, bottom-right on the linear one
                 fig.tight_layout(); C.save(fig, FOLDER, f"{fname}{'_log' if log else ''}_{ds}.png"); plt.close(fig)
 
         # ---- 4. time per node on the medium set

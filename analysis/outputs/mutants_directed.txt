@@ -1,6 +1,98 @@
 CXX="g++" CXXFLAGS="-O3 -march=native -Wall -std=c++17 -pthread -DDEBUG_RR -I /home/tararelan/work/boost_1_84_0" python3 test/mutants_directed.py
-baseline (unmutated): 420/420 verified
+instances: dstar 30, directed 30   algorithms: 7 (4 RRSplit, 3 SymSplit)
+
+baseline (unmutated): 420/420 verified   [8s]
+  rrsplit            dstar     verified 30/30
+  rrsplit            directed  verified 30/30
+  rrsplit_nomax      dstar     verified 30/30
+  rrsplit_nomax      directed  verified 30/30
+  rrsplit_noveq      dstar     verified 30/30
+  rrsplit_noveq      directed  verified 30/30
+  rrsplit_nobound    dstar     verified 30/30
+  rrsplit_nobound    directed  verified 30/30
+  symsplit           dstar     verified 30/30
+  symsplit           directed  verified 30/30
+  symsplit_valonly   dstar     verified 30/30
+  symsplit_valonly   directed  verified 30/30
+  symsplit_varonly   dstar     verified 30/30
+  symsplit_varonly   directed  verified 30/30
+
+mutant 1: twin test compares adjacency, not direction   [graph.cpp]
+ affected algorithms (the mutant changes their code; VeriPB should reject):
+  rrsplit            dstar     caught 18/30
+  rrsplit            directed  caught 15/30
+  rrsplit_nomax      dstar     caught 18/30
+  rrsplit_nomax      directed  caught 15/30
+  rrsplit_noveq      dstar     caught 0/30
+  rrsplit_noveq      directed  caught 0/30
+  rrsplit_nobound    dstar     caught 18/30
+  rrsplit_nobound    directed  caught 15/30
+  symsplit           dstar     caught 0/30
+  symsplit           directed  caught 0/30
+  symsplit_valonly   dstar     caught 0/30
+  symsplit_valonly   directed  caught 0/30
+  symsplit_varonly   dstar     caught 0/30
+  symsplit_varonly   directed  caught 0/30
+  how they were caught: VeriPB rejected the proof 99
 ok twin test compares adjacency, not direction: caught on 99/420
+
+mutant 2: twin test drops the check on the edge between the twins   [graph.cpp]
+ affected algorithms (the mutant changes their code; VeriPB should reject):
+  rrsplit            dstar     caught 27/30
+  rrsplit            directed  caught 0/30
+  rrsplit_nomax      dstar     caught 27/30
+  rrsplit_nomax      directed  caught 0/30
+  rrsplit_noveq      dstar     caught 0/30
+  rrsplit_noveq      directed  caught 0/30
+  rrsplit_nobound    dstar     caught 27/30
+  rrsplit_nobound    directed  caught 0/30
+  symsplit           dstar     caught 0/30
+  symsplit           directed  caught 0/30
+  symsplit_valonly   dstar     caught 0/30
+  symsplit_valonly   directed  caught 0/30
+  symsplit_varonly   dstar     caught 0/30
+  symsplit_varonly   directed  caught 0/30
+  how they were caught: VeriPB rejected the proof 81
 ok twin test drops the check on the edge between the twins: caught on 81/420
+
+mutant 3: RRSplit doesn't split bidomains by edge direction   [rrsplit.cpp]
+ affected algorithms (the mutant changes their code; VeriPB should reject):
+  rrsplit            dstar     caught 30/30
+  rrsplit            directed  caught 29/30
+  rrsplit_nomax      dstar     caught 30/30
+  rrsplit_nomax      directed  caught 29/30
+  rrsplit_noveq      dstar     caught 30/30
+  rrsplit_noveq      directed  caught 30/30
+  rrsplit_nobound    dstar     caught 30/30
+  rrsplit_nobound    directed  caught 29/30
+  how they were caught: VeriPB rejected the proof 237
+ other algorithms (code the mutant does not touch; should still verify):
+  symsplit           dstar     verified 30/30
+  symsplit           directed  verified 30/30
+  symsplit_valonly   dstar     verified 30/30
+  symsplit_valonly   directed  verified 30/30
+  symsplit_varonly   dstar     verified 30/30
+  symsplit_varonly   directed  verified 30/30
 ok RRSplit doesn't split bidomains by edge direction: caught on 237/240
+
+mutant 4: SymSplit doesn't split bidomains by edge direction   [symsplit.cpp]
+ affected algorithms (the mutant changes their code; VeriPB should reject):
+  symsplit           dstar     caught 30/30
+  symsplit           directed  caught 29/30
+  symsplit_valonly   dstar     caught 30/30
+  symsplit_valonly   directed  caught 30/30
+  symsplit_varonly   dstar     caught 30/30
+  symsplit_varonly   directed  caught 29/30
+  how they were caught: VeriPB rejected the proof 178
+ other algorithms (code the mutant does not touch; should still verify):
+  rrsplit            dstar     verified 30/30
+  rrsplit            directed  verified 30/30
+  rrsplit_nomax      dstar     verified 30/30
+  rrsplit_nomax      directed  verified 30/30
+  rrsplit_noveq      dstar     verified 30/30
+  rrsplit_noveq      directed  verified 30/30
+  rrsplit_nobound    dstar     verified 30/30
+  rrsplit_nobound    directed  verified 30/30
 ok SymSplit doesn't split bidomains by edge direction: caught on 178/180
+
+4/4 mutants caught, 199s in total
