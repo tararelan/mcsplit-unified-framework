@@ -9,3 +9,9 @@ ok lex order reversed: caught on 46/48
 ok value symmetry swaps with the wrong vertex: caught on 36/48
 ok maximality rewrite unmaps the holder instead: caught on 28/72
 ok McSplit bound ignores a bidomain's excess: caught on 2/24
+ok down prunes when the bound equals the goal: caught on 24/24
+ok rl_down prunes when the bound equals the goal: caught on 24/24
+ok down skips the exclude-v branch: caught on 17/24
+ok rl_down skips the exclude-v branch: caught on 17/24
+ok down lower bound one too strong: caught on 38/48
+ok goal constraint not used for pruning: caught on 42/48

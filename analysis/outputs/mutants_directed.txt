@@ -95,4 +95,4 @@ mutant 4: SymSplit doesn't split bidomains by edge direction   [symsplit.cpp]
   rrsplit_nobound    directed  verified 30/30
 ok SymSplit doesn't split bidomains by edge direction: caught on 178/180
 
-4/4 mutants caught, 199s in total
+4/4 mutants caught, 159s in total
