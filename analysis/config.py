@@ -65,11 +65,11 @@ _GREY, _BLUE, _ORANGE, _AQUA, _YELLOW, _MAGENTA, _VIOLET = (
 
 ALGOS = {a.key: a for a in [
     Algo("mcsplit", "McSplit",            "baseline", "#3d3c39", "-",  "o"),
-    Algo("down",    "McSplit-down",       "baseline", "#a67c4e", "--", "o"),
+    Algo("down",    "McSplit↓",          "baseline", "#a67c4e", "--", "o"),
     Algo("rl",      "McSplit+RL",         "rl",       _BLUE,    "-",  "s"),
-    Algo("rl_pair", "McSplit+RL Pair",    "rl",       "#0b2f7a", "--", "s"),
-    Algo("rl_rate", "McSplit+RL Rate",    "rl",       "#5bbcf2", ":",  "s"),
-    Algo("rl_down", "McSplit+RL-down",    "rl",       "#12a3c7", "-.", "s"),
+    Algo("rl_pair", r"McSplit+RL$_{\mathrm{Pair}}$",    "rl",       "#0b2f7a", "--", "s"),
+    Algo("rl_rate", r"McSplit+RL$_{\mathrm{Rate}}$",    "rl",       "#5bbcf2", ":",  "s"),
+    Algo("rl_down", "McSplit+RL↓",       "rl",       "#12a3c7", "-.", "s"),
     Algo("ll",      "McSplit+LL",         "ll",       _AQUA,    "-",  "^"),
     Algo("dal",     "McSplit+DAL",        "dal",      _ORANGE,  "-",  "*"),   # DAL: comment out to drop it everywhere
     Algo("dsb",     "McSplit+DSB",        "dsb",      _YELLOW,  "-",  "D"),
@@ -314,16 +314,20 @@ def classify(ds, core=None):
     easy   = every core algorithm solves it within EASY_S seconds
     hard   = no core algorithm solves it within TIMEOUT_S
     medium = everything else.
-    Returns a DataFrame (a, b, cls) over the pairs present for ALL core algorithms."""
+    Returns a DataFrame (a, b, cls) over the pairs present for ALL core algorithms; a pair with a blank (killed) row
+    for any core algorithm is dropped, so it is never counted as unsolved."""
     wanted = core or CORE[ds]
     core = [k for k in wanted if load(k, ds) is not None]
     missing = [k for k in wanted if k not in core]
     if missing:
         print(f"WARNING: classify({ds}): no results for {', '.join(missing)} - "
               f"classes use only {', '.join(core)}. Rerun once the files exist.")
-    wide = None
+    wide, universe, blank = None, set(), {}
     for k in core:
-        d = load(k, ds)[["a", "b", "done", "time"]].copy()
+        raw = load(k, ds)
+        blank[k] = int(raw["nodes"].isna().sum())            # blank rows per algorithm (killed runs)
+        universe |= set(zip(raw["a"], raw["b"]))
+        d = raw[raw["nodes"].notna()][["a", "b", "done", "time"]].copy()   # blank row = run killed / never finished: missing, NOT unsolved
         d[k + "_easy"] = d["done"] & (d["time"] <= EASY_S)
         d[k + "_done"] = d["done"]
         d = d[["a", "b", k + "_easy", k + "_done"]]
@@ -332,6 +336,8 @@ def classify(ds, core=None):
     hard = ~wide[[k + "_done" for k in core]].any(axis=1)
     wide["cls"] = np.where(easy, "easy", np.where(hard, "hard", "medium"))
     wide.attrs["core"] = core
+    wide.attrs["blank"] = blank                              # {algorithm: number of blank rows}
+    wide.attrs["excluded"] = len(universe) - len(wide)       # pairs dropped because ANY core algorithm has a blank row
     return wide[["a", "b", "cls"]]
 
 

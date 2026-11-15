@@ -1,8 +1,10 @@
 python3 test/check_proofs.py --solver bin/mcsp 
 ok   mcsplit            random    8/8
+ok   down               random    8/8
 ok   rl                 random    8/8
 ok   rl_pair            random    8/8
 ok   rl_rate            random    8/8
+ok   rl_down            random    8/8
 ok   ll                 random    8/8
 ok   ll_lsm             random    8/8
 ok   ll_lum             random    8/8
@@ -20,9 +22,11 @@ ok   symsplit           random    8/8
 ok   symsplit_valonly   random    8/8
 ok   symsplit_varonly   random    8/8
 ok   mcsplit            directed  8/8
+ok   down               directed  8/8
 ok   rl                 directed  8/8
 ok   rl_pair            directed  8/8
 ok   rl_rate            directed  8/8
+ok   rl_down            directed  8/8
 ok   ll                 directed  8/8
 ok   ll_lsm             directed  8/8
 ok   ll_lum             directed  8/8
@@ -40,9 +44,11 @@ ok   symsplit           directed  8/8
 ok   symsplit_valonly   directed  8/8
 ok   symsplit_varonly   directed  8/8
 ok   mcsplit            labelled  8/8
+ok   down               labelled  8/8
 ok   rl                 labelled  8/8
 ok   rl_pair            labelled  8/8
 ok   rl_rate            labelled  8/8
+ok   rl_down            labelled  8/8
 ok   ll                 labelled  8/8
 ok   ll_lsm             labelled  8/8
 ok   ll_lum             labelled  8/8
@@ -53,9 +59,11 @@ ok   dsb                labelled  8/8
 ok   dsb_always         labelled  8/8
 ok   dsb_never          labelled  8/8
 ok   mcsplit            binary    8/8
+ok   down               binary    8/8
 ok   rl                 binary    8/8
 ok   rl_pair            binary    8/8
 ok   rl_rate            binary    8/8
+ok   rl_down            binary    8/8
 ok   ll                 binary    8/8
 ok   ll_lsm             binary    8/8
 ok   ll_lum             binary    8/8
@@ -73,9 +81,11 @@ ok   symsplit           binary    8/8
 ok   symsplit_valonly   binary    8/8
 ok   symsplit_varonly   binary    8/8
 ok   mcsplit            tree      8/8
+ok   down               tree      8/8
 ok   rl                 tree      8/8
 ok   rl_pair            tree      8/8
 ok   rl_rate            tree      8/8
+ok   rl_down            tree      8/8
 ok   ll                 tree      8/8
 ok   ll_lsm             tree      8/8
 ok   ll_lum             tree      8/8
@@ -93,9 +103,11 @@ ok   symsplit           tree      8/8
 ok   symsplit_valonly   tree      8/8
 ok   symsplit_varonly   tree      8/8
 ok   mcsplit            star      8/8
+ok   down               star      8/8
 ok   rl                 star      8/8
 ok   rl_pair            star      8/8
 ok   rl_rate            star      8/8
+ok   rl_down            star      8/8
 ok   ll                 star      8/8
 ok   ll_lsm             star      8/8
 ok   ll_lum             star      8/8
@@ -112,4 +124,4 @@ ok   rrsplit_nobound    star      8/8
 ok   symsplit           star      8/8
 ok   symsplit_valonly   star      8/8
 ok   symsplit_varonly   star      8/8
-904/904 verified
+1000/1000 verified

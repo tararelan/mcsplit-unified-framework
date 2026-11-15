@@ -497,7 +497,7 @@ void solve_dsb(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
     }
 
     stats.nodes++;
-    stats.bidomain_counts.push_back(domains.size());
+    stats.record_bidomains(domains.size());
 
     if (current.size() > incumbent.size()) {
         incumbent = current;

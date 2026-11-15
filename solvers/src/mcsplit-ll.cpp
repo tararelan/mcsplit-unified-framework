@@ -432,7 +432,7 @@ void solve_ll(const Graph& g, const Graph& h,
         return;
     }
     stats.nodes++;
-    stats.bidomain_counts.push_back(domains.size());
+    stats.record_bidomains(domains.size());
 
     if (current.size() > incumbent.size()) {
         incumbent = current;

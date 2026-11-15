@@ -265,7 +265,7 @@ void solve(const Graph& g, const Graph& h, std::vector<VtxPair>& incumbent,
     }
 
     stats.nodes++;
-    stats.bidomain_counts.push_back(domains.size());
+    stats.record_bidomains(domains.size());
 
     // Update incumbent if current partial solution is the best seen so far
     if (current.size() > incumbent.size()) {

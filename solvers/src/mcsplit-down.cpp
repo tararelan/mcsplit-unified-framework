@@ -194,7 +194,7 @@ static void solve_down(const Graph& g, const Graph& h, std::vector<VtxPair>& inc
     }
 
     stats.nodes++;
-    stats.bidomain_counts.push_back(domains.size());
+    stats.record_bidomains(domains.size());
 
     if (current.size() > incumbent.size()) {
         incumbent = current;

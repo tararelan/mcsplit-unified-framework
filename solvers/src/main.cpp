@@ -363,18 +363,9 @@ int main(int argc, char **argv)
 	// results CSV. Used to test whether directed (BI) instances really do
 	// produce more bidomains per node on average than undirected ones.
 	double bidomain_mean = 0.0;
-	unsigned int bidomain_max = 0;
-	if (!stats.bidomain_counts.empty())
-	{
-		unsigned long long sum = 0;
-		for (unsigned int count : stats.bidomain_counts)
-		{
-			sum += count;
-			if (count > bidomain_max)
-				bidomain_max = count;
-		}
-		bidomain_mean = static_cast<double>(sum) / stats.bidomain_counts.size();
-	}
+	unsigned int bidomain_max = stats.bidomain_max;
+	if (stats.bidomain_nodes > 0)
+		bidomain_mean = static_cast<double>(stats.bidomain_sum) / stats.bidomain_nodes;
 	std::cout << bidomain_mean << " " << bidomain_max << std::endl;
 
 	return 0;

@@ -512,7 +512,7 @@ void solve_dal(const Graph& g, const Graph& h,
     }
 
     stats.nodes++;
-    stats.bidomain_counts.push_back(domains.size());
+    stats.record_bidomains(domains.size());
 
     // Update incumbent if current solution is the best seen so far
     if (current.size() > incumbent.size()) {

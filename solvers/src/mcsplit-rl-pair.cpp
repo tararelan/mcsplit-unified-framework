@@ -247,7 +247,7 @@ static void solve_rlp(const Graph& g, const Graph& h,
     }
 
     stats.nodes++;
-    stats.bidomain_counts.push_back(domains.size());
+    stats.record_bidomains(domains.size());
 
     if (current.size() > incumbent.size()) {
         incumbent = current;
