@@ -1,0 +1,10 @@
+,McSplit,McSplit+RL,McSplit+RL$_{\mathrm{Pair}}$,McSplit+RL$_{\mathrm{Rate}}$,McSplit+LL,McSplit+DAL,McSplit+DSB,RRSplit,SymSplit
+McSplit,,2.9,2.9,5.7,4.3,5.7,0.0,0.0,0.0
+McSplit+RL,45.7,,7.1,8.6,8.6,11.4,45.7,31.4,7.1
+McSplit+RL$_{\mathrm{Pair}}$,42.9,1.4,,8.6,4.3,8.6,42.9,28.6,7.1
+McSplit+RL$_{\mathrm{Rate}}$,42.9,1.4,4.3,,5.7,7.1,42.9,28.6,0.0
+McSplit+LL,47.1,7.1,8.6,12.9,,14.3,47.1,30.0,0.0
+McSplit+DAL,41.4,4.3,4.3,5.7,7.1,,41.4,27.1,0.0
+McSplit+DSB,1.4,2.9,2.9,5.7,4.3,5.7,,0.0,0.0
+RRSplit,42.9,31.4,31.4,34.3,27.1,30.0,42.9,,7.1
+SymSplit,42.9,21.4,21.4,21.4,28.6,21.4,42.9,0.0,

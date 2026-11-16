@@ -1,6 +1,6 @@
 dataset,algorithm,key,pairs,r2_nodes,exact_nodes_pct,within_2x_pct,median_time_ratio,median_time_ratio_ref_over_1s,reference
 MIVIA,McSplit,mcsplit,3945,1.0,98.0,99.2,1.068,1.055,own
-MIVIA,McSplit↓,down,4259,1.0,100.0,100.0,1.067,1.054,own
+MIVIA,McSplit↓,down,4343,1.0,100.0,100.0,1.066,1.052,own
 MIVIA,McSplit+RL,rl,3874,1.0,100.0,100.0,1.145,1.136,own
 MIVIA,McSplit+LL,ll,3924,1.0,100.0,100.0,1.067,1.057,own
 MIVIA,McSplit+DSB,dsb,3928,1.0,100.0,100.0,1.018,1.008,own

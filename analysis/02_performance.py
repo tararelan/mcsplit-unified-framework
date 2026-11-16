@@ -156,6 +156,30 @@ def main():
             ax.set_title(f"{name}: % of hard instances where row found a\nlarger incumbent than column (n={len(hard)})", fontsize=C.FONT)
             fig.tight_layout(); C.save(fig, FOLDER, f"hard_incumbent_{ds}.png"); plt.close(fig)
 
+            # 5b. the same matrix without the top-down algorithms (down, rl_down): they have no anytime incumbent on
+            #     unsolved instances, so their columns compress the colour scale for everyone else
+            sub = [k for k in algos if k not in ("down", "rl_down")]
+            if 1 < len(sub) < len(algos):
+                labs = [C.label(k) for k in sub]
+                m2 = m.loc[labs, labs]
+                m2.round(1).to_csv(C.out_dir(FOLDER) / f"hard_incumbent_{ds}_no_topdown.csv")
+                print(f"\n5b. same, without the top-down algorithms (Down, RL-down)")
+                print(m2.round(0).to_string(float_format=lambda x: f"{x:.0f}"))
+                vmax2 = max(10.0, float(np.nanmax(m2.values.astype(float))))
+                fig, ax = plt.subplots(figsize=(1.15 * len(sub) + 3.5, 1.0 * len(sub) + 3.0))
+                ax.imshow(m2.values.astype(float), cmap=cmap, vmin=0, vmax=vmax2)
+                ax.set_xticks(range(len(sub))); ax.set_xticklabels(m2.columns, rotation=45, ha="right")
+                ax.set_yticks(range(len(sub))); ax.set_yticklabels(m2.index)
+                ax.grid(False)
+                for i in range(len(sub)):
+                    for j in range(len(sub)):
+                        v = m2.values[i, j]
+                        if not np.isnan(v):
+                            ax.text(j, i, f"{v:.0f}", ha="center", va="center", fontsize=C.FONT,
+                                    color="white" if v > 0.57 * vmax2 else C.INK)
+                ax.set_title(f"{name}: % of hard instances where row found a\nlarger incumbent than column (n={len(hard)}), without top-down", fontsize=C.FONT)
+                fig.tight_layout(); C.save(fig, FOLDER, f"hard_incumbent_{ds}_no_topdown.png"); plt.close(fig)
+
     out = C.out_dir(FOLDER)
     pd.DataFrame(cls_rows).to_csv(out / "classification.csv", index=False)
     if solved_rows:
