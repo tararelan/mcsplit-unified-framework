@@ -13,7 +13,7 @@ LV,McSplit+LL,ll,935,1.0,100.0,100.0,1.082,1.043,own
 LV,McSplit+DSB,dsb,922,1.0,100.0,100.0,1.027,1.016,own
 LV,RRSplit,rrsplit,1070,0.998,68.9,99.1,1.071,1.024,own
 LV,SymSplit,symsplit,1095,1.0,100.0,100.0,1.057,1.022,own
-BI,McSplit,mcsplit,6498,1.0,100.0,100.0,0.993,0.971,own
+BI,McSplit,mcsplit,6500,1.0,100.0,100.0,0.993,0.971,own
 BI,McSplit↓,down,6659,1.0,100.0,100.0,1.005,0.983,own
 BI,McSplit+RL,rl,6581,1.0,98.8,100.0,1.04,1.014,own
 BI,McSplit+LL,ll,6629,1.0,100.0,100.0,1.024,0.995,own

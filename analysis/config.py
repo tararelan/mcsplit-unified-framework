@@ -117,14 +117,14 @@ def label(key):
 REF_BORROW = {"rl_pair": "rl", "rl_rate": "rl", "rl_down": "rl"}
 
 # The set of algorithms that defines easy / medium / hard: every algorithm evaluated in the paper
-# (RRSplit and SymSplit are left out on BI until their agreement check; DAL is in, via its unified results). Hard = none of them
+# (DAL is in, via its unified results; RRSplit and SymSplit are in on BI too, now that their results agree). Hard = none of them
 # solves it, so adding a stronger algorithm shrinks the hard class. The RL variants (Pair/Rate/Down) have no
 # reference of their own; their correctness is checked separately (proof logging).
 _ALL = ["mcsplit", "down", "rl", "rl_pair", "rl_rate", "rl_down", "dal", "ll", "dsb"]
 CORE = {
     "mivia": list(_ALL) + ["rrsplit", "symsplit"],
     "lv":    list(_ALL) + ["rrsplit", "symsplit"],
-    "bi":    list(_ALL),
+    "bi":    list(_ALL) + ["rrsplit", "symsplit"],
 }
 
 # Algorithms whose REFERENCE is known to be unsound on a dataset: left out of the validation (fidelity) only; their

@@ -1,7 +1,0 @@
-instances/SIP/biochemicalReactions/001.txt instances/SIP/biochemicalReactions/042.txt
-instances/SIP/biochemicalReactions/007.txt instances/SIP/biochemicalReactions/034.txt
-instances/SIP/biochemicalReactions/051.txt instances/SIP/biochemicalReactions/140.txt
-instances/SIP/biochemicalReactions/070.txt instances/SIP/biochemicalReactions/096.txt
-instances/SIP/biochemicalReactions/070.txt instances/SIP/biochemicalReactions/097.txt
-instances/SIP/biochemicalReactions/070.txt instances/SIP/biochemicalReactions/144.txt
-instances/SIP/biochemicalReactions/102.txt instances/SIP/biochemicalReactions/106.txt

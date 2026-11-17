@@ -34,24 +34,24 @@ lv,McSplit+DAL,full,dal,McSplit+DAL (full),585,331,56.58,156.86,0.0,0.259,0.0
 lv,McSplit+DSB,full,dsb,McSplit+DSB (full),585,304,51.97,199.69,0.0,0.207,0.0
 lv,RRSplit,full,rrsplit,RRSplit (full),585,451,77.09,294.26,34.32,0.949,0.0
 lv,SymSplit,full,symsplit,SymSplit (full),585,475,81.2,260.21,90.73,0.167,0.0
-bi,McSplit,full,mcsplit,McSplit (plain),968,916,94.63,239.99,0.0,0.109,0.0
-bi,McSplit,variant,down,Down,968,937,96.8,200.31,0.0,0.118,2.17
-bi,McSplit+RL,full,rl,McSplit+RL (full),968,899,92.87,141.03,0.0,0.161,0.0
-bi,McSplit+RL,variant,rl_pair,Pair reward,968,891,92.05,107.69,0.0,0.193,-0.82
-bi,McSplit+RL,variant,rl_rate,Rate reward,968,891,92.05,138.83,0.0,0.166,-0.82
-bi,McSplit+RL,variant,rl_down,Down,968,924,95.45,124.88,0.0,0.176,2.58
-bi,McSplit+RL,variant,ll,LL,968,913,94.32,123.59,0.0,0.171,1.45
-bi,McSplit+LL,full,ll,McSplit+LL (full),968,913,94.32,123.59,0.0,0.171,0.0
-bi,McSplit+LL,variant,ll_lsm,LSM only,968,908,93.8,126.1,0.0,0.174,-0.52
-bi,McSplit+LL,variant,ll_lum,LUM only,968,909,93.9,131.6,0.0,0.166,-0.42
-bi,McSplit+DAL,full,dal,McSplit+DAL (full),968,911,94.11,118.36,0.0,0.191,0.0
-bi,McSplit+DAL,variant,dal_rl,RL policy only,968,901,93.08,124.31,0.0,0.176,-1.03
-bi,McSplit+DAL,variant,dal_dal,DAL policy only,968,892,92.15,77.62,0.0,0.177,-1.96
-bi,McSplit+DSB,full,dsb,McSplit+DSB (full),968,916,94.63,97.17,0.0,0.116,0.0
-bi,McSplit+DSB,variant,dsb_never,No DSB,968,907,93.7,99.53,0.0,0.116,-0.93
-bi,McSplit+DSB,variant,dsb_always,Always DSB,968,915,94.52,96.59,0.0,0.117,-0.11
-bi,RRSplit,full,rrsplit,RRSplit (full),968,925,95.56,151.06,5.71,0.64,0.0
-bi,RRSplit,variant,rrsplit_nomax,No maximality,968,908,93.8,178.98,0.0,0.698,-1.76
-bi,RRSplit,variant,rrsplit_nobound,No bound,968,883,91.22,146.01,5.51,0.708,-4.34
-bi,RRSplit,variant,rrsplit_noveq,No vertex equivalence,968,925,95.56,146.0,5.55,0.658,0.0
-bi,SymSplit,full,symsplit,SymSplit (full),968,925,95.56,78.14,2.96,0.12,0.0
+bi,McSplit,full,mcsplit,McSplit (plain),2369,1050,44.32,257.19,0.0,0.105,0.0
+bi,McSplit,variant,down,Down,2369,1181,49.85,200.31,0.0,0.117,5.53
+bi,McSplit+RL,full,rl,McSplit+RL (full),2369,1082,45.67,141.03,0.0,0.162,0.0
+bi,McSplit+RL,variant,rl_pair,Pair reward,2369,1048,44.24,107.69,0.0,0.195,-1.43
+bi,McSplit+RL,variant,rl_rate,Rate reward,2369,1078,45.5,138.83,0.0,0.168,-0.17
+bi,McSplit+RL,variant,rl_down,Down,2369,1217,51.37,124.88,0.0,0.179,5.7
+bi,McSplit+RL,variant,ll,LL,2369,1123,47.4,123.59,0.0,0.172,1.73
+bi,McSplit+LL,full,ll,McSplit+LL (full),2369,1123,47.4,123.59,0.0,0.172,0.0
+bi,McSplit+LL,variant,ll_lsm,LSM only,2369,1100,46.43,126.1,0.0,0.174,-0.97
+bi,McSplit+LL,variant,ll_lum,LUM only,2369,1128,47.62,131.6,0.0,0.169,0.22
+bi,McSplit+DAL,full,dal,McSplit+DAL (full),2369,1107,46.73,118.36,0.0,0.194,0.0
+bi,McSplit+DAL,variant,dal_rl,RL policy only,2369,1096,46.26,124.31,0.0,0.177,-0.47
+bi,McSplit+DAL,variant,dal_dal,DAL policy only,2369,1048,44.24,77.62,0.0,0.178,-2.49
+bi,McSplit+DSB,full,dsb,McSplit+DSB (full),2369,1043,44.03,218.85,0.0,0.114,0.0
+bi,McSplit+DSB,variant,dsb_never,No DSB,2369,910,38.41,99.53,0.0,0.116,-5.62
+bi,McSplit+DSB,variant,dsb_always,Always DSB,2369,918,38.75,96.59,0.0,0.117,-5.28
+bi,RRSplit,full,rrsplit,RRSplit (full),2369,2217,93.58,151.06,5.71,0.694,0.0
+bi,RRSplit,variant,rrsplit_nomax,No maximality,2369,1913,80.75,178.98,0.0,0.759,-12.83
+bi,RRSplit,variant,rrsplit_nobound,No bound,2369,2085,88.01,146.01,5.51,0.737,-5.57
+bi,RRSplit,variant,rrsplit_noveq,No vertex equivalence,2369,2213,93.41,146.0,5.55,0.711,-0.17
+bi,SymSplit,full,symsplit,SymSplit (full),2369,2235,94.34,104.11,4.24,0.121,0.0
