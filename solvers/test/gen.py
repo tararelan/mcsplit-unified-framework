@@ -1,6 +1,7 @@
 """Random graph generators for testing proof logging.
 
-    gen.py random N P SEED OUT [--labels K] [--directed]   DIMACS, G(n, p)
+    gen.py random N P SEED OUT [--labels K] [--directed] [--loops L]
+                                                           DIMACS, G(n, p), loops on L vertices
     gen.py binary N P SEED OUT [--directed]                MIVIA binary, random 16-bit labels
     gen.py tree N EXTRA SEED OUT                           random tree plus EXTRA edges (many leaves)
     gen.py star HUBS LEAVES EXTRA SEED OUT                 hubs with many leaves (large twin classes)
@@ -20,11 +21,14 @@ def write_dimacs(out, n, edges, labels=None):
             f.write(f"n {i + 1} {l}\n")
 
 
-def random_graph(n, p, seed, out, labels=0, directed=False):
+def random_graph(n, p, seed, out, labels=0, directed=False, loops=0):
     r = random.Random(seed)
     edges = [(i, j) for i in range(n) for j in range(n)
              if i != j and (directed or j > i) and r.random() < p]
-    write_dimacs(out, n, edges, [r.randrange(labels) for _ in range(n)] if labels else None)
+    vertex_labels = [r.randrange(labels) for _ in range(n)] if labels else None
+    # drawn last, so that without loops the graph is the same as before
+    edges += [(v, v) for v in sorted(r.sample(range(n), min(loops, n)))] if loops else []
+    write_dimacs(out, n, edges, vertex_labels)
 
 
 def binary_graph(n, p, seed, out, directed=False):
@@ -88,9 +92,9 @@ def dimacs_to_lad(inp, out):
             adj = [set() for _ in range(n)]
         elif parts and parts[0] == "e":
             i, j = int(parts[1]) - 1, int(parts[2]) - 1
-            if i != j:
-                adj[i].add(j)
-                adj[j].add(i)
+            # a loop is listed once, as the vertex in its own neighbour list
+            adj[i].add(j)
+            adj[j].add(i)
         elif parts and parts[0] == "n":
             raise ValueError("LAD can't hold vertex labels")
     with open(out, "w") as f:
@@ -107,6 +111,7 @@ if __name__ == "__main__":
         a.add_argument(name, type=t)
     a.add_argument("--labels", type=int, default=0)
     a.add_argument("--directed", action="store_true")
+    a.add_argument("--loops", type=int, default=0)
     a = sub.add_parser("binary")
     for name, t in (("n", int), ("p", float), ("seed", int), ("out", str)):
         a.add_argument(name, type=t)
@@ -122,7 +127,7 @@ if __name__ == "__main__":
     a.add_argument("out")
     args = ap.parse_args()
     if args.kind == "random":
-        random_graph(args.n, args.p, args.seed, args.out, args.labels, args.directed)
+        random_graph(args.n, args.p, args.seed, args.out, args.labels, args.directed, args.loops)
     elif args.kind == "binary":
         binary_graph(args.n, args.p, args.seed, args.out, args.directed)
     elif args.kind == "tree":

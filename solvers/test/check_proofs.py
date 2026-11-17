@@ -38,7 +38,15 @@ FAMILIES = {
     "tree": ([], True, True),
     "star": ([], True, True),
     "stored": ([], True, True),
+    # self-loops; written as LAD (like the LV dataset) and as directed DIMACS.
+    # Not checked by CakePB, whose encoder is for loop-free graphs.
+    "loops": ([], True, False),
+    "loops-directed": (["-i"], True, False),
 }
+# families where each answer is also compared with McSplit's
+LOOP_FAMILIES = ("loops", "loops-directed")
+# instance name -> McSplit's size, filled in by main for LOOP_FAMILIES
+OPTIMA = {}
 
 
 def make_instances(family, count, workdir):
@@ -58,6 +66,16 @@ def make_instances(family, count, workdir):
             opts = {"directed": family == "directed", "labels": 3 if family == "labelled" else 0}
             gen.random_graph(n1, r.randint(1, 8) / 10, 2 * i, a + ".dimacs", **opts)
             gen.random_graph(n2, r.randint(1, 8) / 10, 2 * i + 1, b + ".dimacs", **opts)
+            fmt = "-d"
+        elif family in LOOP_FAMILIES:
+            n1 = r.randint(5, 12)
+            n2 = n1 + r.randint(0, 4)
+            # from no loops to a loop on every vertex, but at least one loop
+            l1, l2 = (r.choice([0, 1, 1, n // 3, n // 2, n]) for n in (n1, n2))
+            l1 = max(l1, 1 if l2 == 0 else 0)
+            directed = family == "loops-directed"
+            gen.random_graph(n1, r.randint(1, 8) / 10, 2 * i + 7000, a + ".dimacs", directed=directed, loops=l1)
+            gen.random_graph(n2, r.randint(1, 8) / 10, 2 * i + 7001, b + ".dimacs", directed=directed, loops=l2)
             fmt = "-d"
         elif family == "binary":
             n1 = r.randint(8, 17)
@@ -80,7 +98,7 @@ def make_instances(family, count, workdir):
             os.replace(a + ".dimacs", a + ".tmp")
             os.replace(b + ".dimacs", a + ".dimacs")
             os.replace(a + ".tmp", b + ".dimacs")
-        if FAMILIES[family][2]:
+        if FAMILIES[family][2] or family == "loops":
             gen.dimacs_to_lad(a + ".dimacs", a + ".lad")
             gen.dimacs_to_lad(b + ".dimacs", b + ".lad")
             yield f"{family}{i}", a + ".lad", b + ".lad", "-l"
@@ -107,6 +125,9 @@ def check(args, workdir, algo, family, name, pattern, target, fmt):
     if code != 0:
         return f"solver failed: {out.strip()[-300:]}"
     size = int(out.split()[0])
+    problems = []
+    if name in OPTIMA and size != OPTIMA[name]:
+        problems.append(f"size {size}, McSplit finds {OPTIMA[name]}")
     # the proof's objective counts unmapped vertices of the smaller graph
     with open(prefix + ".opb") as f:
         n_g = next(line for line in f if line.startswith("min:")).count("_null")
@@ -117,7 +138,9 @@ def check(args, workdir, algo, family, name, pattern, target, fmt):
                     args.timeout * 10)
     verdict = next((line for line in out.splitlines() if line.startswith("s ")), out.strip()[-300:])
     if verdict != expected:
-        return f"VeriPB: {verdict!r}, expected {expected!r}"
+        problems.append(f"VeriPB: {verdict!r}, expected {expected!r}")
+    if problems:
+        return "; ".join(problems)
     if use_cake:
         code, out = run([args.cake, pattern, target, elab], args.timeout * 10)
         if f"s VERIFIED MAX CIS SIZE |CIS| = {size}" not in out:
@@ -150,6 +173,12 @@ def main():
     jobs = []
     for family in families:
         instances = list(make_instances(family, args.count, workdir))
+        if family in LOOP_FAMILIES:
+            for name, pattern, target, fmt in instances:
+                cmd = [args.solver, "-q", "-A", "mcsplit"] + ([fmt] if fmt else []) + FAMILIES[family][0] + [pattern, target]
+                code, out = run(cmd, args.timeout)
+                if code == 0:
+                    OPTIMA[name] = int(out.split()[0])
         for algo in algos:
             if algo in UNDIRECTED_ONLY and not FAMILIES[family][1]:
                 continue
