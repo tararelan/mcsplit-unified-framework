@@ -131,6 +131,32 @@ CORE = {
 # unified results are used everywhere else (performance, ablation). validation=True in available() applies this.
 UNSOUND = {("rrsplit", "bi"), ("symsplit", "bi"), ("dal", "mivia"), ("dal", "bi"), ("dal", "lv")}
 
+# RRSplit and SymSplit ignore self-loops (the loop-label line is commented out in both references, and the unified
+# versions start from one unsplit bidomain), so on a graph with a loop their answers cannot be trusted. Their LV results
+# on any pair that touches a looped graph are dropped by load() (mask_loops=True), so those pairs also leave the
+# classification and every comparison built on it. 05_reference_bugs.py and the validation load them unmasked.
+LOOP_UNSOUND = {"rrsplit", "symsplit"}
+_loop_graphs = {}
+
+
+def loop_graphs(ds):
+    """Names of the instance graphs of a dataset that contain a self-loop (LAD files: a vertex listing itself)."""
+    if ds not in _loop_graphs:
+        found = set()
+        folder = REPO / "instances" / "SIP" / "LV"
+        if ds == "lv" and folder.is_dir():
+            for f in folder.iterdir():
+                if not f.is_file() or f.name.startswith("."):
+                    continue
+                lines = f.read_text(errors="ignore").split("\n")
+                for i, line in enumerate(lines[1:int(lines[0]) + 1]):
+                    if str(i) in line.split()[1:]:
+                        found.add(f.name)
+                        break
+        _loop_graphs[ds] = found
+    return _loop_graphs[ds]
+
+
 # Ablation variants (Table 11 of the dissertation): key, label, parent algorithm
 VARIANTS = [
     ("ll_lsm",           "LSM only",              "ll"),
@@ -246,10 +272,10 @@ def _standardise(df, algo):
     return df[keep].drop_duplicates(subset=["a", "b"], keep="first").reset_index(drop=True)
 
 
-def load(algo, ds, need_bidomain=False):
+def load(algo, ds, need_bidomain=False, mask_loops=True):
     """Standard table for one algorithm on one dataset, or None if there is no result file.
     need_bidomain=True skips files that carry no bidomain statistics."""
-    key = (algo, ds, need_bidomain)
+    key = (algo, ds, need_bidomain, mask_loops)
     if key in _cache:
         return _cache[key]
     result = None
@@ -264,6 +290,10 @@ def load(algo, ds, need_bidomain=False):
         if need_bidomain and df["bd_mean"].notna().sum() == 0:
             continue
         df.attrs["source"] = str(path.relative_to(REPO))
+        if mask_loops and ds == "lv" and algo in LOOP_UNSOUND:
+            lg = loop_graphs(ds)
+            df = df[~(df["a"].isin(lg) | df["b"].isin(lg))].copy()
+            df.attrs["source"] = str(path.relative_to(REPO))
         result = df
         break
     _cache[key] = result

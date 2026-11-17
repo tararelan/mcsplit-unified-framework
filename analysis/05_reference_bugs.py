@@ -4,6 +4,10 @@
   DAL       solution-inflating reward bug: the reference reports a larger common subgraph than exists.
   RRSplit   on the directed BI instances the reference writes no result at all (it fails) on almost every pair.
   SymSplit  on BI the reference prints a size that is wrong in BOTH directions (too large and too small).
+  RRSplit and SymSplit (both) ignore self-loops: the loop-label line is commented out in their references, and the
+            unified versions use one unsplit bidomain. On LV, 11 pairs touching a looped graph come out too large (up
+            to 144 vertices too many). Their LV results on the 954 pairs touching a looped graph are not used in
+            the performance analysis (config.LOOP_UNSOUND).
 
 The three defects look different, so every algorithm x dataset is sorted into the same four outcomes. For every
 pair that plain McSplit (exact, unified) solves, McSplit's size is the true optimum. The reference of the algorithm
@@ -15,13 +19,12 @@ under test then either
   - reports LESS      (a finished exact solver cannot undershoot either).
 The unified re-implementation of the same algorithm is checked against the same optimum.
 
-MIVIA and LV are undirected, so RRSplit/SymSplit are expected to behave there: they are the control that shows
-the defect is the direction handling.
+MIVIA is undirected and loop-free, so RRSplit/SymSplit are expected to behave there: it is the control that shows
+the BI defect is the direction handling. LV has no direction but does have loops, so its 11 too-large pairs are the loop defect.
 
 Output (analysis/outputs/reference_bugs/):
   reference_bugs.csv      one row per algorithm x dataset: pairs, then no output / = / > / < the optimum (count and %),
                           the largest excess and shortfall, and the unified implementation's agreement with the optimum
-  reference_bugs.tex      the same table for the paper
   reference_outcomes_<k>.png  one image per algorithm (dal, rrsplit, symsplit): stacked bars of the four outcomes,
                           one bar per dataset, exact counts beside each bar
   reference_bugs.png      reference size against true size (pairs where the reference produced output); points
@@ -45,7 +48,7 @@ OUTCOME_COLORS = {"equal": "#a9c7b8", "larger": "#e07a5f", "smaller": "#5b7fa6",
 
 def compare(k, ds, truth_algo):
     """Per-pair table for one algorithm on one dataset: truth, reference size, unified size. None if no data."""
-    d, t = C.load(k, ds), C.load(truth_algo, ds)
+    d, t = C.load(k, ds, mask_loops=False), C.load(truth_algo, ds)
     if d is None or t is None:
         return None
     t = t[t["done"]][["a", "b", "size"]].rename(columns={"size": "truth"})
@@ -92,14 +95,6 @@ def main():
     t.to_csv(out / "reference_bugs.csv", index=False)
     print("\nreference size vs the true optimum (reference finished and McSplit finished):")
     print(t.to_string(index=False))
-
-    tex = t[["algorithm", "dataset", "pairs", "pct_no_output", "pct_equal", "pct_larger", "pct_smaller",
-             "max_excess", "max_shortfall", "unified_equal", "unified_pairs"]].rename(columns={
-        "pct_no_output": "no output \\%", "pct_equal": "$=$ opt \\%", "pct_larger": "$>$ opt \\%",
-        "pct_smaller": "$<$ opt \\%", "max_excess": "max excess", "max_shortfall": "max shortfall",
-        "unified_equal": "unif. $=$ opt", "unified_pairs": "unif. pairs"})
-    (out / "reference_bugs.tex").write_text(tex.to_latex(index=False, escape=False, float_format="%.1f"))
-    print("  saved", (out / "reference_bugs.tex").relative_to(C.REPO))
 
     ks_ = [k for k in CASES if any((k, ds) in tables for ds in DATASETS)]
     # ---- figure 1: the four outcomes as stacked bars, one image per algorithm, one bar per dataset

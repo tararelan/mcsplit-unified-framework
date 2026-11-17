@@ -1,7 +1,7 @@
 CXX="g++" CXXFLAGS="-O3 -march=native -Wall -std=c++17 -pthread -DDEBUG_RR -I /home/tararelan/work/boost_1_84_0" python3 test/mutants_directed.py
 instances: dstar 30, directed 30   algorithms: 7 (4 RRSplit, 3 SymSplit)
 
-baseline (unmutated): 420/420 verified   [8s]
+baseline (unmutated): 420/420 verified   [10s]
   rrsplit            dstar     verified 30/30
   rrsplit            directed  verified 30/30
   rrsplit_nomax      dstar     verified 30/30
@@ -95,4 +95,4 @@ mutant 4: SymSplit doesn't split bidomains by edge direction   [symsplit.cpp]
   rrsplit_nobound    directed  verified 30/30
 ok SymSplit doesn't split bidomains by edge direction: caught on 178/180
 
-4/4 mutants caught, 159s in total
+4/4 mutants caught, 179s in total

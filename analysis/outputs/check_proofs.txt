@@ -1,4 +1,244 @@
 python3 test/check_proofs.py --solver bin/mcsp 
+FAIL rrsplit loops0: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit-loops0.pbp:1684\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1691 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit -l /tmp/check_proofs_5e4vgkzz/loops0-pattern.lad /tmp/check_proofs_5e4vgkzz/loops0-target.lad
+FAIL rrsplit loops1: size 10, McSplit finds 7; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit-loops1.pbp:1393\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 9.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A rrsplit -l /tmp/check_proofs_5e4vgkzz/loops1-pattern.lad /tmp/check_proofs_5e4vgkzz/loops1-target.lad
+FAIL rrsplit loops2: size 7, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit-loops2.pbp:1016\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1021 in the database.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A rrsplit -l /tmp/check_proofs_5e4vgkzz/loops2-pattern.lad /tmp/check_proofs_5e4vgkzz/loops2-target.lad
+FAIL rrsplit loops3: VeriPB: "reverse unit propagation (RUP) from core and derived database. Rerun with the option '--trace-failed' to see the propagations. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit -l /tmp/check_proofs_5e4vgkzz/loops3-pattern.lad /tmp/check_proofs_5e4vgkzz/loops3-target.lad
+FAIL rrsplit loops4: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A rrsplit -l /tmp/check_proofs_5e4vgkzz/loops4-pattern.lad /tmp/check_proofs_5e4vgkzz/loops4-target.lad
+FAIL rrsplit loops5: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A rrsplit -l /tmp/check_proofs_5e4vgkzz/loops5-pattern.lad /tmp/check_proofs_5e4vgkzz/loops5-target.lad
+FAIL rrsplit loops6: size 5, McSplit finds 4; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit-loops6.pbp:684\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 666 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit -l /tmp/check_proofs_5e4vgkzz/loops6-pattern.lad /tmp/check_proofs_5e4vgkzz/loops6-target.lad
+FAIL rrsplit loops7: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit-loops7.pbp:4289\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 10.', expected 's VERIFIED BOUNDS 7 <= obj <= 7'
+     bin/mcsp -q -A rrsplit -l /tmp/check_proofs_5e4vgkzz/loops7-pattern.lad /tmp/check_proofs_5e4vgkzz/loops7-target.lad
+FAIL rrsplit_nomax loops0: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nomax-loops0.pbp:1684\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1691 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_nomax -l /tmp/check_proofs_5e4vgkzz/loops0-pattern.lad /tmp/check_proofs_5e4vgkzz/loops0-target.lad
+FAIL rrsplit_nomax loops1: size 10, McSplit finds 7; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nomax-loops1.pbp:1393\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 9.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A rrsplit_nomax -l /tmp/check_proofs_5e4vgkzz/loops1-pattern.lad /tmp/check_proofs_5e4vgkzz/loops1-target.lad
+FAIL rrsplit_nomax loops2: size 7, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nomax-loops2.pbp:1016\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1021 in the database.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A rrsplit_nomax -l /tmp/check_proofs_5e4vgkzz/loops2-pattern.lad /tmp/check_proofs_5e4vgkzz/loops2-target.lad
+FAIL rrsplit_nomax loops3: VeriPB: "reverse unit propagation (RUP) from core and derived database. Rerun with the option '--trace-failed' to see the propagations. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_nomax -l /tmp/check_proofs_5e4vgkzz/loops3-pattern.lad /tmp/check_proofs_5e4vgkzz/loops3-target.lad
+FAIL rrsplit_nomax loops4: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A rrsplit_nomax -l /tmp/check_proofs_5e4vgkzz/loops4-pattern.lad /tmp/check_proofs_5e4vgkzz/loops4-target.lad
+FAIL rrsplit_nomax loops5: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A rrsplit_nomax -l /tmp/check_proofs_5e4vgkzz/loops5-pattern.lad /tmp/check_proofs_5e4vgkzz/loops5-target.lad
+FAIL rrsplit_nomax loops6: size 5, McSplit finds 4; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nomax-loops6.pbp:682\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 664 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_nomax -l /tmp/check_proofs_5e4vgkzz/loops6-pattern.lad /tmp/check_proofs_5e4vgkzz/loops6-target.lad
+FAIL rrsplit_nomax loops7: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nomax-loops7.pbp:4289\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 10.', expected 's VERIFIED BOUNDS 7 <= obj <= 7'
+     bin/mcsp -q -A rrsplit_nomax -l /tmp/check_proofs_5e4vgkzz/loops7-pattern.lad /tmp/check_proofs_5e4vgkzz/loops7-target.lad
+FAIL rrsplit_noveq loops0: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_noveq-loops0.pbp:1664\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1691 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_noveq -l /tmp/check_proofs_5e4vgkzz/loops0-pattern.lad /tmp/check_proofs_5e4vgkzz/loops0-target.lad
+FAIL rrsplit_noveq loops1: size 10, McSplit finds 7; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_noveq-loops1.pbp:1327\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 9.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A rrsplit_noveq -l /tmp/check_proofs_5e4vgkzz/loops1-pattern.lad /tmp/check_proofs_5e4vgkzz/loops1-target.lad
+FAIL rrsplit_noveq loops2: size 7, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_noveq-loops2.pbp:996\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1021 in the database.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A rrsplit_noveq -l /tmp/check_proofs_5e4vgkzz/loops2-pattern.lad /tmp/check_proofs_5e4vgkzz/loops2-target.lad
+FAIL rrsplit_noveq loops3: VeriPB: "reverse unit propagation (RUP) from core and derived database. Rerun with the option '--trace-failed' to see the propagations. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_noveq -l /tmp/check_proofs_5e4vgkzz/loops3-pattern.lad /tmp/check_proofs_5e4vgkzz/loops3-target.lad
+FAIL rrsplit_noveq loops4: size 7, McSplit finds 6; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_noveq-loops4.pbp:866\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 891 in the database.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A rrsplit_noveq -l /tmp/check_proofs_5e4vgkzz/loops4-pattern.lad /tmp/check_proofs_5e4vgkzz/loops4-target.lad
+FAIL rrsplit_noveq loops5: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_noveq-loops5.pbp:145\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 8.', expected 's VERIFIED BOUNDS 1 <= obj <= 1'
+     bin/mcsp -q -A rrsplit_noveq -l /tmp/check_proofs_5e4vgkzz/loops5-pattern.lad /tmp/check_proofs_5e4vgkzz/loops5-target.lad
+FAIL rrsplit_noveq loops6: size 5, McSplit finds 4; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_noveq-loops6.pbp:634\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 636 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_noveq -l /tmp/check_proofs_5e4vgkzz/loops6-pattern.lad /tmp/check_proofs_5e4vgkzz/loops6-target.lad
+FAIL rrsplit_noveq loops7: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_noveq-loops7.pbp:4250\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 10.', expected 's VERIFIED BOUNDS 7 <= obj <= 7'
+     bin/mcsp -q -A rrsplit_noveq -l /tmp/check_proofs_5e4vgkzz/loops7-pattern.lad /tmp/check_proofs_5e4vgkzz/loops7-target.lad
+FAIL rrsplit_nobound loops0: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nobound-loops0.pbp:1684\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1691 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_nobound -l /tmp/check_proofs_5e4vgkzz/loops0-pattern.lad /tmp/check_proofs_5e4vgkzz/loops0-target.lad
+FAIL rrsplit_nobound loops1: size 10, McSplit finds 7; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nobound-loops1.pbp:1393\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 9.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A rrsplit_nobound -l /tmp/check_proofs_5e4vgkzz/loops1-pattern.lad /tmp/check_proofs_5e4vgkzz/loops1-target.lad
+FAIL rrsplit_nobound loops2: size 7, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nobound-loops2.pbp:1016\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1021 in the database.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A rrsplit_nobound -l /tmp/check_proofs_5e4vgkzz/loops2-pattern.lad /tmp/check_proofs_5e4vgkzz/loops2-target.lad
+FAIL rrsplit_nobound loops3: VeriPB: "reverse unit propagation (RUP) from core and derived database. Rerun with the option '--trace-failed' to see the propagations. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_nobound -l /tmp/check_proofs_5e4vgkzz/loops3-pattern.lad /tmp/check_proofs_5e4vgkzz/loops3-target.lad
+FAIL rrsplit_nobound loops4: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A rrsplit_nobound -l /tmp/check_proofs_5e4vgkzz/loops4-pattern.lad /tmp/check_proofs_5e4vgkzz/loops4-target.lad
+FAIL rrsplit_nobound loops5: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A rrsplit_nobound -l /tmp/check_proofs_5e4vgkzz/loops5-pattern.lad /tmp/check_proofs_5e4vgkzz/loops5-target.lad
+FAIL rrsplit_nobound loops6: size 5, McSplit finds 4; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nobound-loops6.pbp:684\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 666 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_nobound -l /tmp/check_proofs_5e4vgkzz/loops6-pattern.lad /tmp/check_proofs_5e4vgkzz/loops6-target.lad
+FAIL rrsplit_nobound loops7: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nobound-loops7.pbp:4289\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 10.', expected 's VERIFIED BOUNDS 7 <= obj <= 7'
+     bin/mcsp -q -A rrsplit_nobound -l /tmp/check_proofs_5e4vgkzz/loops7-pattern.lad /tmp/check_proofs_5e4vgkzz/loops7-target.lad
+FAIL symsplit loops0: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit-loops0.pbp:1684\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1691 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A symsplit -l /tmp/check_proofs_5e4vgkzz/loops0-pattern.lad /tmp/check_proofs_5e4vgkzz/loops0-target.lad
+FAIL symsplit loops1: size 10, McSplit finds 7; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit-loops1.pbp:1393\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 9.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A symsplit -l /tmp/check_proofs_5e4vgkzz/loops1-pattern.lad /tmp/check_proofs_5e4vgkzz/loops1-target.lad
+FAIL symsplit loops2: size 7, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit-loops2.pbp:1016\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1021 in the database.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A symsplit -l /tmp/check_proofs_5e4vgkzz/loops2-pattern.lad /tmp/check_proofs_5e4vgkzz/loops2-target.lad
+FAIL symsplit loops3: VeriPB: "reverse unit propagation (RUP) from core and derived database. Rerun with the option '--trace-failed' to see the propagations. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A symsplit -l /tmp/check_proofs_5e4vgkzz/loops3-pattern.lad /tmp/check_proofs_5e4vgkzz/loops3-target.lad
+FAIL symsplit loops4: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A symsplit -l /tmp/check_proofs_5e4vgkzz/loops4-pattern.lad /tmp/check_proofs_5e4vgkzz/loops4-target.lad
+FAIL symsplit loops5: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A symsplit -l /tmp/check_proofs_5e4vgkzz/loops5-pattern.lad /tmp/check_proofs_5e4vgkzz/loops5-target.lad
+FAIL symsplit loops6: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A symsplit -l /tmp/check_proofs_5e4vgkzz/loops6-pattern.lad /tmp/check_proofs_5e4vgkzz/loops6-target.lad
+FAIL symsplit loops7: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A symsplit -l /tmp/check_proofs_5e4vgkzz/loops7-pattern.lad /tmp/check_proofs_5e4vgkzz/loops7-target.lad
+FAIL symsplit_valonly loops0: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_valonly-loops0.pbp:1664\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1691 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A symsplit_valonly -l /tmp/check_proofs_5e4vgkzz/loops0-pattern.lad /tmp/check_proofs_5e4vgkzz/loops0-target.lad
+FAIL symsplit_valonly loops1: size 10, McSplit finds 7; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_valonly-loops1.pbp:1327\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 9.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A symsplit_valonly -l /tmp/check_proofs_5e4vgkzz/loops1-pattern.lad /tmp/check_proofs_5e4vgkzz/loops1-target.lad
+FAIL symsplit_valonly loops2: size 7, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_valonly-loops2.pbp:996\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1021 in the database.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A symsplit_valonly -l /tmp/check_proofs_5e4vgkzz/loops2-pattern.lad /tmp/check_proofs_5e4vgkzz/loops2-target.lad
+FAIL symsplit_valonly loops3: VeriPB: "reverse unit propagation (RUP) from core and derived database. Rerun with the option '--trace-failed' to see the propagations. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A symsplit_valonly -l /tmp/check_proofs_5e4vgkzz/loops3-pattern.lad /tmp/check_proofs_5e4vgkzz/loops3-target.lad
+FAIL symsplit_valonly loops4: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A symsplit_valonly -l /tmp/check_proofs_5e4vgkzz/loops4-pattern.lad /tmp/check_proofs_5e4vgkzz/loops4-target.lad
+FAIL symsplit_valonly loops5: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_valonly-loops5.pbp:145\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 8.', expected 's VERIFIED BOUNDS 1 <= obj <= 1'
+     bin/mcsp -q -A symsplit_valonly -l /tmp/check_proofs_5e4vgkzz/loops5-pattern.lad /tmp/check_proofs_5e4vgkzz/loops5-target.lad
+FAIL symsplit_valonly loops6: size 5, McSplit finds 4; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_valonly-loops6.pbp:631\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 636 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A symsplit_valonly -l /tmp/check_proofs_5e4vgkzz/loops6-pattern.lad /tmp/check_proofs_5e4vgkzz/loops6-target.lad
+FAIL symsplit_valonly loops7: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A symsplit_valonly -l /tmp/check_proofs_5e4vgkzz/loops7-pattern.lad /tmp/check_proofs_5e4vgkzz/loops7-target.lad
+FAIL symsplit_varonly loops0: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_varonly-loops0.pbp:1684\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1691 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A symsplit_varonly -l /tmp/check_proofs_5e4vgkzz/loops0-pattern.lad /tmp/check_proofs_5e4vgkzz/loops0-target.lad
+FAIL symsplit_varonly loops1: size 10, McSplit finds 7; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_varonly-loops1.pbp:1393\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 9.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A symsplit_varonly -l /tmp/check_proofs_5e4vgkzz/loops1-pattern.lad /tmp/check_proofs_5e4vgkzz/loops1-target.lad
+FAIL symsplit_varonly loops2: size 7, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_varonly-loops2.pbp:1016\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1021 in the database.', expected 's VERIFIED BOUNDS 2 <= obj <= 2'
+     bin/mcsp -q -A symsplit_varonly -l /tmp/check_proofs_5e4vgkzz/loops2-pattern.lad /tmp/check_proofs_5e4vgkzz/loops2-target.lad
+FAIL symsplit_varonly loops3: VeriPB: "reverse unit propagation (RUP) from core and derived database. Rerun with the option '--trace-failed' to see the propagations. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A symsplit_varonly -l /tmp/check_proofs_5e4vgkzz/loops3-pattern.lad /tmp/check_proofs_5e4vgkzz/loops3-target.lad
+FAIL symsplit_varonly loops4: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A symsplit_varonly -l /tmp/check_proofs_5e4vgkzz/loops4-pattern.lad /tmp/check_proofs_5e4vgkzz/loops4-target.lad
+FAIL symsplit_varonly loops5: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A symsplit_varonly -l /tmp/check_proofs_5e4vgkzz/loops5-pattern.lad /tmp/check_proofs_5e4vgkzz/loops5-target.lad
+FAIL symsplit_varonly loops6: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A symsplit_varonly -l /tmp/check_proofs_5e4vgkzz/loops6-pattern.lad /tmp/check_proofs_5e4vgkzz/loops6-target.lad
+FAIL symsplit_varonly loops7: solver failed: terminate called after throwing an instance of 'std::logic_error'
+  what():  proof logging: twins with different vertex labels
+     bin/mcsp -q -A symsplit_varonly -l /tmp/check_proofs_5e4vgkzz/loops7-pattern.lad /tmp/check_proofs_5e4vgkzz/loops7-target.lad
+FAIL rrsplit loops-directed0: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit-loops-directed0.pbp:9279\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 9295 in the database.', expected 's VERIFIED BOUNDS 5 <= obj <= 5'
+     bin/mcsp -q -A rrsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed0-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed0-target.dimacs
+FAIL rrsplit loops-directed1: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit-loops-directed1.pbp:2428\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 19.', expected 's VERIFIED BOUNDS 6 <= obj <= 6'
+     bin/mcsp -q -A rrsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed1-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed1-target.dimacs
+FAIL rrsplit loops-directed2: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit-loops-directed2.pbp:1282\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1281 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed2-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed2-target.dimacs
+FAIL rrsplit loops-directed3: size 4, McSplit finds 1; VeriPB: "ting with on constraint on the saved trail. Use the option '--trace-failed' to see which constraints propagate which literals. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 8 <= obj <= 8'
+     bin/mcsp -q -A rrsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed3-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed3-target.dimacs
+FAIL rrsplit loops-directed4: VeriPB: "reverse unit propagation (RUP) from core and derived database. Rerun with the option '--trace-failed' to see the propagations. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A rrsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed4-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed4-target.dimacs
+FAIL rrsplit loops-directed5: size 3, McSplit finds 1; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit-loops-directed5.pbp:67\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1 in the database.', expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A rrsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed5-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed5-target.dimacs
+FAIL rrsplit loops-directed6: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit-loops-directed6.pbp:1516\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1523 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed6-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed6-target.dimacs
+FAIL rrsplit loops-directed7: size 3, McSplit finds 2; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit-loops-directed7.pbp:1498\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 7 in the database.', expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A rrsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed7-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed7-target.dimacs
+FAIL rrsplit_nomax loops-directed0: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nomax-loops-directed0.pbp:9279\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 9295 in the database.', expected 's VERIFIED BOUNDS 5 <= obj <= 5'
+     bin/mcsp -q -A rrsplit_nomax -i -d /tmp/check_proofs_5e4vgkzz/loops-directed0-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed0-target.dimacs
+FAIL rrsplit_nomax loops-directed1: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nomax-loops-directed1.pbp:2428\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 19.', expected 's VERIFIED BOUNDS 6 <= obj <= 6'
+     bin/mcsp -q -A rrsplit_nomax -i -d /tmp/check_proofs_5e4vgkzz/loops-directed1-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed1-target.dimacs
+FAIL rrsplit_nomax loops-directed2: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nomax-loops-directed2.pbp:1282\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1281 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_nomax -i -d /tmp/check_proofs_5e4vgkzz/loops-directed2-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed2-target.dimacs
+FAIL rrsplit_nomax loops-directed3: size 4, McSplit finds 1; VeriPB: "ting with on constraint on the saved trail. Use the option '--trace-failed' to see which constraints propagate which literals. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 8 <= obj <= 8'
+     bin/mcsp -q -A rrsplit_nomax -i -d /tmp/check_proofs_5e4vgkzz/loops-directed3-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed3-target.dimacs
+FAIL rrsplit_nomax loops-directed4: VeriPB: "reverse unit propagation (RUP) from core and derived database. Rerun with the option '--trace-failed' to see the propagations. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A rrsplit_nomax -i -d /tmp/check_proofs_5e4vgkzz/loops-directed4-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed4-target.dimacs
+FAIL rrsplit_nomax loops-directed5: size 3, McSplit finds 1; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nomax-loops-directed5.pbp:67\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1 in the database.', expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A rrsplit_nomax -i -d /tmp/check_proofs_5e4vgkzz/loops-directed5-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed5-target.dimacs
+FAIL rrsplit_nomax loops-directed6: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nomax-loops-directed6.pbp:1516\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1523 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_nomax -i -d /tmp/check_proofs_5e4vgkzz/loops-directed6-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed6-target.dimacs
+FAIL rrsplit_nomax loops-directed7: size 3, McSplit finds 2; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nomax-loops-directed7.pbp:1498\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 7 in the database.', expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A rrsplit_nomax -i -d /tmp/check_proofs_5e4vgkzz/loops-directed7-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed7-target.dimacs
+FAIL rrsplit_noveq loops-directed0: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_noveq-loops-directed0.pbp:9259\n\nCaused by:\n\tProofgoal 9 could not be autoproven. Please add an explicit subproof for proofgoal 9.', expected 's VERIFIED BOUNDS 5 <= obj <= 5'
+     bin/mcsp -q -A rrsplit_noveq -i -d /tmp/check_proofs_5e4vgkzz/loops-directed0-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed0-target.dimacs
+FAIL rrsplit_noveq loops-directed1: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_noveq-loops-directed1.pbp:2408\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 19.', expected 's VERIFIED BOUNDS 6 <= obj <= 6'
+     bin/mcsp -q -A rrsplit_noveq -i -d /tmp/check_proofs_5e4vgkzz/loops-directed1-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed1-target.dimacs
+FAIL rrsplit_noveq loops-directed2: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_noveq-loops-directed2.pbp:1262\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1281 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_noveq -i -d /tmp/check_proofs_5e4vgkzz/loops-directed2-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed2-target.dimacs
+FAIL rrsplit_noveq loops-directed3: size 4, McSplit finds 1; VeriPB: "ting with on constraint on the saved trail. Use the option '--trace-failed' to see which constraints propagate which literals. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 8 <= obj <= 8'
+     bin/mcsp -q -A rrsplit_noveq -i -d /tmp/check_proofs_5e4vgkzz/loops-directed3-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed3-target.dimacs
+FAIL rrsplit_noveq loops-directed4: VeriPB: "reverse unit propagation (RUP) from core and derived database. Rerun with the option '--trace-failed' to see the propagations. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A rrsplit_noveq -i -d /tmp/check_proofs_5e4vgkzz/loops-directed4-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed4-target.dimacs
+FAIL rrsplit_noveq loops-directed5: size 3, McSplit finds 1; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_noveq-loops-directed5.pbp:47\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1 in the database.', expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A rrsplit_noveq -i -d /tmp/check_proofs_5e4vgkzz/loops-directed5-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed5-target.dimacs
+FAIL rrsplit_noveq loops-directed6: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_noveq-loops-directed6.pbp:1496\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1523 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_noveq -i -d /tmp/check_proofs_5e4vgkzz/loops-directed6-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed6-target.dimacs
+FAIL rrsplit_noveq loops-directed7: size 3, McSplit finds 2; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_noveq-loops-directed7.pbp:1461\n\nCaused by:\n\tProofgoal 450 could not be autoproven. Please add an explicit subproof for proofgoal 450.', expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A rrsplit_noveq -i -d /tmp/check_proofs_5e4vgkzz/loops-directed7-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed7-target.dimacs
+FAIL rrsplit_nobound loops-directed0: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nobound-loops-directed0.pbp:9279\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 9295 in the database.', expected 's VERIFIED BOUNDS 5 <= obj <= 5'
+     bin/mcsp -q -A rrsplit_nobound -i -d /tmp/check_proofs_5e4vgkzz/loops-directed0-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed0-target.dimacs
+FAIL rrsplit_nobound loops-directed1: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nobound-loops-directed1.pbp:2428\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 19.', expected 's VERIFIED BOUNDS 6 <= obj <= 6'
+     bin/mcsp -q -A rrsplit_nobound -i -d /tmp/check_proofs_5e4vgkzz/loops-directed1-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed1-target.dimacs
+FAIL rrsplit_nobound loops-directed2: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nobound-loops-directed2.pbp:1282\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1281 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_nobound -i -d /tmp/check_proofs_5e4vgkzz/loops-directed2-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed2-target.dimacs
+FAIL rrsplit_nobound loops-directed3: size 4, McSplit finds 1; VeriPB: "ting with on constraint on the saved trail. Use the option '--trace-failed' to see which constraints propagate which literals. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 8 <= obj <= 8'
+     bin/mcsp -q -A rrsplit_nobound -i -d /tmp/check_proofs_5e4vgkzz/loops-directed3-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed3-target.dimacs
+FAIL rrsplit_nobound loops-directed4: VeriPB: "reverse unit propagation (RUP) from core and derived database. Rerun with the option '--trace-failed' to see the propagations. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A rrsplit_nobound -i -d /tmp/check_proofs_5e4vgkzz/loops-directed4-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed4-target.dimacs
+FAIL rrsplit_nobound loops-directed5: size 3, McSplit finds 1; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nobound-loops-directed5.pbp:67\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1 in the database.', expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A rrsplit_nobound -i -d /tmp/check_proofs_5e4vgkzz/loops-directed5-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed5-target.dimacs
+FAIL rrsplit_nobound loops-directed6: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nobound-loops-directed6.pbp:1516\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1523 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A rrsplit_nobound -i -d /tmp/check_proofs_5e4vgkzz/loops-directed6-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed6-target.dimacs
+FAIL rrsplit_nobound loops-directed7: size 3, McSplit finds 2; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/rrsplit_nobound-loops-directed7.pbp:1498\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 7 in the database.', expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A rrsplit_nobound -i -d /tmp/check_proofs_5e4vgkzz/loops-directed7-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed7-target.dimacs
+FAIL symsplit loops-directed0: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit-loops-directed0.pbp:9279\n\nCaused by:\n\tProofgoal 9 could not be autoproven. Please add an explicit subproof for proofgoal 9.', expected 's VERIFIED BOUNDS 5 <= obj <= 5'
+     bin/mcsp -q -A symsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed0-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed0-target.dimacs
+FAIL symsplit loops-directed1: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit-loops-directed1.pbp:2428\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 19.', expected 's VERIFIED BOUNDS 6 <= obj <= 6'
+     bin/mcsp -q -A symsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed1-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed1-target.dimacs
+FAIL symsplit loops-directed2: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit-loops-directed2.pbp:1282\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1281 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A symsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed2-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed2-target.dimacs
+FAIL symsplit loops-directed3: size 4, McSplit finds 1; VeriPB: "ting with on constraint on the saved trail. Use the option '--trace-failed' to see which constraints propagate which literals. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 8 <= obj <= 8'
+     bin/mcsp -q -A symsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed3-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed3-target.dimacs
+FAIL symsplit loops-directed4: VeriPB: "reverse unit propagation (RUP) from core and derived database. Rerun with the option '--trace-failed' to see the propagations. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A symsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed4-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed4-target.dimacs
+FAIL symsplit loops-directed5: size 3, McSplit finds 1; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit-loops-directed5.pbp:67\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1 in the database.', expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A symsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed5-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed5-target.dimacs
+FAIL symsplit loops-directed6: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit-loops-directed6.pbp:1516\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1523 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A symsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed6-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed6-target.dimacs
+FAIL symsplit loops-directed7: size 3, McSplit finds 2; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit-loops-directed7.pbp:1498\n\nCaused by:\n\tProofgoal 450 could not be autoproven. Please add an explicit subproof for proofgoal 450.', expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A symsplit -i -d /tmp/check_proofs_5e4vgkzz/loops-directed7-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed7-target.dimacs
+FAIL symsplit_valonly loops-directed0: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_valonly-loops-directed0.pbp:9259\n\nCaused by:\n\tProofgoal 9 could not be autoproven. Please add an explicit subproof for proofgoal 9.', expected 's VERIFIED BOUNDS 5 <= obj <= 5'
+     bin/mcsp -q -A symsplit_valonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed0-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed0-target.dimacs
+FAIL symsplit_valonly loops-directed1: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_valonly-loops-directed1.pbp:2408\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 19.', expected 's VERIFIED BOUNDS 6 <= obj <= 6'
+     bin/mcsp -q -A symsplit_valonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed1-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed1-target.dimacs
+FAIL symsplit_valonly loops-directed2: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_valonly-loops-directed2.pbp:1262\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1281 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A symsplit_valonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed2-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed2-target.dimacs
+FAIL symsplit_valonly loops-directed3: size 4, McSplit finds 1; VeriPB: "ting with on constraint on the saved trail. Use the option '--trace-failed' to see which constraints propagate which literals. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 8 <= obj <= 8'
+     bin/mcsp -q -A symsplit_valonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed3-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed3-target.dimacs
+FAIL symsplit_valonly loops-directed4: VeriPB: "reverse unit propagation (RUP) from core and derived database. Rerun with the option '--trace-failed' to see the propagations. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A symsplit_valonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed4-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed4-target.dimacs
+FAIL symsplit_valonly loops-directed5: size 3, McSplit finds 1; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_valonly-loops-directed5.pbp:47\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1 in the database.', expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A symsplit_valonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed5-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed5-target.dimacs
+FAIL symsplit_valonly loops-directed6: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_valonly-loops-directed6.pbp:1496\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1523 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A symsplit_valonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed6-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed6-target.dimacs
+FAIL symsplit_valonly loops-directed7: size 3, McSplit finds 2; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_valonly-loops-directed7.pbp:1461\n\nCaused by:\n\tProofgoal 450 could not be autoproven. Please add an explicit subproof for proofgoal 450.', expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A symsplit_valonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed7-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed7-target.dimacs
+FAIL symsplit_varonly loops-directed0: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_varonly-loops-directed0.pbp:9279\n\nCaused by:\n\tProofgoal 9 could not be autoproven. Please add an explicit subproof for proofgoal 9.', expected 's VERIFIED BOUNDS 5 <= obj <= 5'
+     bin/mcsp -q -A symsplit_varonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed0-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed0-target.dimacs
+FAIL symsplit_varonly loops-directed1: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_varonly-loops-directed1.pbp:2428\n\nCaused by:\n\tThe propagated assignment does not satisfy the constraint with ID 19.', expected 's VERIFIED BOUNDS 6 <= obj <= 6'
+     bin/mcsp -q -A symsplit_varonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed1-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed1-target.dimacs
+FAIL symsplit_varonly loops-directed2: VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_varonly-loops-directed2.pbp:1282\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1281 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A symsplit_varonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed2-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed2-target.dimacs
+FAIL symsplit_varonly loops-directed3: size 4, McSplit finds 1; VeriPB: "ting with on constraint on the saved trail. Use the option '--trace-failed' to see which constraints propagate which literals. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 8 <= obj <= 8'
+     bin/mcsp -q -A symsplit_varonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed3-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed3-target.dimacs
+FAIL symsplit_varonly loops-directed4: VeriPB: "reverse unit propagation (RUP) from core and derived database. Rerun with the option '--trace-failed' to see the propagations. A wrong cutting planes ('pol') derivation earlier in the proof can also cause this; add '--trace-pol' (with a trace option such as '--trace-lines') to trace pol derivations.", expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A symsplit_varonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed4-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed4-target.dimacs
+FAIL symsplit_varonly loops-directed5: size 3, McSplit finds 1; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_varonly-loops-directed5.pbp:67\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1 in the database.', expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A symsplit_varonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed5-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed5-target.dimacs
+FAIL symsplit_varonly loops-directed6: size 6, McSplit finds 5; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_varonly-loops-directed6.pbp:1516\n\nCaused by:\n\tPropagation engine error: The given solution is conflicting with constraint 1523 in the database.', expected 's VERIFIED BOUNDS 3 <= obj <= 3'
+     bin/mcsp -q -A symsplit_varonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed6-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed6-target.dimacs
+FAIL symsplit_varonly loops-directed7: size 3, McSplit finds 2; VeriPB: 'Running VeriPB version 3.0.2\nError: Checking error at /tmp/check_proofs_5e4vgkzz/symsplit_varonly-loops-directed7.pbp:1498\n\nCaused by:\n\tProofgoal 450 could not be autoproven. Please add an explicit subproof for proofgoal 450.', expected 's VERIFIED BOUNDS 4 <= obj <= 4'
+     bin/mcsp -q -A symsplit_varonly -i -d /tmp/check_proofs_5e4vgkzz/loops-directed7-pattern.dimacs /tmp/check_proofs_5e4vgkzz/loops-directed7-target.dimacs
 ok   mcsplit            random    8/8
 ok   down               random    8/8
 ok   rl                 random    8/8
@@ -124,4 +364,49 @@ ok   rrsplit_nobound    star      8/8
 ok   symsplit           star      8/8
 ok   symsplit_valonly   star      8/8
 ok   symsplit_varonly   star      8/8
-1000/1000 verified
+ok   mcsplit            loops     8/8
+ok   down               loops     8/8
+ok   rl                 loops     8/8
+ok   rl_pair            loops     8/8
+ok   rl_rate            loops     8/8
+ok   rl_down            loops     8/8
+ok   ll                 loops     8/8
+ok   ll_lsm             loops     8/8
+ok   ll_lum             loops     8/8
+ok   dal                loops     8/8
+ok   dal_rl             loops     8/8
+ok   dal_dal            loops     8/8
+ok   dsb                loops     8/8
+ok   dsb_always         loops     8/8
+ok   dsb_never          loops     8/8
+FAIL rrsplit            loops     0/8
+FAIL rrsplit_nomax      loops     0/8
+FAIL rrsplit_noveq      loops     0/8
+FAIL rrsplit_nobound    loops     0/8
+FAIL symsplit           loops     0/8
+FAIL symsplit_valonly   loops     0/8
+FAIL symsplit_varonly   loops     0/8
+ok   mcsplit            loops-directed 8/8
+ok   down               loops-directed 8/8
+ok   rl                 loops-directed 8/8
+ok   rl_pair            loops-directed 8/8
+ok   rl_rate            loops-directed 8/8
+ok   rl_down            loops-directed 8/8
+ok   ll                 loops-directed 8/8
+ok   ll_lsm             loops-directed 8/8
+ok   ll_lum             loops-directed 8/8
+ok   dal                loops-directed 8/8
+ok   dal_rl             loops-directed 8/8
+ok   dal_dal            loops-directed 8/8
+ok   dsb                loops-directed 8/8
+ok   dsb_always         loops-directed 8/8
+ok   dsb_never          loops-directed 8/8
+FAIL rrsplit            loops-directed 0/8
+FAIL rrsplit_nomax      loops-directed 0/8
+FAIL rrsplit_noveq      loops-directed 0/8
+FAIL rrsplit_nobound    loops-directed 0/8
+FAIL symsplit           loops-directed 0/8
+FAIL symsplit_valonly   loops-directed 0/8
+FAIL symsplit_varonly   loops-directed 0/8
+1240/1352 verified
+make: *** [Makefile:27: check-proofs] Error 1

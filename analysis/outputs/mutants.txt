@@ -15,3 +15,4 @@ ok down skips the exclude-v branch: caught on 17/24
 ok rl_down skips the exclude-v branch: caught on 17/24
 ok down lower bound one too strong: caught on 38/48
 ok goal constraint not used for pruning: caught on 42/48
+ok mcsplit ignores the loop bit when splitting by label: caught on 16/16
