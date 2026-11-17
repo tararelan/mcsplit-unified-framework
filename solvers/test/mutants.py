@@ -84,6 +84,16 @@ MUTANTS = [
      ['down', 'rl_down']),
 ]
 
+# run on the self-loop families instead, since loops only matter there
+LOOP_MUTANTS = [
+    ("mcsplit ignores the loop bit when splitting by label", "mcsplit.cpp",
+     "    for (unsigned int label : g_sorted.label) left_labels.insert(label);\n",
+     "    for (auto& l : g_sorted.label) l &= ~(1u << 31);\n"
+     "    for (auto& l : h_sorted.label) l &= ~(1u << 31);\n"
+     "    for (unsigned int label : g_sorted.label) left_labels.insert(label);\n",
+     ["mcsplit"]),
+]
+
 
 def build(workdir, name, file, old, new):
     src = os.path.join(workdir, name, "src")
@@ -115,8 +125,11 @@ def main():
     workdir = tempfile.mkdtemp(prefix="mutants_")
     families = ["random", "tree", "star", "stored"]
     instances = [(f,) + inst for f in families for inst in check_proofs.make_instances(f, args.count, workdir)]
+    loop_instances = [(f,) + inst for f in check_proofs.LOOP_FAMILIES
+                      for inst in check_proofs.make_instances(f, args.count, workdir)]
     survived = 0
-    for i, (name, file, old, new, algos) in enumerate(MUTANTS):
+    runs = [(m, instances) for m in MUTANTS] + [(m, loop_instances) for m in LOOP_MUTANTS]
+    for i, ((name, file, old, new, algos), instances) in enumerate(runs):
         binary, err = build(workdir, f"m{i}", file, old, new)
         if err:
             print(f"?? {name}: {err}")
