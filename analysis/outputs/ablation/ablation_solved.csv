@@ -30,6 +30,8 @@ lv,McSplit+RL,variant,rl_rate,Rate reward,533,282,52.91,166.72,0.0,0.236,-1.5
 lv,McSplit+RL,variant,rl_down,Down,533,381,71.48,176.48,0.0,0.487,17.07
 lv,McSplit+RL,variant,ll,LL,533,286,53.66,136.49,0.0,0.308,-0.75
 lv,McSplit+LL,full,ll,McSplit+LL (full),533,286,53.66,136.49,0.0,0.308,0.0
+lv,McSplit+LL,variant,ll_lsm,LSM only,533,292,54.78,163.37,0.0,0.285,1.12
+lv,McSplit+LL,variant,ll_lum,LUM only,533,300,56.29,171.33,0.0,0.279,2.63
 lv,McSplit+DAL,full,dal,McSplit+DAL (full),533,303,56.85,156.86,0.0,0.261,0.0
 lv,McSplit+DSB,full,dsb,McSplit+DSB (full),533,277,51.97,199.69,0.0,0.207,0.0
 lv,RRSplit,full,rrsplit,RRSplit (full),533,409,76.74,294.93,36.95,0.925,0.0
@@ -55,3 +57,5 @@ bi,RRSplit,variant,rrsplit_nomax,No maximality,2369,1913,80.75,178.98,0.0,0.759,
 bi,RRSplit,variant,rrsplit_nobound,No bound,2369,2085,88.01,146.01,5.51,0.737,-5.57
 bi,RRSplit,variant,rrsplit_noveq,No vertex equivalence,2369,2213,93.41,146.0,5.55,0.711,-0.17
 bi,SymSplit,full,symsplit,SymSplit (full),2369,2235,94.34,104.11,4.24,0.121,0.0
+bi,SymSplit,variant,symsplit_varonly,Variable symmetry only,2369,2234,94.3,138.04,5.7,0.119,-0.04
+bi,SymSplit,variant,symsplit_valonly,Value symmetry only,2369,2232,94.22,136.68,6.22,0.121,-0.12

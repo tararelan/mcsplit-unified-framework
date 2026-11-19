@@ -30,6 +30,10 @@
 // direction-aware split in filter_domains_sym
 static bool sym_multiway = false;
 
+// true while mcs_sym runs SymSplit-down (see mcs_sym): each search then only
+// asks whether a mapping of size `goal` exists, so it stops once it has one
+static bool sym_down = false;
+
 // Forward declarations
 static int calc_bound_sym(const std::vector<Bidomain> &domains);
 static void remove_bidomain_sym(std::vector<Bidomain> &domains, int idx);
@@ -43,7 +47,7 @@ std::vector<Bidomain> filter_domains_sym(const std::vector<Bidomain> &d, std::ve
 int find_vertices_with_common_neighbors(const Graph &g, std::vector<int> &eqn_classes);
 bool break_h_sym(const std::vector<int> &arr, int start_idx, int len, int w, const std::vector<int> &h_eqn_classes);
 void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent, std::vector<VtxPair> &current, std::vector<Bidomain> &domains, std::vector<int> &left, std::vector<int> &right, unsigned int goal, Stats &stats, std::chrono::time_point<std::chrono::steady_clock> start_time, std::atomic<bool> &abort_due_to_timeout, const std::vector<int> &g_eqn_classes, const std::vector<int> &h_eqn_classes, std::vector<int> &index_right, int sym_mode, ProofLogger *proof);
-std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h, Stats &stats, std::atomic<bool> &abort_due_to_timeout, int sym_mode = 3, ProofLogger *proof = nullptr);
+std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h, Stats &stats, std::atomic<bool> &abort_due_to_timeout, int sym_mode = 3, ProofLogger *proof = nullptr, bool down = false);
 
 /**
  * Computes the McSplit upper bound on the number of additional vertex
@@ -507,6 +511,18 @@ int find_vertices_with_common_neighbors(const Graph &g, std::vector<int> &eqn_cl
 	for (int v = 0; v < g.n; v++)
 	{
 		std::size_t n_hash = 0, p_hash = 0;
+		// Self-loops are stored as the most significant bit of the vertex
+		// label (graph.cpp), so two vertices with the same neighbours but
+		// only one of them looped are NOT interchangeable. Hash the label so
+		// they never share a class. The reference SymSplit has the loop bit
+		// commented out (reference/symsplit/graph.cpp) and so ignores loops
+		// entirely; with no loops or labels (label 0) nothing extra is
+		// hashed, so the classes are exactly as before.
+		if (g.label[v])
+		{
+			boost::hash_combine(n_hash, g.label[v]);
+			boost::hash_combine(p_hash, g.label[v]);
+		}
 		for (int u = 0; u < g.n; u++)
 		{
 			if (v != u && g.adjmat[v][u])
@@ -667,6 +683,15 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
 		stats.bound_pruned++;
 		if (proof)
 			proof->prune_by_bound(domains, left, right);
+		return;
+	}
+
+	// SymSplit-down only: this search asks whether a mapping of size `goal`
+	// exists, so once the incumbent has reached it there is nothing left to
+	// look for (as McSplit-down's cut in mcsplit-down.cpp)
+	if (sym_down && incumbent.size() == goal)
+	{
+		stats.cut_branches++;
 		return;
 	}
 
@@ -865,9 +890,65 @@ void solve_sym(const Graph &g, const Graph &h, std::vector<VtxPair> &incumbent,
  * @return                     Maximum common induced subgraph as matched vertex pairs,
  *                             indexed into the original unsorted graphs
  */
+/**
+ * Builds the initial bidomains: one per vertex label shared by both graphs,
+ * as McSplit does. A self-loop sets the top bit of a vertex's label, so this
+ * keeps looped and unlooped vertices apart (a looped vertex can only be
+ * matched to a looped one in an induced subgraph). The reference SymSplit
+ * starts from a single bidomain because it drops loops when reading graphs
+ * (the loop line in its add_edge is commented out); on loop-free unlabelled
+ * graphs every label is 0, so this is still that single bidomain.
+ *
+ * index_right[w] is set to w's position in right, as filter_domains_sym and
+ * the sparse partition expect.
+ */
+static std::vector<Bidomain> build_domains_sym(const Graph &g, const Graph &h, std::vector<int> &left,
+											   std::vector<int> &right, std::vector<int> &index_right)
+{
+	std::vector<Bidomain> domains;
+	std::vector<unsigned int> labels;
+	for (unsigned int l : g.label)
+		labels.push_back(l);
+	std::sort(labels.begin(), labels.end());
+	labels.erase(std::unique(labels.begin(), labels.end()), labels.end());
+
+	index_right.assign(h.n, 0);
+	for (unsigned int label : labels)
+	{
+		int start_l = left.size(), start_r = right.size();
+		for (int i = 0; i < g.n; i++)
+			if (g.label[i] == label)
+				left.push_back(i);
+		for (int i = 0; i < h.n; i++)
+			if (h.label[i] == label)
+				right.push_back(i);
+		int left_len = left.size() - start_l, right_len = right.size() - start_r;
+		if (left_len && right_len)
+			domains.push_back({start_l, start_r, left_len, right_len, false});
+		else
+		{
+			// a label only one graph has: those vertices can never be matched
+			left.resize(start_l);
+			right.resize(start_r);
+		}
+	}
+	// H-vertices that can never be matched go after every bidomain, so
+	// that each vertex still has a position in index_right (the sparse
+	// partition looks neighbours up there)
+	std::vector<bool> placed(h.n, false);
+	for (int w : right)
+		placed[w] = true;
+	for (int i = 0; i < h.n; i++)
+		if (!placed[i])
+			right.push_back(i);
+	for (int k = 0; k < (int)right.size(); k++)
+		index_right[right[k]] = k;
+	return domains;
+}
+
 std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h,
                               Stats &stats, std::atomic<bool> &abort_due_to_timeout, int sym_mode,
-                              ProofLogger *proof)
+                              ProofLogger *proof, bool down)
 {
 
 	auto calc_degrees = [](const Graph& g) {
@@ -976,29 +1057,47 @@ std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h,
 		}
 	}
 
-	std::vector<int> index_right(h_sorted.n);
-	for (int i = 0; i < h_sorted.n; i++)
-	{
-		index_right[i] = i;
-	}
-
-	std::vector<int> left, right;
-	for (int i = 0; i < g_sorted.n; i++)
-	{
-		left.push_back(i);
-	}
-	for (int i = 0; i < h_sorted.n; i++)
-	{
-		right.push_back(i);
-	}
-	std::vector<Bidomain> domains;
-	domains.push_back({0, 0, g_sorted.n, h_sorted.n, false});
-
-	std::vector<VtxPair> incumbent, current;
+	std::vector<VtxPair> incumbent;
 	auto start_time = std::chrono::steady_clock::now();
-	solve_sym(g_sorted, h_sorted, incumbent, current, domains, left, right, 1,
-			  stats, start_time, abort_due_to_timeout,
-			  g_eqn_sorted, h_eqn_sorted, index_right, sym_mode, proof);
+	sym_down = down;
+	if (!down)
+	{
+		std::vector<int> left, right, index_right;
+		std::vector<Bidomain> domains = build_domains_sym(g_sorted, h_sorted, left, right, index_right);
+		std::vector<VtxPair> current;
+		solve_sym(g_sorted, h_sorted, incumbent, current, domains, left, right, 1,
+				  stats, start_time, abort_due_to_timeout,
+				  g_eqn_sorted, h_eqn_sorted, index_right, sym_mode, proof);
+	}
+	else
+	{
+		// SymSplit-down: as McSplit-down, try goal sizes |V(g)|, |V(g)|-1,
+		// ... and stop at the first one a mapping of that size exists for.
+		// Each goal is a fresh search with SymSplit's own branching,
+		// symmetry breaking and maximality. Symmetry breaking only removes
+		// mappings that have an isomorphic twin still in the search, so it
+		// is as sound for "is there one of size goal?" as for "what is the
+		// largest?". g is the smaller graph (main swaps for symsplit*).
+		for (int k = 0; k < g_sorted.n; k++)
+		{
+			if (abort_due_to_timeout)
+				break;
+			unsigned int goal = g_sorted.n - k;
+			std::vector<int> left, right, index_right;
+			std::vector<Bidomain> domains = build_domains_sym(g_sorted, h_sorted, left, right, index_right);
+			std::vector<VtxPair> current;
+			if (proof)
+				proof->begin_goal(goal);
+			solve_sym(g_sorted, h_sorted, incumbent, current, domains, left, right, goal,
+					  stats, start_time, abort_due_to_timeout,
+					  g_eqn_sorted, h_eqn_sorted, index_right, sym_mode, proof);
+			if (proof)
+				proof->end_goal();
+			if (incumbent.size() == goal)
+				break;
+		}
+	}
+	sym_down = false;
 
 	for (auto &p : incumbent)
 	{

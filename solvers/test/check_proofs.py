@@ -27,7 +27,7 @@ GENERAL = ["mcsplit", "down", "rl", "rl_pair", "rl_rate", "rl_down", "ll", "ll_l
            "dsb", "dsb_always", "dsb_never"]
 # these ignore direction and labels, so only run on undirected unlabelled instances
 UNDIRECTED_ONLY = ["rrsplit", "rrsplit_nomax", "rrsplit_noveq", "rrsplit_nobound",
-                   "symsplit", "symsplit_valonly", "symsplit_varonly"]
+                   "symsplit", "symsplit_valonly", "symsplit_varonly", "symsplit_down"]
 
 # family -> (solver flags, works with UNDIRECTED_ONLY, LAD so CakePB can check it)
 FAMILIES = {

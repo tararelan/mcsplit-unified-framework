@@ -46,7 +46,7 @@ std::vector<VtxPair> mcs_rr(const Graph &g, const Graph &h, Stats &stats,
 // sym_mode: bitmask - bit 0 = variable symmetry, bit 1 = value symmetry
 std::vector<VtxPair> mcs_sym(const Graph &g, const Graph &h,
 							 Stats &stats, std::atomic<bool> &abort_due_to_timeout, int sym_mode = 3,
-							 ProofLogger *proof = nullptr);
+							 ProofLogger *proof = nullptr, bool down = false);
 
 static char doc[] = "Unified MCS solver";
 static char args_doc[] = "FILENAME1 FILENAME2";
@@ -65,7 +65,7 @@ static struct argp_option options[] = {
 	{"labelled", 'a', 0, 0, "Use both vertex and edge labels"},
 	{"vertex-labelled", 'x', 0, 0, "Use vertex labels only (no edge labels)"},
 	{"timeout", 't', "timeout", 0, "Abort search after this many seconds (0 = no limit)"},
-	{"algorithm", 'A', "algo", 0, "Algorithm to run: mcsplit, down, rl, rl_pair, rl_rate, rl_down, ll, dal, dsb, rrsplit, symsplit"},
+	{"algorithm", 'A', "algo", 0, "Algorithm to run: mcsplit, down, rl, rl_pair, rl_rate, rl_down, ll, dal, dsb, rrsplit, symsplit, symsplit_down"},
 	{"swap-smaller", 's', 0, 0, "Uniform preprocessing: make the smaller graph G for every algorithm (default: each reference's own behaviour)"},
 	{"proof", 'p', "prefix", 0, "Write a VeriPB model and proof to PREFIX.opb and PREFIX.pbp"},
 	{0}};
@@ -210,7 +210,7 @@ int main(int argc, char **argv)
 																	"dal", "dal_rl", "dal_dal",
 																	"dsb", "dsb_always", "dsb_never",
 																	"rrsplit", "rrsplit_nomax", "rrsplit_noveq", "rrsplit_nobound",
-																	"symsplit", "symsplit_valonly", "symsplit_varonly"};
+																	"symsplit", "symsplit_valonly", "symsplit_varonly", "symsplit_down"};
 		if (!proof_algorithms.count(arguments.algorithm))
 		{
 			std::cerr << "Proof logging is not supported for algorithm " << arguments.algorithm << std::endl;
@@ -314,6 +314,8 @@ int main(int argc, char **argv)
 		solution = mcs_sym(g, h, stats, abort_due_to_timeout, 2, proof.get()); // value only
 	else if (arguments.algorithm == "symsplit_varonly")
 		solution = mcs_sym(g, h, stats, abort_due_to_timeout, 1, proof.get()); // variable only
+	else if (arguments.algorithm == "symsplit_down")
+		solution = mcs_sym(g, h, stats, abort_due_to_timeout, 3, proof.get(), true); // SymSplit + McSplit-down goal loop
 
 	else
 		solution = mcs(g, h, multiway, stats, abort_due_to_timeout, proof.get());
